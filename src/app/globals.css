@@ -1,0 +1,831 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens transcribed from apragya.ai's own stylesheet (:root and .dark).
+ * Values are space-separated RGB triples so Tailwind can apply alpha via color-mix.
+ */
+:root {
+  --background: 248 250 252;
+  --surface: 255 255 255;
+  --surface-2: 241 245 249;
+  --border: 226 232 240;
+  --border-subtle: 241 245 249;
+  --text-primary: 15 23 42;
+  --text-secondary: 51 65 85;
+  --text-muted: 100 116 139;
+  --accent: 13 148 136;
+  --accent-hover: 15 118 110;
+  --accent-muted: 204 251 241;
+  --success: 79 122 76;
+  --success-muted: 220 232 215;
+  --warning: 184 134 62;
+  --warning-muted: 243 229 201;
+  --danger: 160 69 69;
+  --danger-muted: 240 218 218;
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: light;
+}
+
+.dark {
+  --background: 19 17 14;
+  --surface: 28 26 22;
+  --surface-2: 42 39 32;
+  --border: 60 56 47;
+  --border-subtle: 42 39 32;
+  --text-primary: 242 239 232;
+  --text-secondary: 168 161 148;
+  --text-muted: 115 110 100;
+  --accent: 56 189 248;
+  --accent-hover: 94 234 212;
+  --accent-muted: 19 78 74;
+  --success: 123 165 120;
+  --success-muted: 30 48 28;
+  --warning: 212 167 101;
+  --warning-muted: 62 44 20;
+  --danger: 196 106 106;
+  --danger-muted: 58 24 24;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-bg: rgb(var(--background));
+  --color-surface: rgb(var(--surface));
+  --color-surface-2: rgb(var(--surface-2));
+  --color-line: rgb(var(--border));
+  --color-line-subtle: rgb(var(--border-subtle));
+  --color-fg: rgb(var(--text-primary));
+  --color-fg-2: rgb(var(--text-secondary));
+  --color-fg-muted: rgb(var(--text-muted));
+  --color-accent: rgb(var(--accent));
+  --color-accent-hover: rgb(var(--accent-hover));
+  --color-accent-muted: rgb(var(--accent-muted));
+  --color-ok: rgb(var(--success));
+  --color-ok-muted: rgb(var(--success-muted));
+  --color-warn: rgb(var(--warning));
+  --color-warn-muted: rgb(var(--warning-muted));
+  --color-bad: rgb(var(--danger));
+  --color-bad-muted: rgb(var(--danger-muted));
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Apragya's signature: the word after the headline verb picks up a teal→emerald wash. */
+@utility brand-gradient-text {
+  background-image: linear-gradient(90deg, rgb(var(--accent)), color-mix(in oklab, rgb(var(--accent)) 55%, #34d399));
+  background-clip: text;
+  color: transparent;
+}
+
+@utility card {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  border-radius: 1rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Signed-in app polish. Apragya's own UI sits on a tinted ground with cards that
+ * lift off it very slightly — enough to read as panels, never as drop shadows.
+ * ------------------------------------------------------------------------ */
+
+/** Every panel in the app is a rounded-2xl surface, so one rule covers them all. */
+.rounded-2xl.border-line.bg-surface,
+.rounded-2xl.bg-surface.border-line {
+  box-shadow:
+    0 1px 2px rgb(var(--text-primary) / 0.04),
+    0 10px 30px -22px rgb(var(--text-primary) / 0.28);
+}
+
+.app-surface thead {
+  background: color-mix(in oklab, rgb(var(--surface-2)) 60%, transparent);
+}
+
+.app-surface tbody tr {
+  transition: background-color 0.15s var(--ease-standard);
+}
+
+.app-surface tbody tr:hover {
+  background: color-mix(in oklab, rgb(var(--surface-2)) 45%, transparent);
+}
+
+/** Inputs and selects share one focus ring rather than four near-identical ones. */
+.app-surface :is(input, select, textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(var(--accent) / 0.16);
+}
+
+/* ---------------------------------------------------------------------------
+ * Density. The live screenshots were taken on a very wide display, so type that
+ * matches them there reads oversized on a laptop. This is the product's own
+ * scale — a step down from the marketing pages, which keep their sizes.
+ *
+ * Overriding the size classes here keeps the ratios intact instead of
+ * re-guessing a number in thirty components. Both families are covered: the
+ * arbitrary values most of the app uses, and Tailwind's named steps, which a
+ * few headings reach for and which the first pass missed entirely — that is why
+ * the workspace greeting stayed large while everything under it shrank.
+ * ------------------------------------------------------------------------ */
+
+/* Named steps. Line height moves with the size so the leading stays in proportion. */
+.app-surface .text-4xl { font-size: 27px; line-height: 1.15; }
+.app-surface .text-3xl { font-size: 23px; line-height: 1.2; }
+.app-surface .text-2xl { font-size: 19px; line-height: 1.25; }
+.app-surface .text-xl { font-size: 16px; line-height: 1.3; }
+.app-surface .text-lg { font-size: 15px; line-height: 1.35; }
+.app-surface .text-base { font-size: 13.5px; line-height: 1.5; }
+.app-surface .text-sm { font-size: 12.5px; line-height: 1.5; }
+.app-surface .text-xs { font-size: 11px; line-height: 1.45; }
+
+/* Arbitrary values, covering every size the product actually uses. */
+.app-surface .text-\[42px\] { font-size: 30px; }
+.app-surface .text-\[40px\] { font-size: 29px; }
+.app-surface .text-\[34px\] { font-size: 25px; }
+.app-surface .text-\[30px\] { font-size: 23px; }
+.app-surface .text-\[28px\] { font-size: 20.5px; }
+.app-surface .text-\[26px\] { font-size: 19.5px; }
+.app-surface .text-\[24px\] { font-size: 18px; }
+.app-surface .text-\[22px\] { font-size: 17px; }
+.app-surface .text-\[20px\] { font-size: 15.5px; }
+.app-surface .text-\[19px\] { font-size: 15px; }
+.app-surface .text-\[18px\] { font-size: 14.5px; }
+.app-surface .text-\[17px\] { font-size: 13.5px; }
+.app-surface .text-\[16px\] { font-size: 13.5px; }
+.app-surface .text-\[15px\] { font-size: 13px; }
+.app-surface .text-\[14px\] { font-size: 12.5px; }
+.app-surface .text-\[13\.5px\] { font-size: 12.5px; }
+.app-surface .text-\[13px\] { font-size: 12px; }
+.app-surface .text-\[12\.5px\] { font-size: 11.5px; }
+.app-surface .text-\[12px\] { font-size: 11px; }
+.app-surface .text-\[11\.5px\] { font-size: 11px; }
+.app-surface .text-\[11px\] { font-size: 10.5px; }
+.app-surface .text-\[10px\] { font-size: 9.5px; }
+
+/*
+ * Below this, text is a label rather than something anyone reads a sentence of,
+ * so it keeps its size — shrinking it further only costs legibility.
+ */
+
+/* Panels and table cells tighten with the type so the rhythm holds. */
+.app-surface .p-8 { padding: 1.4rem; }
+.app-surface .p-7 { padding: 1.25rem; }
+.app-surface .p-6 { padding: 1.05rem; }
+.app-surface .p-5 { padding: 0.9rem; }
+.app-surface :is(td, th).px-6 { padding-inline: 1rem; }
+.app-surface :is(td, th).px-5 { padding-inline: 0.85rem; }
+.app-surface :is(td, th).py-4 { padding-block: 0.62rem; }
+.app-surface :is(td, th).py-3\.5 { padding-block: 0.55rem; }
+.app-surface :is(td, th).py-3 { padding-block: 0.5rem; }
+
+/* ---------------------------------------------------------------------------
+ * Colour. The product ground gets a faint accent wash instead of flat grey, and
+ * the chips that carry meaning stop being uniformly neutral.
+ * ------------------------------------------------------------------------ */
+.app-surface {
+  background-image: radial-gradient(80% 50% at 50% 0%, rgb(var(--accent) / 0.05), transparent 70%);
+}
+
+.app-surface .bg-accent-muted {
+  background-image: linear-gradient(135deg, rgb(var(--accent) / 0.16), rgb(var(--accent) / 0.07));
+}
+
+/*
+ * Tone chips. Categorical information reads faster in colour than in six shades
+ * of grey, so category, auth-type and metric chips each take a hue. Both themes
+ * are defined here because the app's dark mode is a class, not a media query.
+ */
+.tone-teal { background: rgb(20 184 166 / 0.13); color: rgb(13 148 136); }
+.tone-sky { background: rgb(56 189 248 / 0.14); color: rgb(2 132 199); }
+.tone-violet { background: rgb(167 139 250 / 0.16); color: rgb(109 68 220); }
+.tone-amber { background: rgb(245 158 11 / 0.15); color: rgb(180 108 8); }
+.tone-rose { background: rgb(244 63 94 / 0.13); color: rgb(190 40 65); }
+.tone-emerald { background: rgb(16 185 129 / 0.14); color: rgb(4 140 98); }
+.tone-slate { background: rgb(100 116 139 / 0.14); color: rgb(71 85 105); }
+
+.dark .tone-teal { background: rgb(20 184 166 / 0.18); color: rgb(94 234 212); }
+.dark .tone-sky { background: rgb(56 189 248 / 0.18); color: rgb(125 211 252); }
+.dark .tone-violet { background: rgb(167 139 250 / 0.2); color: rgb(196 181 253); }
+.dark .tone-amber { background: rgb(245 158 11 / 0.2); color: rgb(252 211 77); }
+.dark .tone-rose { background: rgb(244 63 94 / 0.18); color: rgb(253 164 175); }
+.dark .tone-emerald { background: rgb(16 185 129 / 0.18); color: rgb(110 231 183); }
+.dark .tone-slate { background: rgb(148 163 184 / 0.18); color: rgb(203 213 225); }
+
+/*
+ * Sidebar icon hues. A rail of twenty identical grey glyphs is a wall to scan;
+ * a stable colour per destination turns it into something you aim at. These set
+ * colour only — the glyphs sit on the rail, not in a chip — and every hue is
+ * defined for both themes because dark mode here is a class, not a media query.
+ */
+.nav-sky { color: rgb(2 132 199); }
+.nav-violet { color: rgb(124 58 237); }
+.nav-amber { color: rgb(180 108 8); }
+.nav-blue { color: rgb(37 99 235); }
+.nav-fuchsia { color: rgb(192 38 211); }
+.nav-orange { color: rgb(217 119 6); }
+.nav-emerald { color: rgb(4 140 98); }
+.nav-indigo { color: rgb(79 70 229); }
+.nav-cyan { color: rgb(8 145 178); }
+.nav-rose { color: rgb(190 40 65); }
+.nav-pink { color: rgb(219 39 119); }
+.nav-teal { color: rgb(13 148 136); }
+.nav-slate { color: rgb(100 116 139); }
+
+.dark .nav-sky { color: rgb(125 211 252); }
+.dark .nav-violet { color: rgb(196 181 253); }
+.dark .nav-amber { color: rgb(252 211 77); }
+.dark .nav-blue { color: rgb(147 197 253); }
+.dark .nav-fuchsia { color: rgb(240 171 252); }
+.dark .nav-orange { color: rgb(253 186 116); }
+.dark .nav-emerald { color: rgb(110 231 183); }
+.dark .nav-indigo { color: rgb(165 180 252); }
+.dark .nav-cyan { color: rgb(103 232 249); }
+.dark .nav-rose { color: rgb(253 164 175); }
+.dark .nav-pink { color: rgb(249 168 212); }
+.dark .nav-teal { color: rgb(94 234 212); }
+.dark .nav-slate { color: rgb(148 163 184); }
+
+/* ---------------------------------------------------------------------------
+ * Motion. Content arrives rather than appearing; rows stagger in behind it; the
+ * things you can click respond. Everything here is off under reduced motion.
+ * ------------------------------------------------------------------------ */
+@keyframes app-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes row-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dialog-enter {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes overlay-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.app-enter {
+  animation: app-enter 0.34s var(--ease-standard) both;
+}
+
+/* Only the first dozen rows stagger — past that it reads as lag, not polish. */
+.app-surface tbody tr:nth-child(-n + 12) {
+  animation: row-enter 0.3s var(--ease-standard) both;
+  animation-delay: calc(var(--row-step, 22ms) * var(--row-index, 0));
+}
+
+.app-surface tbody tr:nth-child(1) { --row-index: 0; }
+.app-surface tbody tr:nth-child(2) { --row-index: 1; }
+.app-surface tbody tr:nth-child(3) { --row-index: 2; }
+.app-surface tbody tr:nth-child(4) { --row-index: 3; }
+.app-surface tbody tr:nth-child(5) { --row-index: 4; }
+.app-surface tbody tr:nth-child(6) { --row-index: 5; }
+.app-surface tbody tr:nth-child(7) { --row-index: 6; }
+.app-surface tbody tr:nth-child(8) { --row-index: 7; }
+.app-surface tbody tr:nth-child(9) { --row-index: 8; }
+.app-surface tbody tr:nth-child(10) { --row-index: 9; }
+.app-surface tbody tr:nth-child(11) { --row-index: 10; }
+.app-surface tbody tr:nth-child(12) { --row-index: 11; }
+
+/* Modals: the overlay fades, the panel rises into it. */
+.app-surface [role='dialog'] {
+  animation: overlay-enter 0.18s var(--ease-standard) both;
+}
+
+.app-surface [role='dialog'] > div {
+  animation: dialog-enter 0.26s var(--ease-standard) both;
+}
+
+/** Cards that navigate somewhere lift a little as the cursor crosses them. */
+.app-surface a.rounded-2xl,
+.app-surface button.rounded-2xl,
+.app-surface a.rounded-xl,
+.app-surface button.rounded-xl {
+  transition:
+    transform 0.18s var(--ease-standard),
+    border-color 0.18s var(--ease-standard),
+    box-shadow 0.18s var(--ease-standard),
+    background-color 0.18s var(--ease-standard);
+}
+
+.app-surface :is(a, button).rounded-2xl:hover {
+  transform: translateY(-2px);
+}
+
+.app-surface button:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+
+.app-surface nav a {
+  transition:
+    background-color 0.15s var(--ease-standard),
+    color 0.15s var(--ease-standard),
+    padding-left 0.15s var(--ease-standard);
+}
+
+.app-surface nav a:hover {
+  padding-left: 0.95rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-surface tbody tr,
+  .app-surface :is(a, button),
+  .app-surface nav a {
+    transition: none;
+  }
+
+  .app-enter,
+  .app-surface tbody tr,
+  .app-surface [role='dialog'],
+  .app-surface [role='dialog'] > div {
+    animation: none;
+  }
+
+  .app-surface :is(a, button).rounded-2xl:hover,
+  .app-surface button:active:not(:disabled) {
+    transform: none;
+  }
+
+  .app-surface nav a:hover {
+    padding-left: 0.75rem;
+  }
+}
+
+/*
+ * The marketing pages use a teal→emerald wash on their primary button; the
+ * product itself uses flat teal, so the same component reads correctly on both.
+ */
+.app-surface .btn-accent {
+  background-image: none;
+  background-color: rgb(var(--accent));
+  box-shadow: 0 1px 2px rgb(var(--accent) / 0.35);
+}
+
+.app-surface .btn-accent:hover:not(:disabled) {
+  background-color: rgb(var(--accent-hover));
+  opacity: 1;
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 28s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee { animation: none; }
+  html { scroll-behavior: auto; }
+}
+
+/*
+ * Agent Studio is a separate product on its own subdomain with its own dark
+ * palette — a cool navy rather than the warm near-black the main app uses.
+ * Scoping the tokens here lets it keep that identity inside this codebase.
+ */
+.agent-studio {
+  --background: 13 27 38;
+  --surface: 16 32 44;
+  --surface-2: 23 43 56;
+  --border: 30 51 66;
+  --border-subtle: 23 43 56;
+  --text-primary: 230 237 243;
+  --text-secondary: 178 194 205;
+  --text-muted: 139 163 176;
+  --accent: 45 212 191;
+  --accent-hover: 94 234 212;
+  --accent-muted: 19 78 74;
+  --success: 52 211 153;
+  --success-muted: 6 78 59;
+  --warning: 251 146 60;
+  --warning-muted: 67 39 14;
+  --danger: 248 113 113;
+  --danger-muted: 69 26 26;
+  color-scheme: dark;
+}
+
+/*
+ * Pitch Pilot ships with its own indigo identity rather than the workspace teal,
+ * so the accent tokens are swapped for the duration of that app only.
+ */
+.pitch-pilot {
+  --accent: 79 70 229;
+  --accent-hover: 99 102 241;
+  --accent-muted: 226 226 253;
+}
+
+.dark .pitch-pilot {
+  --accent: 129 140 248;
+  --accent-hover: 165 180 252;
+  --accent-muted: 42 39 86;
+}
+
+/* ---------------------------------------------------------------------------
+ * Marketing surface: depth, motion, and emphasis for the pages a visitor sees
+ * before signing up. The signed-in app deliberately stays plain.
+ * ------------------------------------------------------------------------ */
+
+/** Layered radial washes — richer than a single gradient, still cheap to paint. */
+@utility mesh {
+  background-image:
+    radial-gradient(60% 55% at 12% 8%, rgb(var(--accent) / 0.18), transparent 60%),
+    radial-gradient(45% 45% at 88% 4%, rgb(52 211 153 / 0.16), transparent 62%),
+    radial-gradient(70% 60% at 50% 100%, rgb(var(--accent) / 0.1), transparent 70%);
+}
+
+/** A hairline gradient border that survives both themes. */
+@utility edge {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--color-surface), var(--color-surface)) padding-box,
+    linear-gradient(140deg, rgb(var(--accent) / 0.45), rgb(var(--border)) 45%, rgb(var(--accent) / 0.25)) border-box;
+}
+
+@utility lift {
+  transition:
+    transform 0.25s var(--ease-standard),
+    box-shadow 0.25s var(--ease-standard),
+    border-color 0.25s var(--ease-standard);
+}
+
+.lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 40px -24px rgb(var(--text-primary) / 0.35);
+}
+
+@utility glow {
+  box-shadow: 0 0 0 1px rgb(var(--accent) / 0.25), 0 20px 60px -28px rgb(var(--accent) / 0.55);
+}
+
+/* Entrance: elements start shifted and fade in once observed. */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s var(--ease-standard),
+    transform 0.6s var(--ease-standard);
+}
+
+.reveal[data-shown='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-float {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 rgb(var(--accent) / 0.45); }
+  70% { box-shadow: 0 0 0 14px rgb(var(--accent) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--accent) / 0); }
+}
+
+.animate-ring {
+  animation: pulse-ring 2.6s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .animate-float,
+  .animate-ring {
+    animation: none;
+  }
+
+  .lift:hover {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * Finish. The layer that makes the marketing surface worth lingering on:
+ * light that moves, surfaces that answer the cursor, and entrances with some
+ * direction to them. Everything here is decoration — it is all switched off
+ * under prefers-reduced-motion, and nothing below changes a layout.
+ * ------------------------------------------------------------------------ */
+
+/**
+ * Aurora. Three slow, offset blooms drifting behind the hero. Only `transform`
+ * and `opacity` animate, so the whole thing stays on the compositor.
+ */
+@keyframes aurora-a {
+  0%, 100% { transform: translate3d(-8%, -6%, 0) scale(1); }
+  50% { transform: translate3d(10%, 8%, 0) scale(1.18); }
+}
+@keyframes aurora-b {
+  0%, 100% { transform: translate3d(12%, 4%, 0) scale(1.1); }
+  50% { transform: translate3d(-10%, -8%, 0) scale(0.92); }
+}
+@keyframes aurora-c {
+  0%, 100% { transform: translate3d(0, 10%, 0) scale(0.95); }
+  50% { transform: translate3d(6%, -6%, 0) scale(1.15); }
+}
+
+.aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aurora::before,
+.aurora::after,
+.aurora > i {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  will-change: transform;
+}
+
+.aurora::before {
+  width: 52%;
+  height: 78%;
+  left: 2%;
+  top: -18%;
+  background: rgb(var(--accent) / 0.34);
+  animation: aurora-a 19s ease-in-out infinite;
+}
+
+.aurora::after {
+  width: 44%;
+  height: 66%;
+  right: 4%;
+  top: -12%;
+  background: rgb(52 211 153 / 0.3);
+  animation: aurora-b 23s ease-in-out infinite;
+}
+
+.aurora > i {
+  width: 56%;
+  height: 62%;
+  left: 24%;
+  bottom: -26%;
+  background: rgb(var(--accent) / 0.22);
+  animation: aurora-c 27s ease-in-out infinite;
+}
+
+/**
+ * Spotlight. A soft highlight that tracks the pointer across a card, plus a
+ * matching rim on the border. `--mx` / `--my` are written by one listener for
+ * the whole page, so hovering a grid of cards costs a single rAF.
+ */
+.spotlight {
+  position: relative;
+  isolation: isolate;
+}
+
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.35s var(--ease-standard);
+  background: radial-gradient(
+    22rem circle at var(--mx, 50%) var(--my, 50%),
+    rgb(var(--accent) / 0.16),
+    transparent 60%
+  );
+}
+
+.spotlight:hover::before {
+  opacity: 1;
+}
+
+/** A light that sweeps across a button once, on hover. */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-120%) skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  transition: transform 0.7s var(--ease-standard);
+}
+
+.shine:hover::after {
+  transform: translateX(120%) skewX(-18deg);
+}
+
+/** Entrances with a direction, so a page does not all arrive the same way. */
+.reveal[data-dir='left'] { transform: translateX(-22px); }
+.reveal[data-dir='right'] { transform: translateX(22px); }
+.reveal[data-dir='scale'] { transform: scale(0.955); }
+.reveal[data-dir='left'][data-shown='true'],
+.reveal[data-dir='right'][data-shown='true'],
+.reveal[data-dir='scale'][data-shown='true'] { transform: none; }
+
+/** Words of a headline, arriving in sequence. */
+@keyframes word-in {
+  from { opacity: 0; transform: translateY(0.5em) rotate(1.5deg); }
+  to { opacity: 1; transform: none; }
+}
+
+.word-in > span {
+  display: inline-block;
+  animation: word-in 0.62s var(--ease-standard) both;
+}
+
+/** The read-progress bar pinned to the top of the marketing pages. */
+.scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 60;
+  height: 2px;
+  transform-origin: left;
+  background: linear-gradient(90deg, rgb(var(--accent)), rgb(52 211 153));
+  transition: transform 0.1s linear;
+}
+
+/** A link whose underline grows from the left rather than blinking on. */
+.underline-grow {
+  position: relative;
+}
+
+.underline-grow::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -3px;
+  height: 1.5px;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left;
+  background: rgb(var(--accent));
+  transition: transform 0.28s var(--ease-standard);
+}
+
+.underline-grow:hover::after {
+  transform: scaleX(1);
+}
+
+/** Tilts a little towards the pointer. Paired with the same listener as .spotlight. */
+.tilt {
+  transition: transform 0.4s var(--ease-standard);
+  transform: perspective(1200px) rotateX(calc((var(--my, 50%) - 50%) * -0.04))
+    rotateY(calc((var(--mx, 50%) - 50%) * 0.045));
+}
+
+/* ------------------------- inside the workspace ------------------------- */
+
+/** The active rail item's marker slides rather than jumping between rows. */
+.app-surface a[aria-current='page']::before,
+.app-surface .nav-active::before {
+  transition: transform 0.3s var(--ease-standard);
+}
+
+/** KPI panels answer the cursor, in the app's quieter register. */
+.app-surface .stat-hover {
+  transition:
+    transform 0.25s var(--ease-standard),
+    box-shadow 0.25s var(--ease-standard),
+    border-color 0.25s var(--ease-standard);
+}
+
+.app-surface .stat-hover:hover {
+  transform: translateY(-2px);
+  border-color: rgb(var(--accent) / 0.4);
+  box-shadow: 0 14px 30px -22px rgb(var(--accent) / 0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before,
+  .aurora::after,
+  .aurora > i,
+  .word-in > span {
+    animation: none;
+  }
+
+  .word-in > span { opacity: 1; }
+
+  .spotlight::before,
+  .shine::after,
+  .tilt,
+  .underline-grow::after,
+  .scroll-progress {
+    transition: none;
+  }
+
+  .tilt { transform: none; }
+  .app-surface .stat-hover:hover { transform: none; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Workspace finish. The app is somewhere people work, so it stays quieter than
+ * the marketing pages — but "quiet" should still mean alive, not inert.
+ * ------------------------------------------------------------------------ */
+
+/** Panels and list rows arrive with the page rather than snapping in. */
+.app-surface .app-enter > * > .grid > *,
+.app-surface .app-enter > .grid > * {
+  animation: row-enter 0.4s var(--ease-standard) both;
+}
+
+.app-surface .app-enter > .grid > *:nth-child(1) { animation-delay: 30ms; }
+.app-surface .app-enter > .grid > *:nth-child(2) { animation-delay: 70ms; }
+.app-surface .app-enter > .grid > *:nth-child(3) { animation-delay: 110ms; }
+.app-surface .app-enter > .grid > *:nth-child(4) { animation-delay: 150ms; }
+.app-surface .app-enter > .grid > *:nth-child(5) { animation-delay: 190ms; }
+
+/**
+ * Every panel in the app answers the cursor a little — the workspace register
+ * of the marketing `lift`: an accent hairline, no shadow theatre. The `:has`
+ * guard means only the innermost panel under the pointer lights up, so nesting
+ * a card inside a card does not light both.
+ */
+.app-surface .rounded-2xl.border {
+  transition:
+    transform 0.22s var(--ease-standard),
+    border-color 0.22s var(--ease-standard),
+    box-shadow 0.22s var(--ease-standard);
+}
+
+.app-surface section.rounded-2xl.border:hover:not(:has(.rounded-2xl.border:hover)),
+.app-surface li.rounded-2xl.border:hover:not(:has(.rounded-2xl.border:hover)),
+.app-surface div.rounded-2xl.border:hover:not(:has(.rounded-2xl.border:hover)) {
+  border-color: rgb(var(--accent) / 0.35);
+  box-shadow: 0 10px 26px -20px rgb(var(--accent) / 0.65);
+}
+
+/** The rail's active item gets a marker that grows into place. */
+@keyframes rail-mark {
+  from { transform: translateY(-50%) scaleY(0); }
+  to { transform: translateY(-50%) scaleY(1); }
+}
+
+.app-surface nav a[class*='before:bg-accent']::before {
+  animation: rail-mark 0.26s var(--ease-standard) both;
+}
+
+/** Rail rows shift a hair towards their label on hover. */
+.app-surface nav a {
+  transition:
+    background-color 0.18s var(--ease-standard),
+    color 0.18s var(--ease-standard),
+    padding-left 0.18s var(--ease-standard);
+}
+
+.app-surface nav a:hover {
+  padding-left: 0.85rem;
+}
+
+/** Icons lean in when you reach for the thing they label. */
+.app-surface button:hover > svg,
+.app-surface a:hover > svg {
+  transform: scale(1.12);
+}
+
+.app-surface svg {
+  transition: transform 0.18s var(--ease-standard);
+}
+
+/** A tab that is being switched to underlines from the middle out. */
+.app-surface nav button[aria-current='page'] {
+  transition: color 0.2s var(--ease-standard);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-surface .app-enter > .grid > *,
+  .app-surface nav a[class*='before:bg-accent']::before {
+    animation: none;
+  }
+
+  .app-surface nav a:hover { padding-left: 0.625rem; }
+
+  .app-surface button:hover > svg,
+  .app-surface a:hover > svg {
+    transform: none;
+  }
+}
