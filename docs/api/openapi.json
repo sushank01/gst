@@ -2859,6 +2859,543 @@
         }
       }
     },
+    "/api/v1/companies/{id}/primary": {
+      "post": {
+        "operationId": "post_api_v1_companies_id_primary",
+        "summary": "Makes this the primary entity.",
+        "description": "Both writes happen in one transaction: the index allows exactly one primary,\nso clearing and setting separately would leave a moment with none.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "companies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/companies/{id}": {
+      "get": {
+        "operationId": "get_api_v1_companies_id_",
+        "summary": "One entity, with the name of its parent.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "companies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "operationId": "patch_api_v1_companies_id_",
+        "summary": "Edits an entity, including where it sits in the hierarchy.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "companies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "currency": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 3,
+                    "description": "ISO 4217 code."
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 2
+                  },
+                  "taxId": {
+                    "type": "string",
+                    "maxLength": 40
+                  }
+                },
+                "required": [
+                  "name",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_api_v1_companies_id_",
+        "summary": "Archives it — refused for the primary entity, and while it has subsidiaries.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "companies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/companies": {
+      "get": {
+        "operationId": "get_api_v1_companies",
+        "summary": "The workspace's legal entities, primary first.",
+        "description": "The primary one is a real row created with the tenant — the prototype\nderived it from the organisation name typed at signup, so the entity every\ndocument was issued against did not exist in storage.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "companies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_v1_companies",
+        "summary": "Adds an entity. Codes are unique per workspace, whatever their case.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "companies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "code": {
+                    "type": "string",
+                    "maxLength": 20
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "country": {
+                    "type": "string",
+                    "maxLength": 2
+                  },
+                  "taxId": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "parentId": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                },
+                "required": [
+                  "name",
+                  "code",
+                  "timezone",
+                  "country",
+                  "taxId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/credits/balance": {
       "get": {
         "operationId": "get_api_v1_credits_balance",
@@ -8860,6 +9397,288 @@
         }
       }
     },
+    "/api/v1/jobs/{id}/attempts": {
+      "get": {
+        "operationId": "get_api_v1_jobs_id_attempts",
+        "summary": "Every attempt at this job.",
+        "description": "The job row keeps only the latest error; these rows keep all of them, so a\njob that failed three different ways can be diagnosed.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "jobs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs/{id}/cancel": {
+      "post": {
+        "operationId": "post_api_v1_jobs_id_cancel",
+        "summary": "Cancels a queued job.",
+        "description": "A running job holds a lease and is refused: cancelling it would leave a\nworker writing results for something the screen says is cancelled.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "jobs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "operationId": "get_api_v1_jobs",
+        "summary": "Queued and finished work, newest first.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "jobs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "queued",
+                "running",
+                "succeeded",
+                "failed",
+                "cancelled",
+                "dead"
+              ]
+            }
+          },
+          {
+            "name": "scheduleId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      }
+    },
     "/api/v1/members/{id}": {
       "patch": {
         "operationId": "patch_api_v1_members_id_",
@@ -9199,6 +10018,244 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/notifications/{id}/read": {
+      "post": {
+        "operationId": "post_api_v1_notifications_id_read",
+        "summary": "Marks one read. Idempotent — reading twice keeps the first timestamp.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all": {
+      "post": {
+        "operationId": "post_api_v1_notifications_read_all",
+        "summary": "Clears this person's badge. Nobody else's.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/notifications": {
+      "get": {
+        "operationId": "get_api_v1_notifications",
+        "summary": "This person's notifications, with their own unread count.",
+        "description": "Per person, not per workspace: the prototype kept one number for the whole\nbrowser, so everybody sharing it saw the same badge and one of them reading\nan item cleared it for all of them.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "unreadOnly",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
       }
     },
     "/api/v1/pos/sales/{id}/void": {
@@ -11885,6 +12942,535 @@
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedules/{id}": {
+      "patch": {
+        "operationId": "patch_api_v1_schedules_id_",
+        "summary": "Edits a schedule. Changing the expression recomputes the next run.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "schedules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "cron": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "overlapPolicy": {
+                    "type": "string",
+                    "enum": [
+                      "skip",
+                      "queue",
+                      "allow"
+                    ]
+                  },
+                  "active": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "cron",
+                  "timezone"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_api_v1_schedules_id_",
+        "summary": "Removes a schedule. Jobs it already produced keep their own history.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "schedules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/schedules/{id}/run": {
+      "post": {
+        "operationId": "post_api_v1_schedules_id_run",
+        "summary": "Runs a schedule now, by enqueuing a real job.",
+        "description": "A null `jobId` means that instant was already queued — reported honestly\nrather than as a fresh run. The prototype's equivalent printed a success\nline and did nothing at all.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "schedules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/schedules/missed": {
+      "get": {
+        "operationId": "get_api_v1_schedules_missed",
+        "summary": "Occurrences that were not run, and why.",
+        "description": "Recorded rather than silently skipped: a schedule that quietly missed a\nnight is indistinguishable from one that ran and did nothing.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "schedules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/schedules": {
+      "get": {
+        "operationId": "get_api_v1_schedules",
+        "summary": "Every schedule, with its real next run and the next few local occurrences.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "schedules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_v1_schedules",
+        "summary": "Creates a schedule, refusing an expression that could never fire.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "schedules"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "kind": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "targetRef": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "payload": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "catchupWindowSeconds": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "name",
+                  "kind",
+                  "timezone",
+                  "targetRef"
+                ],
+                "additionalProperties": false
               }
             }
           }
