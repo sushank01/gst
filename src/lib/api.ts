@@ -121,6 +121,7 @@ export const api = {
   get: <T>(path: string, query?: RequestOptions['query'], signal?: AbortSignal) =>
     apiRequest<T>(path, { query, signal }),
   post: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'POST', body }),
+  put: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'PUT', body }),
   patch: <T>(path: string, body?: unknown) => apiRequest<T>(path, { method: 'PATCH', body }),
   delete: <T>(path: string, query?: RequestOptions['query']) => apiRequest<T>(path, { method: 'DELETE', query }),
 }

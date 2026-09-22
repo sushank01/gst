@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react'
 import { marketApps, mobileApps, webApps } from '../../lib/appData'
 import type { MarketApp, SmallApp } from '../../lib/appData'
 import { agentGroups, agentsByAppCode, totalEnterpriseAgents } from '../../lib/agentCatalog'
-import { useWorkspace } from '../../lib/workspace'
+import { useAppState, useInstallations } from '../../lib/useInstallations'
 import { Dialog } from '../../components/EnterpriseUi'
 
 type TabId = 'enterprise' | 'web' | 'mobile' | 'agents' | 'enterpriseAgents'
@@ -33,61 +33,86 @@ function AppIcon({ icon, tone, size = 'md' }: { icon: string; tone: string; size
   )
 }
 
+/**
+ * Install, disable and uninstall — all against the server.
+ *
+ * The prototype's Install button waited 800ms and pushed a string into a
+ * browser array. Every decision here belongs to the server: whether the plan
+ * has room, whether the application is real, and whether this role may change
+ * it. A refusal is shown with the server's own reason rather than being
+ * swallowed or retried.
+ */
 function InstallControls({ app }: { app: { code: string; gated?: boolean } }) {
-  const { installed, disabledApps, install, uninstall, toggleAppDisabled } = useWorkspace()
-  const [busy, setBusy] = useState(false)
-  const isInstalled = installed.includes(app.code)
+  const { install, uninstall, setEnabled, pending, lastRefusal, entitlement } = useInstallations()
+  const { status, releasable } = useAppState(app.code)
+  const busy = pending === app.code
 
-  if (isInstalled) {
+  if (status === 'installed' || status === 'disabled') {
     return (
-      <div className="flex gap-2">
-        <button
-          onClick={() => toggleAppDisabled(app.code)}
-          title="Disabling keeps the app installed but stops its agents"
-          className={`flex-1 rounded-xl border px-3 py-2 text-[13px] font-medium transition ${
-            disabledApps.includes(app.code)
-              ? 'border-ok/50 text-ok hover:bg-ok-muted/40'
-              : 'border-warn/50 text-warn hover:bg-warn-muted/40'
-          }`}
-        >
-          {disabledApps.includes(app.code) ? '▸ Enable' : '🔒 Disable'}
-        </button>
-        <button
-          onClick={() => uninstall(app.code)}
-          className="flex-1 rounded-xl border border-bad/50 px-3 py-2 text-[13px] font-medium text-bad transition hover:bg-bad-muted/40"
-        >
-          ✕ Uninstall
-        </button>
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <button
+            onClick={() => void setEnabled(app.code, status === 'disabled')}
+            disabled={busy}
+            title="Disabling keeps the app installed and its data intact, but closes it to users"
+            className={`flex-1 rounded-xl border px-3 py-2 text-[13px] font-medium transition disabled:opacity-60 ${
+              status === 'disabled'
+                ? 'border-ok/50 text-ok hover:bg-ok-muted/40'
+                : 'border-warn/50 text-warn hover:bg-warn-muted/40'
+            }`}
+          >
+            {status === 'disabled' ? '▸ Enable' : '🔒 Disable'}
+          </button>
+          <button
+            onClick={() => void uninstall(app.code)}
+            disabled={busy}
+            className="flex-1 rounded-xl border border-bad/50 px-3 py-2 text-[13px] font-medium text-bad transition hover:bg-bad-muted/40 disabled:opacity-60"
+          >
+            ✕ Uninstall
+          </button>
+        </div>
+        {busy && <p className="text-[12px] text-fg-muted">Saving…</p>}
       </div>
     )
   }
 
-  if (app.gated) {
+  /*
+   * Not releasable means the catalogue lists it but nothing is behind it yet.
+   * Saying so is more useful than an Install button that produces an empty
+   * shell, and more honest than "Upgrade", which implies money would fix it.
+   */
+  if (!releasable) {
     return (
-      <Link
-        to="/app/account"
-        title="This app is above your current plan"
-        className="block w-full rounded-xl border border-line px-3 py-2 text-center text-[13px] font-medium text-fg-2 transition hover:bg-surface-2"
+      <p
+        title="This application is in the catalogue but has no implementation behind it yet"
+        className="block w-full rounded-xl border border-line px-3 py-2 text-center text-[13px] font-medium text-fg-muted"
       >
-        ⚡ Upgrade
-      </Link>
+        Not yet available
+      </p>
     )
   }
 
+  const full = entitlement?.remaining === 0
+
   return (
-    <button
-      onClick={async () => {
-        setBusy(true)
-        // The live product quotes a 10–20s install; compressed here.
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        install(app.code)
-        setBusy(false)
-      }}
-      disabled={busy}
-      className="w-full rounded-xl bg-accent px-3 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-    >
-      {busy ? 'Installing…' : '⚡ Install'}
-    </button>
+    <div className="space-y-2">
+      <button
+        onClick={() => void install(app.code)}
+        disabled={busy}
+        className="w-full rounded-xl bg-accent px-3 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+      >
+        {busy ? 'Installing…' : '⚡ Install'}
+      </button>
+      {full && (
+        <p className="text-[12px] text-warn">
+          Your plan covers {entitlement?.appQuota} app(s) and they are all in use.{' '}
+          <Link to="/app/account" className="underline">
+            Manage plan
+          </Link>
+        </p>
+      )}
+      {busy === false && lastRefusal && <p className="text-[12px] text-bad">{lastRefusal}</p>}
+    </div>
   )
 }
 

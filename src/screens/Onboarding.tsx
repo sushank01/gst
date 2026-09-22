@@ -4,8 +4,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from '../lib/router'
 import { Button, Field, Logo } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { ApiClientError } from '../lib/api'
-import { useWorkspace } from '../lib/workspace'
+import { ApiClientError, api } from '../lib/api'
 import { industries, teamSizes } from '../lib/content'
 import { marketApps } from '../lib/appData'
 
@@ -16,7 +15,6 @@ export default function Onboarding() {
   const [params] = useSearchParams()
   const intent = params.get('intent')
   const { session, completeOnboarding } = useAuth()
-  const { install } = useWorkspace()
 
   const [step, setStep] = useState(0)
   const [workspaceName, setWorkspaceName] = useState(session?.user.organization ?? '')
@@ -25,6 +23,12 @@ export default function Onboarding() {
   /* The two apps a new Apragya tenant starts with, pre-selected but changeable. */
   const [apps, setApps] = useState<string[]>(['CRM', 'HR'])
   const [error, setError] = useState<string | null>(null)
+  /*
+   * Distinct from `error`: the workspace WAS created, and something about the
+   * app selection needs saying. Reporting it as an error would tell the user
+   * their sign-up failed when it did not.
+   */
+  const [notice, setNotice] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const toggleApp = (name: string) =>
@@ -57,9 +61,21 @@ export default function Onboarding() {
         teamSize,
         apps: marketApps.filter((app) => apps.includes(app.code)).map((app) => app.name),
       })
-      // App installation is still browser-local state (Loop 12 moves it into
-      // the same transaction as the tenant).
-      apps.forEach(install)
+      /*
+       * Installing the chosen apps is a second server call, reconciling rather
+       * than appending: an app the user unticked is genuinely uninstalled.
+       * It runs AFTER the workspace commits because it needs the session to
+       * be bound to the new tenant, and a failure here must not lose the
+       * workspace that was just created — so it reports rather than throws.
+       */
+      const result = await api.put<{ refused: { appCode: string; reason: string }[] }>('/apps', { apps })
+      if (result.refused.length) {
+        setNotice(
+          `Your workspace is ready. ${result.refused
+            .map((entry) => entry.reason)
+            .join(' ')} You can install the rest from the marketplace later.`,
+        )
+      }
       navigate('/app', { replace: true })
     } catch (error) {
       setError(error instanceof ApiClientError ? error.message : 'We could not create your workspace. Please try again.')
@@ -201,6 +217,13 @@ export default function Onboarding() {
                 </p>
               )}
             </>
+          )}
+
+          {step === steps.length - 1 && error && <p className="mt-4 text-[13px] text-bad">{error}</p>}
+          {notice && (
+            <p className="mt-4 rounded-xl border border-warn/30 bg-warn-muted/40 px-3.5 py-2.5 text-[13px] text-fg-2">
+              {notice}
+            </p>
           )}
 
           <div className="mt-8 flex items-center justify-between">

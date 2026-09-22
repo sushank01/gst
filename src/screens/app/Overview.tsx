@@ -5,6 +5,8 @@ import { Link, useNavigate } from '../../lib/router'
 import { useAuth } from '../../lib/auth'
 import { useWorkspace } from '../../lib/workspace'
 import { marketApps } from '../../lib/appData'
+import { useApps } from '../../lib/useWorkspaceSummary'
+import { WorkspaceSummary } from './WorkspaceSummary'
 import { AppMetricsPanel, OverviewPanel, RunsRangeFilter } from './dashboardPanels'
 import type { RunsRange } from './dashboardPanels'
 
@@ -47,9 +49,34 @@ function TwoFactorBanner() {
   )
 }
 
+/**
+ * The plan card.
+ *
+ * Every number comes from the server: the countdown from the subscription's
+ * stored end date, the credit figures from the ledger, the app count from the
+ * installations. The prototype rendered "13 days left" as a constant and a
+ * credit total that no spend ever moved, so both were wrong from day two.
+ */
 function TrialCard() {
-  const { trialDaysLeft, creditsUsed, creditsTotal, installed, appQuota } = useWorkspace()
-  const pct = Math.min(100, Math.round((creditsUsed / creditsTotal) * 100))
+  const { data, loading, error } = useApps()
+
+  if (loading) {
+    return (
+      <section className="rounded-2xl border border-line bg-surface p-5" aria-busy="true">
+        <p className="text-[13px] text-fg-muted">Loading your plan…</p>
+      </section>
+    )
+  }
+  if (error || !data) {
+    return (
+      <section className="rounded-2xl border border-line bg-surface p-5">
+        <p className="text-[13px] text-fg-2">Your plan details could not be loaded right now.</p>
+      </section>
+    )
+  }
+
+  const { entitlement } = data
+  const installed = data.apps.filter((app) => app.status && app.status !== 'uninstalled').length
 
   return (
     <section className="flex flex-wrap items-center gap-x-10 gap-y-4 rounded-2xl border border-line bg-surface p-5">
@@ -58,37 +85,31 @@ function TrialCard() {
           ✦
         </span>
         <div>
-          <p className="text-[15px] font-semibold">Trial</p>
+          <p className="text-[15px] font-semibold">{entitlement.planName ?? 'No plan'}</p>
           <p className="flex items-center gap-1.5 text-[12px] text-fg-muted">
             <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-warn" />
-            Trial
+            {entitlement.status ?? 'Not subscribed'}
           </p>
         </div>
       </div>
 
-      <p className="flex items-center gap-2 text-[13px] text-fg-2">
-        <span aria-hidden>📅</span>
-        {trialDaysLeft} days left in trial
-      </p>
-
-      <div className="min-w-[14rem]">
-        <div className="flex items-baseline justify-between gap-6 text-[13px]">
-          <span className="flex items-center gap-2 text-fg-2">
-            <span aria-hidden>🪙</span>
-            AI Credits
-          </span>
-          <span className="font-medium">
-            {creditsUsed.toLocaleString()} / {creditsTotal.toLocaleString()}
-          </span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full rounded-full bg-gradient-to-r from-accent to-emerald-400" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
+      {/* Null means there is no trial, which is not the same as a trial ending today. */}
+      {entitlement.trialDaysLeft !== null && (
+        <p className="flex items-center gap-2 text-[13px] text-fg-2">
+          <span aria-hidden>📅</span>
+          {entitlement.trialDaysLeft === 0
+            ? 'Your trial has ended'
+            : `${entitlement.trialDaysLeft} day${entitlement.trialDaysLeft === 1 ? '' : 's'} left in trial`}
+        </p>
+      )}
 
       <p className="text-[13px] text-fg-2">
-        Apps <span className="font-semibold">{installed.length} / {appQuota}</span>{' '}
-        <span className="text-fg-muted">+ 2 included</span>
+        Apps{' '}
+        <span className="font-semibold">
+          {installed}
+          {entitlement.appQuota === null ? '' : ` / ${entitlement.appQuota}`}
+        </span>{' '}
+        {entitlement.appQuota === null && <span className="text-fg-muted">no limit recorded</span>}
       </p>
 
       <Link to="/app/account" className="ml-auto text-[13px] font-medium text-accent hover:underline">
@@ -258,6 +279,7 @@ function DashboardTabs() {
 
       {tab === 'overview' ? (
         <>
+          <WorkspaceSummary />
           <RunsRangeFilter value={range} onChange={setRange} />
           <OverviewPanel range={range} />
         </>

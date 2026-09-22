@@ -29,9 +29,16 @@ export type InstallationRow = {
 
 export type Entitlement = {
   planCode: string | null
+  planName: string | null
+  status: string | null
   appQuota: number | null
   used: number
   remaining: number | null
+  /** A real timestamp from the subscription, not a constant. Null if untrialled. */
+  trialEndsAt: string | null
+  /** Whole days remaining, floored, never negative. Null when there is no trial. */
+  trialDaysLeft: number | null
+  monthlyCredits: number | null
 }
 
 /**
@@ -42,8 +49,15 @@ export type Entitlement = {
  * commercially authorised is decision D4 and is not asserted here.
  */
 export async function entitlement(db: Db, ctx: TenantContext): Promise<Entitlement> {
-  const { rows } = await db.query<{ code: string | null; app_quota: number | null }>(
-    `select p.code, p.app_quota
+  const { rows } = await db.query<{
+    code: string | null
+    name: string | null
+    app_quota: number | null
+    monthly_credits: number | null
+    status: string
+    trial_ends_at: Date | null
+  }>(
+    `select p.code, p.name, p.app_quota, p.monthly_credits, s.status, s.trial_ends_at
        from subscriptions s
        left join plans p on p.id = s.plan_id
       where s.tenant_id = $1 and s.status in ('trialing', 'active')
@@ -56,11 +70,19 @@ export async function entitlement(db: Db, ctx: TenantContext): Promise<Entitleme
   )
   const used = Number(counted[0].n)
   const quota = rows[0]?.app_quota ?? null
+  const trialEnds = rows[0]?.trial_ends_at ? new Date(rows[0].trial_ends_at) : null
   return {
     planCode: rows[0]?.code ?? null,
+    planName: rows[0]?.name ?? null,
+    status: rows[0]?.status ?? null,
     appQuota: quota,
     used,
     remaining: quota === null ? null : Math.max(0, quota - used),
+    trialEndsAt: trialEnds ? trialEnds.toISOString() : null,
+    // Computed from the stored date each time it is asked for. The prototype
+    // rendered "13 days left" as a constant, which was wrong from day two.
+    trialDaysLeft: trialEnds ? Math.max(0, Math.floor((trialEnds.getTime() - ctx.now.getTime()) / 86_400_000)) : null,
+    monthlyCredits: rows[0]?.monthly_credits ?? null,
   }
 }
 

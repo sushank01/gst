@@ -63,7 +63,12 @@ test('installing is idempotent and reinstalling reuses the same row', async () =
 test('QUOTA: the plan limit is enforced, and two installs cannot share the last slot', async () => {
   const { db, ctx } = await workspace(2)
   await installApp(ctx, 'CRM')
-  assert.deepEqual(await entitlement(db, ctx), { planCode: 'starter', appQuota: 2, used: 1, remaining: 1 })
+  const limits = await entitlement(db, ctx)
+  assert.deepEqual(
+    { planCode: limits.planCode, appQuota: limits.appQuota, used: limits.used, remaining: limits.remaining },
+    { planCode: 'starter', appQuota: 2, used: 1, remaining: 1 },
+  )
+  assert.equal(limits.trialDaysLeft, null, 'a subscription with no trial date has no trial, not a default one')
 
   const results = await Promise.allSettled([installApp(ctx, 'HR'), installApp(ctx, 'SUP')])
   assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1, 'only one may take the last slot')
