@@ -9,9 +9,9 @@ one — the asset metrics rows, for example, are served by
 `/api/v1/reports/apps/{code}`. Closing a line means reading the rows behind
 it and deciding what the operation actually needs, not renaming a path.
 
-At this pass: **725 ledger rows**, 132 documented operations,
-21 SERVED, 28 VERIFIED, 2 BLOCKED,
-674 still DISCOVERED.
+At this pass: **725 ledger rows**, 145 documented operations,
+25 SERVED, 28 VERIFIED, 2 BLOCKED,
+670 still DISCOVERED.
 
 ## Sales & POS — 98 endpoint(s)
 
@@ -114,90 +114,6 @@ At this pass: **725 ledger rows**, 132 documented operations,
 - `get /api/v1/apps/POS/appearance` — 1 operation(s): OP-POS-SET-APPEARANCE
 - `post /api/v1/copilot/ask` — 1 operation(s): OP-POS-SET-COPILOT
 
-## Support & Ticketing — 81 endpoint(s)
-
-- `get /api/v1/tenants/{tenantId}/apps/SUP` — 1 operation(s): OP-SUP-APP-INSTALL-GATE
-- `get /api/v1/support/reports/dashboard` — 1 operation(s): OP-SUP-DASH-KPI
-- `get /api/v1/support/reports/breakdown?by=status|priority|category` — 1 operation(s): OP-SUP-DASH-BREAKDOWN
-- `get /api/v1/support/tickets?queue&status&channel&tag&q&cursor&limit&sort` — 1 operation(s): OP-SUP-TICKET-LIST
-- `get /api/v1/support/tickets?queue=all|mine|unassigned` — 1 operation(s): OP-SUP-TICKET-QUEUE-FILTER
-- `get /api/v1/support/tickets?statusId=` — 1 operation(s): OP-SUP-TICKET-STATUS-FILTER
-- `get /api/v1/support/tickets?channelId=` — 1 operation(s): OP-SUP-TICKET-SOURCE-FILTER
-- `get /api/v1/support/tickets?tag=a&tag=b` — 1 operation(s): OP-SUP-TICKET-TAG-FILTER
-- `get /api/v1/support/tickets?q=` — 1 operation(s): OP-SUP-TICKET-SEARCH
-- `post /api/v1/support/ticket-views` — 1 operation(s): OP-SUP-VIEW-SAVE
-- `post /api/v1/support/tickets/{id}/transition` — 1 operation(s): OP-SUP-TICKET-TRANSITION
-- `post /api/v1/support/tickets/{id}/unassign` — 1 operation(s): OP-SUP-TICKET-UNASSIGN
-- `post /api/v1/support/tickets/{id}/sla-waiver` — 1 operation(s): OP-SUP-TICKET-SLA-FLAG
-- `post /api/v1/support/tickets/{id}/messages (visibility=internal)` — 1 operation(s): OP-SUP-TICKET-NOTE
-- `delete /api/v1/support/tickets/{id}` — 1 operation(s): OP-SUP-TICKET-DELETE
-- `get /api/v1/support/kb/articles` — 1 operation(s): OP-SUP-KB-LIST
-- `get /api/v1/support/kb/search?q=&locale=` — 1 operation(s): OP-SUP-KB-SEARCH
-- `get /api/v1/support/kb/articles?categoryId=` — 1 operation(s): OP-SUP-KB-CATEGORY-FILTER
-- `get /api/v1/support/kb/articles?state=` — 1 operation(s): OP-SUP-KB-STATE-FILTER
-- `post /api/v1/support/kb/articles` — 1 operation(s): OP-SUP-KB-CREATE
-- `patch /api/v1/support/kb/articles/{id}` — 1 operation(s): OP-SUP-KB-UPDATE
-- `delete /api/v1/support/kb/articles/{id}` — 1 operation(s): OP-SUP-KB-DELETE
-- `post /api/v1/support/kb/articles/import` — 1 operation(s): OP-SUP-KB-IMPORT-CSV
-- `post /api/v1/support/kb/categories` — 1 operation(s): OP-SUP-KBCAT-CREATE
-- `get /api/v1/support/my/tickets` — 1 operation(s): OP-SUP-REQ-LIST
-- `post /api/v1/support/my/tickets` — 1 operation(s): OP-SUP-REQ-CREATE
-- `get /api/v1/support/canned-responses` — 1 operation(s): OP-SUP-CANNED-LIST
-- `post /api/v1/support/canned-responses` — 1 operation(s): OP-SUP-CANNED-CREATE
-- `delete /api/v1/support/canned-responses/{id}` — 1 operation(s): OP-SUP-CANNED-DELETE
-- `patch /api/v1/support/canned-responses/{id}` — 1 operation(s): OP-SUP-CANNED-UPDATE
-- `get /api/v1/support/reports/{key}` — 1 operation(s): OP-SUP-REPORT-TAB
-- `get /api/v1/support/reports/{key}?from=&to=&tz=` — 1 operation(s): OP-SUP-REPORT-RANGE
-- `get /api/v1/support/reports/sla` — 1 operation(s): OP-SUP-REPORT-SLA
-- `get /api/v1/support/reports/response-times` — 1 operation(s): OP-SUP-REPORT-RESPONSE
-- `get /api/v1/support/reports/reopen-rate` — 1 operation(s): OP-SUP-REPORT-REOPEN
-- `get /api/v1/support/reports/csat` — 1 operation(s): OP-SUP-REPORT-CSAT
-- `get /api/v1/support/reports/nps` — 1 operation(s): OP-SUP-REPORT-NPS
-- `get /api/v1/support/reports/agent-leaderboard` — 1 operation(s): OP-SUP-REPORT-LEADERBOARD
-- `get /api/v1/support/reports/volume-heatmap` — 1 operation(s): OP-SUP-REPORT-HEATMAP
-- `get /api/v1/support/sla-policies` — 1 operation(s): OP-SUP-PLANGATE-SLA
-- `get /api/v1/support/routing-rules` — 1 operation(s): OP-SUP-PLANGATE-ROUTING
-- `get /api/v1/support/field-options?kind=` — 1 operation(s): OP-SUP-FIELD-SUBTAB
-- `post /api/v1/support/field-options` — 1 operation(s): OP-SUP-FIELD-CREATE
-- `patch /api/v1/support/field-options/{id}` — 1 operation(s): OP-SUP-FIELD-UPDATE
-- `delete /api/v1/support/field-options/{id}?reassignTo=` — 1 operation(s): OP-SUP-FIELD-DELETE
-- `post /api/v1/support/field-options/reorder` — 1 operation(s): OP-SUP-FIELD-REORDER
-- `put /api/v1/support/settings/widget` — 1 operation(s): OP-SUP-WIDGET-SAVE
-- `get /api/v1/support/settings/widget/snippet` — 1 operation(s): OP-SUP-WIDGET-COPY-SNIPPET
-- `post /api/v1/public/support/widget/tickets` — 1 operation(s): OP-SUP-WIDGET-INTAKE
-- `put /api/v1/support/settings/csat` — 1 operation(s): OP-SUP-CSAT-SAVE
-- `post /api/v1/support/csat/send-pending` — 1 operation(s): OP-SUP-CSAT-SEND-PENDING
-- `post /api/v1/support/escalation-rules` — 1 operation(s): OP-SUP-ESCALATION-CREATE
-- `delete /api/v1/support/escalation-rules/{id}` — 1 operation(s): OP-SUP-ESCALATION-DELETE
-- `patch /api/v1/support/{ruleType}/{id}` — 1 operation(s): OP-SUP-ESCALATION-TOGGLE
-- `post /api/v1/support/sla/evaluate` — 1 operation(s): OP-SUP-ESCALATION-RUN-DETECTOR
-- `post /api/v1/support/tickets/auto-close` — 1 operation(s): OP-SUP-ESCALATION-RUN-AUTOCLOSE
-- `post /api/v1/support/inbox-accounts` — 1 operation(s): OP-SUP-INBOX-CREATE
-- `delete /api/v1/support/inbox-accounts/{id}` — 1 operation(s): OP-SUP-INBOX-DELETE
-- `post /api/v1/support/inbound-channels` — 1 operation(s): OP-SUP-CHANNEL-CREATE
-- `delete /api/v1/support/inbound-channels/{id}` — 1 operation(s): OP-SUP-CHANNEL-DELETE
-- `post /api/v1/public/support/channels/{endpointId}` — 1 operation(s): OP-SUP-CHANNEL-WEBHOOK-RECEIVE
-- `get /api/v1/support/parse-failures` — 1 operation(s): OP-SUP-PARSE-FAILURES-LIST
-- `post /api/v1/support/parse-failures/{id}/retry` — 1 operation(s): OP-SUP-PARSE-FAILURE-RETRY
-- `post /api/v1/support/business-hours` — 1 operation(s): OP-SUP-BUSINESSHOURS-CREATE
-- `delete /api/v1/support/business-hours/{id}` — 1 operation(s): OP-SUP-BUSINESSHOURS-DELETE
-- `post /api/v1/support/auto-responses` — 1 operation(s): OP-SUP-AUTORESPONSE-CREATE
-- `delete /api/v1/support/auto-responses/{id}` — 1 operation(s): OP-SUP-AUTORESPONSE-DELETE
-- `post /api/v1/support/shift-handoffs` — 1 operation(s): OP-SUP-SHIFTHANDOFF-CREATE
-- `delete /api/v1/support/shift-handoffs/{id}` — 1 operation(s): OP-SUP-SHIFTHANDOFF-DELETE
-- `get /api/v1/support/csat/review-queue?reviewed=` — 1 operation(s): OP-SUP-CSATREVIEW-LIST
-- `get /api/v1/support/csat/review-queue?reviewed=true` — 1 operation(s): OP-SUP-CSATREVIEW-SHOWREVIEWED
-- `post /api/v1/support/csat/{responseId}/review` — 1 operation(s): OP-SUP-CSATREVIEW-RECORD
-- `get /api/v1/support/exports?report=` — 1 operation(s): OP-SUP-EXPORT-REPORT-SELECT
-- `get /api/v1/support/exports?format=csv|xlsx` — 1 operation(s): OP-SUP-EXPORT-FORMAT-SELECT
-- `get /api/v1/support/exports?from=&to=&tz=` — 1 operation(s): OP-SUP-EXPORT-RANGE
-- `post /api/v1/support/exports` — 1 operation(s): OP-SUP-EXPORT-DOWNLOAD
-- `post /api/v1/support/report-schedules` — 1 operation(s): OP-SUP-EXPORT-SCHEDULE-CREATE
-- `delete /api/v1/support/report-schedules/{id}` — 1 operation(s): OP-SUP-EXPORT-SCHEDULE-DELETE
-- `patch /api/v1/crm/contacts/{id} (serviceTier)` — 1 operation(s): OP-SUP-TIERS-ASSIGN
-- `post /api/v1/support/kb/index` — 1 operation(s): OP-SUP-KB-INDEX
-- `get /api/v1/support/agents` — 1 operation(s): OP-SUP-AGENTS-LIST
-
 ## Asset Management — 77 endpoint(s)
 
 - `get /api/v1/assets/metrics` — 4 operation(s): OP-ITAM-DASH-ACTIVE-COUNT, OP-ITAM-DASH-PENDING-REQUESTS, OP-ITAM-DASH-OUT-OF-WARRANTY, OP-ITAM-DASH-LEAVER-HOLDINGS
@@ -277,6 +193,86 @@ At this pass: **725 ledger rows**, 132 documented operations,
 - `patch /api/v1/assets/taxonomies/{key}/entries/{id}` — 1 operation(s): OP-ITAM-TAX-EDIT-LABEL
 - `delete /api/v1/assets/taxonomies/{key}/entries/{id}` — 1 operation(s): OP-ITAM-TAX-DELETE-ENTRY
 - `put /api/v1/assets/taxonomies/{key}/entries` — 1 operation(s): OP-ITAM-TAX-SAVE
+
+## Support & Ticketing — 77 endpoint(s)
+
+- `get /api/v1/tenants/{tenantId}/apps/SUP` — 1 operation(s): OP-SUP-APP-INSTALL-GATE
+- `get /api/v1/support/reports/dashboard` — 1 operation(s): OP-SUP-DASH-KPI
+- `get /api/v1/support/reports/breakdown?by=status|priority|category` — 1 operation(s): OP-SUP-DASH-BREAKDOWN
+- `get /api/v1/support/tickets?queue&status&channel&tag&q&cursor&limit&sort` — 1 operation(s): OP-SUP-TICKET-LIST
+- `get /api/v1/support/tickets?queue=all|mine|unassigned` — 1 operation(s): OP-SUP-TICKET-QUEUE-FILTER
+- `get /api/v1/support/tickets?statusId=` — 1 operation(s): OP-SUP-TICKET-STATUS-FILTER
+- `get /api/v1/support/tickets?channelId=` — 1 operation(s): OP-SUP-TICKET-SOURCE-FILTER
+- `get /api/v1/support/tickets?tag=a&tag=b` — 1 operation(s): OP-SUP-TICKET-TAG-FILTER
+- `get /api/v1/support/tickets?q=` — 1 operation(s): OP-SUP-TICKET-SEARCH
+- `post /api/v1/support/ticket-views` — 1 operation(s): OP-SUP-VIEW-SAVE
+- `post /api/v1/support/tickets/{id}/transition` — 1 operation(s): OP-SUP-TICKET-TRANSITION
+- `post /api/v1/support/tickets/{id}/unassign` — 1 operation(s): OP-SUP-TICKET-UNASSIGN
+- `post /api/v1/support/tickets/{id}/sla-waiver` — 1 operation(s): OP-SUP-TICKET-SLA-FLAG
+- `post /api/v1/support/tickets/{id}/messages (visibility=internal)` — 1 operation(s): OP-SUP-TICKET-NOTE
+- `delete /api/v1/support/tickets/{id}` — 1 operation(s): OP-SUP-TICKET-DELETE
+- `get /api/v1/support/kb/search?q=&locale=` — 1 operation(s): OP-SUP-KB-SEARCH
+- `get /api/v1/support/kb/articles?categoryId=` — 1 operation(s): OP-SUP-KB-CATEGORY-FILTER
+- `get /api/v1/support/kb/articles?state=` — 1 operation(s): OP-SUP-KB-STATE-FILTER
+- `delete /api/v1/support/kb/articles/{id}` — 1 operation(s): OP-SUP-KB-DELETE
+- `post /api/v1/support/kb/articles/import` — 1 operation(s): OP-SUP-KB-IMPORT-CSV
+- `get /api/v1/support/my/tickets` — 1 operation(s): OP-SUP-REQ-LIST
+- `post /api/v1/support/my/tickets` — 1 operation(s): OP-SUP-REQ-CREATE
+- `get /api/v1/support/canned-responses` — 1 operation(s): OP-SUP-CANNED-LIST
+- `post /api/v1/support/canned-responses` — 1 operation(s): OP-SUP-CANNED-CREATE
+- `delete /api/v1/support/canned-responses/{id}` — 1 operation(s): OP-SUP-CANNED-DELETE
+- `patch /api/v1/support/canned-responses/{id}` — 1 operation(s): OP-SUP-CANNED-UPDATE
+- `get /api/v1/support/reports/{key}` — 1 operation(s): OP-SUP-REPORT-TAB
+- `get /api/v1/support/reports/{key}?from=&to=&tz=` — 1 operation(s): OP-SUP-REPORT-RANGE
+- `get /api/v1/support/reports/sla` — 1 operation(s): OP-SUP-REPORT-SLA
+- `get /api/v1/support/reports/response-times` — 1 operation(s): OP-SUP-REPORT-RESPONSE
+- `get /api/v1/support/reports/reopen-rate` — 1 operation(s): OP-SUP-REPORT-REOPEN
+- `get /api/v1/support/reports/csat` — 1 operation(s): OP-SUP-REPORT-CSAT
+- `get /api/v1/support/reports/nps` — 1 operation(s): OP-SUP-REPORT-NPS
+- `get /api/v1/support/reports/agent-leaderboard` — 1 operation(s): OP-SUP-REPORT-LEADERBOARD
+- `get /api/v1/support/reports/volume-heatmap` — 1 operation(s): OP-SUP-REPORT-HEATMAP
+- `get /api/v1/support/sla-policies` — 1 operation(s): OP-SUP-PLANGATE-SLA
+- `get /api/v1/support/routing-rules` — 1 operation(s): OP-SUP-PLANGATE-ROUTING
+- `get /api/v1/support/field-options?kind=` — 1 operation(s): OP-SUP-FIELD-SUBTAB
+- `post /api/v1/support/field-options` — 1 operation(s): OP-SUP-FIELD-CREATE
+- `patch /api/v1/support/field-options/{id}` — 1 operation(s): OP-SUP-FIELD-UPDATE
+- `delete /api/v1/support/field-options/{id}?reassignTo=` — 1 operation(s): OP-SUP-FIELD-DELETE
+- `post /api/v1/support/field-options/reorder` — 1 operation(s): OP-SUP-FIELD-REORDER
+- `put /api/v1/support/settings/widget` — 1 operation(s): OP-SUP-WIDGET-SAVE
+- `get /api/v1/support/settings/widget/snippet` — 1 operation(s): OP-SUP-WIDGET-COPY-SNIPPET
+- `post /api/v1/public/support/widget/tickets` — 1 operation(s): OP-SUP-WIDGET-INTAKE
+- `put /api/v1/support/settings/csat` — 1 operation(s): OP-SUP-CSAT-SAVE
+- `post /api/v1/support/csat/send-pending` — 1 operation(s): OP-SUP-CSAT-SEND-PENDING
+- `post /api/v1/support/escalation-rules` — 1 operation(s): OP-SUP-ESCALATION-CREATE
+- `delete /api/v1/support/escalation-rules/{id}` — 1 operation(s): OP-SUP-ESCALATION-DELETE
+- `patch /api/v1/support/{ruleType}/{id}` — 1 operation(s): OP-SUP-ESCALATION-TOGGLE
+- `post /api/v1/support/sla/evaluate` — 1 operation(s): OP-SUP-ESCALATION-RUN-DETECTOR
+- `post /api/v1/support/tickets/auto-close` — 1 operation(s): OP-SUP-ESCALATION-RUN-AUTOCLOSE
+- `post /api/v1/support/inbox-accounts` — 1 operation(s): OP-SUP-INBOX-CREATE
+- `delete /api/v1/support/inbox-accounts/{id}` — 1 operation(s): OP-SUP-INBOX-DELETE
+- `post /api/v1/support/inbound-channels` — 1 operation(s): OP-SUP-CHANNEL-CREATE
+- `delete /api/v1/support/inbound-channels/{id}` — 1 operation(s): OP-SUP-CHANNEL-DELETE
+- `post /api/v1/public/support/channels/{endpointId}` — 1 operation(s): OP-SUP-CHANNEL-WEBHOOK-RECEIVE
+- `get /api/v1/support/parse-failures` — 1 operation(s): OP-SUP-PARSE-FAILURES-LIST
+- `post /api/v1/support/parse-failures/{id}/retry` — 1 operation(s): OP-SUP-PARSE-FAILURE-RETRY
+- `post /api/v1/support/business-hours` — 1 operation(s): OP-SUP-BUSINESSHOURS-CREATE
+- `delete /api/v1/support/business-hours/{id}` — 1 operation(s): OP-SUP-BUSINESSHOURS-DELETE
+- `post /api/v1/support/auto-responses` — 1 operation(s): OP-SUP-AUTORESPONSE-CREATE
+- `delete /api/v1/support/auto-responses/{id}` — 1 operation(s): OP-SUP-AUTORESPONSE-DELETE
+- `post /api/v1/support/shift-handoffs` — 1 operation(s): OP-SUP-SHIFTHANDOFF-CREATE
+- `delete /api/v1/support/shift-handoffs/{id}` — 1 operation(s): OP-SUP-SHIFTHANDOFF-DELETE
+- `get /api/v1/support/csat/review-queue?reviewed=` — 1 operation(s): OP-SUP-CSATREVIEW-LIST
+- `get /api/v1/support/csat/review-queue?reviewed=true` — 1 operation(s): OP-SUP-CSATREVIEW-SHOWREVIEWED
+- `post /api/v1/support/csat/{responseId}/review` — 1 operation(s): OP-SUP-CSATREVIEW-RECORD
+- `get /api/v1/support/exports?report=` — 1 operation(s): OP-SUP-EXPORT-REPORT-SELECT
+- `get /api/v1/support/exports?format=csv|xlsx` — 1 operation(s): OP-SUP-EXPORT-FORMAT-SELECT
+- `get /api/v1/support/exports?from=&to=&tz=` — 1 operation(s): OP-SUP-EXPORT-RANGE
+- `post /api/v1/support/exports` — 1 operation(s): OP-SUP-EXPORT-DOWNLOAD
+- `post /api/v1/support/report-schedules` — 1 operation(s): OP-SUP-EXPORT-SCHEDULE-CREATE
+- `delete /api/v1/support/report-schedules/{id}` — 1 operation(s): OP-SUP-EXPORT-SCHEDULE-DELETE
+- `patch /api/v1/crm/contacts/{id} (serviceTier)` — 1 operation(s): OP-SUP-TIERS-ASSIGN
+- `post /api/v1/support/kb/index` — 1 operation(s): OP-SUP-KB-INDEX
+- `get /api/v1/support/agents` — 1 operation(s): OP-SUP-AGENTS-LIST
 
 ## Business Suite, Prompt Lab, Agent Studios — 59 endpoint(s)
 
