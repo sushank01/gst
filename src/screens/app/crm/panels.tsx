@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Action, BigEmpty, Card, Chip, SearchBox, Segmented, Select, Toolbar } from '../../../components/AppChrome'
 import { activityTypes, contactTypes, leadSources, leadStatuses, settingsGroups, timeRanges } from '../../../lib/crmData'
 import { CountUp } from '../../../components/CountUp'
@@ -24,6 +24,7 @@ import {
   useContactDuplicates,
   useContacts,
   useDealFilters,
+  useDealOptions,
   useDeals,
   usePartyFilters,
   usePipelines,
@@ -31,6 +32,7 @@ import {
   type CrmActivity,
   type CrmParty,
   type DealFilters,
+  type DealOption,
 } from './records'
 
 function greeting() {
@@ -1216,6 +1218,7 @@ function NewDealDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('0')
   const [currency, setCurrency] = useState('')
+  const [pipelineId, setPipelineId] = useState('')
   const [stage, setStage] = useState('')
   const [account, setAccount] = useState('')
   const [contact, setContact] = useState('')
@@ -1224,7 +1227,15 @@ function NewDealDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const pipeline = pipelines.pipelines.find((entry) => entry.isDefault) ?? pipelines.pipelines[0]
+  /*
+   * A workspace that duplicated a pipeline could filter the board by the copy
+   * but never create into it: this dialog always resolved the default, so the
+   * second pipeline was a board that could only ever be empty.
+   */
+  const pipeline =
+    pipelines.pipelines.find((entry) => entry.id === pipelineId) ??
+    pipelines.pipelines.find((entry) => entry.isDefault) ??
+    pipelines.pipelines[0]
   const chosenCurrency = currency || deals.defaultCurrency || ''
 
   const submit = async () => {
@@ -1236,7 +1247,9 @@ function NewDealDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
         name,
         amount,
         currency: chosenCurrency,
-        pipelineId: stage ? pipeline?.id : undefined,
+        // Always named, so a deal cannot land in the default pipeline because
+        // no stage was picked in the one that was chosen.
+        pipelineId: pipeline?.id,
         stageId: stage || undefined,
         accountId: account || undefined,
         primaryContactId: contact || undefined,
@@ -1278,6 +1291,29 @@ function NewDealDialog({ onClose, onCreated }: { onClose: () => void; onCreated:
             />
           </label>
         </div>
+
+        {pipelines.pipelines.length > 1 && (
+          <label>
+            <span className="text-[13px] text-fg-2">Pipeline</span>
+            <select
+              value={pipeline?.id ?? ''}
+              onChange={(event) => {
+                setPipelineId(event.target.value)
+                // Stage ids belong to one pipeline, so a stage chosen in the
+                // previous one would be refused by the server as not found.
+                setStage('')
+              }}
+              className={fieldClass}
+            >
+              {pipelines.pipelines.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name}
+                  {entry.isDefault ? ' (default)' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <label>
           <span className="text-[13px] text-fg-2">Stage</span>
@@ -1647,7 +1683,24 @@ function NewActivityDialog({
   const activities = useActivities(RECENT_ACTIVITY)
   const contacts = useContacts(PICKER_PAGE)
   const companies = useCompanies(PICKER_PAGE)
-  const deals = useDeals({ ...TOTALS_ONLY, limit: 100 })
+  // Every pipeline's deals, not the board's. An activity may be about any of
+  // them, and the board read answers for one pipeline only.
+  const deals = useDealOptions()
+
+  /*
+   * Grouped by pipeline so two deals called "Renewal" in different pipelines
+   * are told apart in the list. Insertion order is the server's — default
+   * pipeline first, then by name — so the groups do not reshuffle per render.
+   */
+  const dealsByPipeline = useMemo(() => {
+    const groups = new Map<string, DealOption[]>()
+    for (const deal of deals.deals) {
+      const existing = groups.get(deal.pipelineName)
+      if (existing) existing.push(deal)
+      else groups.set(deal.pipelineName, [deal])
+    }
+    return [...groups]
+  }, [deals.deals])
 
   const [kind, setKind] = useState(fixedKind ?? activityTypes[0])
   const [subject, setSubject] = useState('')
@@ -1727,15 +1780,15 @@ function NewActivityDialog({
                 ))}
               </optgroup>
             )}
-            {deals.deals.length > 0 && (
-              <optgroup label="Deals">
-                {deals.deals.map((entry) => (
+            {dealsByPipeline.map(([pipelineName, rows]) => (
+              <optgroup key={pipelineName} label={`Deals · ${pipelineName}`}>
+                {rows.map((entry) => (
                   <option key={entry.id} value={`deal:${entry.id}`}>
                     {entry.name}
                   </option>
                 ))}
               </optgroup>
-            )}
+            ))}
           </select>
           {!contacts.rows.length && !companies.rows.length && !deals.deals.length ? (
             <span className="mt-1 block text-[12px] text-fg-muted">
@@ -1746,7 +1799,7 @@ function NewActivityDialog({
                difference between "it is not there" and "it is not listed". */
             (contacts.total > contacts.rows.length ||
               companies.total > companies.rows.length ||
-              deals.total > deals.deals.length) && (
+              deals.capped) && (
               <span className="mt-1 block text-[12px] text-fg-muted">
                 Only the most recent contacts, accounts and deals are listed here, not every one in the workspace.
               </span>

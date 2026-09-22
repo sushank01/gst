@@ -11,7 +11,7 @@ import {
   listLeads, createLead, updateLead, archiveLead, restoreLead, convertLead, leadSummary,
   listPipelines, createPipeline, tenantCurrency,
   listParties, createParty, updateParty, archiveParty, restoreParty, duplicateParties,
-  listDeals, createDeal, updateDeal, archiveDeal, addDecimals,
+  listDeals, listDealOptions, createDeal, updateDeal, archiveDeal, addDecimals,
   listActivities, createActivity, updateActivity,
 } from '../src/server/services/crm.ts'
 
@@ -286,6 +286,61 @@ test('duplicating a pipeline copies that pipeline stages, not the built-in list'
 
   const copy = await createPipeline(aliceCtx, { name: 'Copy', duplicateOf: source.id })
   assert.equal(copy.stages[0].name, 'Sourced', 'the copy reflects the edited source')
+  await db.close()
+})
+
+test('a deal can be created into a pipeline other than the default one', async () => {
+  const { db, aliceCtx } = await twoTenants()
+  // Seeds the default pipeline, so the one below is genuinely a second.
+  await createDeal(aliceCtx, { name: 'Ordinary', amount: '100.0000', currency: 'USD' })
+  const partner = await createPipeline(aliceCtx, { name: 'Partner deals' })
+
+  // No stage named. It used to answer 404 "That pipeline stage" — the fallback
+  // resolved the DEFAULT pipeline's first stage, which does not belong to the
+  // pipeline that was asked for, so every pipeline but the default one was
+  // impossible to create into from the product.
+  const deal = await createDeal(aliceCtx, {
+    name: 'Reseller rollout',
+    amount: '5000.0000',
+    currency: 'USD',
+    pipelineId: partner.id,
+  })
+  assert.equal(deal.pipelineId, partner.id)
+  assert.equal(deal.stageId, partner.stages[0].id, 'it enters at that pipeline first stage')
+
+  const board = await listDeals(aliceCtx, { pipelineId: partner.id })
+  assert.equal(board.rows.length, 1, 'and it is on that board, not the default one')
+  assert.equal(board.rows[0].id, deal.id)
+  await db.close()
+})
+
+test('the deal picker spans every pipeline, and says when it is not showing them all', async () => {
+  const { db, aliceCtx, malloryCtx } = await twoTenants()
+  await createDeal(aliceCtx, { name: 'House deal', amount: '100.0000', currency: 'USD' })
+  const partner = await createPipeline(aliceCtx, { name: 'Partner deals' })
+  await createDeal(aliceCtx, { name: 'Reseller deal', amount: '200.0000', currency: 'USD', pipelineId: partner.id })
+
+  const all = await listDealOptions(aliceCtx)
+  assert.deepEqual(
+    all.deals.map((deal) => deal.name).sort(),
+    ['House deal', 'Reseller deal'],
+    'an activity can be about any deal, not only one pipeline worth',
+  )
+  assert.equal(all.capped, false, 'two deals under a limit of two hundred are all of them')
+  assert.equal(all.deals.find((deal) => deal.name === 'Reseller deal')?.pipelineName, 'Partner deals')
+
+  // The limit is what the caller asked for, and the flag is measured by reading
+  // one row past it — not inferred from a full page, which would tell a
+  // workspace holding exactly one deal that there were more.
+  const exactly = await listDealOptions(aliceCtx, 2)
+  assert.equal(exactly.deals.length, 2)
+  assert.equal(exactly.capped, false)
+
+  const one = await listDealOptions(aliceCtx, 1)
+  assert.equal(one.deals.length, 1)
+  assert.equal(one.capped, true)
+
+  assert.deepEqual((await listDealOptions(malloryCtx)).deals, [], 'ISOLATION: another workspace sees none of them')
   await db.close()
 })
 

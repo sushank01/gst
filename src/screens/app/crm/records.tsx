@@ -470,6 +470,36 @@ export type NewDeal = {
   source?: string
 }
 
+export type DealOption = { id: string; name: string; pipelineName: string }
+
+/**
+ * Every deal in the workspace, for a target picker.
+ *
+ * Not `useDeals`, which answers for one pipeline because a board is a
+ * pipeline. An activity may be about any deal, and reading the board meant a
+ * workspace with a second pipeline could only ever log one against a deal in
+ * the default.
+ */
+type DealOptions = { deals: DealOption[]; capped: boolean }
+
+export function useDealOptions() {
+  const resource = useResource<DealOptions>(
+    'crm-deal-options',
+    useCallback((signal) => api.get<DealOptions>('/crm/deals/options', undefined, signal), []),
+  )
+  return useMemo(
+    () => ({
+      deals: resource.data?.deals ?? [],
+      /** The server read one row past the limit, so this is measured, not guessed. */
+      capped: resource.data?.capped ?? false,
+      loaded: resource.data !== undefined,
+      loading: resource.loading,
+      error: resource.error,
+    }),
+    [resource],
+  )
+}
+
 /**
  * One pipeline's deals, with the board columns and the KPI totals the server
  * computed over the same filter — so a column header, the row count beside it

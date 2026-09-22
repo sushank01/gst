@@ -1079,6 +1079,40 @@ async function effectivePipeline(
   return rows[0] ?? null
 }
 
+export type DealOption = { id: string; name: string; pipelineName: string }
+
+/**
+ * Every open deal in the workspace, for a picker.
+ *
+ * Deliberately not `listDeals`, which answers for ONE pipeline because a board
+ * is a pipeline. A picker is not: an activity may be about any deal, and using
+ * the board read meant a workspace with a second pipeline could log a call
+ * against a deal in the default one and nothing else. Grouping by pipeline is
+ * the caller's business, so the pipeline's name comes back with each row.
+ */
+export async function listDealOptions(
+  ctx: TenantContext,
+  limit = 200,
+): Promise<{ deals: DealOption[]; capped: boolean }> {
+  ctx.require('record.read')
+  const wanted = Math.min(Math.max(limit, 1), 500)
+  // One more than asked for, so `capped` is something the query answered
+  // rather than an inference from a full page — a workspace with exactly
+  // `wanted` deals is not truncated, and must not be told it is.
+  const { rows } = await ctx.db.query<{ id: string; name: string; pipeline_name: string }>(
+    `select d.id, d.name, p.name as pipeline_name
+       from deals d join pipelines p on p.id = d.pipeline_id
+      where d.tenant_id = $1 and d.archived_at is null and p.archived_at is null
+      order by p.is_default desc, p.name, d.updated_at desc
+      limit $2`,
+    [ctx.tenantId, wanted + 1],
+  )
+  return {
+    deals: rows.slice(0, wanted).map((row) => ({ id: row.id, name: row.name, pipelineName: row.pipeline_name })),
+    capped: rows.length > wanted,
+  }
+}
+
 /**
  * Deals for one pipeline, with per-stage and per-outcome totals.
  *
@@ -1217,16 +1251,41 @@ async function assertParty(tx: Db, ctx: TenantContext, id: string, kind: PartyKi
   if (!rows[0]) throw notFound(kind === 'person' ? 'That contact' : 'That account')
 }
 
+/** The stage a deal enters at in `pipelineId`: the lowest position it has. */
+async function firstStageOf(tx: Db, ctx: TenantContext, pipelineId: string): Promise<string> {
+  const { rows } = await tx.query<{ id: string }>(
+    `select s.id from pipeline_stages s join pipelines p on p.id = s.pipeline_id
+      where s.pipeline_id = $1 and p.tenant_id = $2 and p.archived_at is null
+      order by s.position limit 1`,
+    [pipelineId, ctx.tenantId],
+  )
+  if (!rows[0]) throw notFound('That pipeline')
+  return rows[0].id
+}
+
 export async function createDeal(ctx: TenantContext, input: CreateDealInput): Promise<DealRow> {
   ctx.require('record.create')
 
   return ctx.db.transaction(async (tx) => {
+    /*
+     * A deal named a pipeline but no stage enters at that pipeline's FIRST
+     * stage. Falling back to the default pipeline's first stage — which is
+     * what happened while the two were resolved together — produced a 404
+     * reading "That pipeline stage" for a caller who had never named one,
+     * because the check below requires the stage to belong to the pipeline
+     * that was asked for. That made every pipeline but the default one
+     * impossible to create into.
+     */
     let pipelineId = input.pipelineId ?? null
     let stageId = input.stageId ?? null
-    if (!pipelineId || !stageId) {
-      const fallback = await defaultPipeline(tx, ctx)
-      pipelineId = pipelineId ?? fallback.pipelineId
-      stageId = stageId ?? fallback.stageId
+    if (!stageId) {
+      if (pipelineId) {
+        stageId = await firstStageOf(tx, ctx, pipelineId)
+      } else {
+        const fallback = await defaultPipeline(tx, ctx)
+        pipelineId = fallback.pipelineId
+        stageId = fallback.stageId
+      }
     }
 
     const { rows: stage } = await tx.query<{ id: string; outcome: string; probability: number }>(

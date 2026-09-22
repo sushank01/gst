@@ -11,12 +11,24 @@ import { useSearchParams } from '../lib/router'
 
 export type ChromeTab = { id: string; icon: string; label: string }
 
+/*
+ * `trialDaysLeft` is `number | null`, and null is the ordinary answer: a
+ * workspace that never had a trial, and every workspace for the moment before
+ * GET /apps replies. The prop used to be a plain `number` with the callers
+ * writing `?? 0`, so both of those read "Trial · 0 days left" — a countdown
+ * over a trial that does not exist, contradicting the sidebar three
+ * centimetres away, which has always hidden the pill for null.
+ *
+ * `version` has no default. It used to default to 'v1.0.0'; nothing in the
+ * product tracks a version for an application, so every app asserted the same
+ * invented one.
+ */
 export function AppChrome({
   icon,
   tone,
   name,
   blurb,
-  version = 'v1.0.0',
+  version,
   trialDaysLeft,
   tabs,
   children,
@@ -26,7 +38,7 @@ export function AppChrome({
   name: string
   blurb: string
   version?: string
-  trialDaysLeft: number
+  trialDaysLeft: number | null
   tabs: readonly ChromeTab[]
   children: (tab: string) => ReactNode
 }) {
@@ -44,13 +56,15 @@ export function AppChrome({
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
             <p className="mt-1 text-[14px] text-fg-muted">{blurb}</p>
-            <p className="mt-0.5 text-[13px] text-fg-muted">{version}</p>
+            {version && <p className="mt-0.5 text-[13px] text-fg-muted">{version}</p>}
           </div>
         </div>
 
-        <span className="rounded-full bg-warn-muted px-3.5 py-1.5 text-[13px] font-medium text-warn">
-          Trial · {trialDaysLeft} days left
-        </span>
+        {trialDaysLeft !== null && (
+          <span className="rounded-full bg-warn-muted px-3.5 py-1.5 text-[13px] font-medium text-warn">
+            {trialDaysLeft === 0 ? 'Trial ended' : `Trial · ${trialDaysLeft} day${trialDaysLeft === 1 ? '' : 's'} left`}
+          </span>
+        )}
       </header>
 
       <nav aria-label={`${name} sections`} className="mt-5 flex flex-wrap gap-1 border-b border-line pb-3">

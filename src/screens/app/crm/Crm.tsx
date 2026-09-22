@@ -45,7 +45,7 @@ export default function Crm() {
       tone="bg-blue-500"
       name="CRM"
       blurb="Manage your sales pipeline, track deals, and close more revenue"
-      trialDaysLeft={entitlement?.trialDaysLeft ?? 0}
+      trialDaysLeft={entitlement?.trialDaysLeft ?? null}
       tabs={crmTabs}
     >
       {(tab) => {
