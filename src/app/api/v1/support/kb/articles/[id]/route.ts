@@ -1,6 +1,6 @@
 import { tenantRoute, jsonBody, pathSegment, searchParams } from '../../../../../../../server/http/handler.ts'
 import { parseOrThrow, z, optionalTrimmed, uuid } from '../../../../../../../server/http/validate.ts'
-import { readArticle, recordArticleView, updateArticle } from '../../../../../../../server/services/knowledge.ts'
+import { archiveArticle, readArticle, recordArticleView, updateArticle } from '../../../../../../../server/services/knowledge.ts'
 
 const Query = z.object({ countView: z.coerce.boolean().optional() }).strict()
 
@@ -26,3 +26,11 @@ const Patch = z
 export const PATCH = tenantRoute(async ({ request, ctx }) => ({
   body: { article: await updateArticle(ctx, pathSegment(request), parseOrThrow(Patch, await jsonBody(request))) },
 }))
+
+const Archive = z.object({ version: z.coerce.number().int().min(0) }).strict()
+
+/** Archives it. Kept rather than destroyed, because its versions still point at it. */
+export const DELETE = tenantRoute(async ({ request, ctx }) => {
+  const { version } = parseOrThrow(Archive, searchParams(request))
+  return { body: { article: await archiveArticle(ctx, pathSegment(request), version) } }
+})

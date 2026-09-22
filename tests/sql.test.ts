@@ -59,22 +59,73 @@ function topLevelArgs(src: string): string[] {
 
 type Call = { file: string; line: number; sql: string; params: number }
 
+/**
+ * Reads the argument list of a call whose `(` is at `open`, by balanced scan.
+ *
+ * A regex cannot do this. The first version of this file used a lazy
+ * `\[([\s\S]*?)\]` to grab the parameter array, and it stopped at the first
+ * `]` followed by `)` — which is inside `JSON.stringify(x ?? [])`, and again
+ * at the `[]` of an `as never[]` cast. It therefore reported parameter counts
+ * that were simply wrong, and a static check that cries wolf gets switched
+ * off. Balanced scanning is the only thing that reads code correctly.
+ */
+function callArguments(source: string, open: number): string | null {
+  let depth = 0
+  let quote: string | null = null
+  for (let i = open; i < source.length; i += 1) {
+    const ch = source[i]
+    if (quote) {
+      if (ch === '\\') {
+        i += 1
+        continue
+      }
+      if (ch === quote) quote = null
+      continue
+    }
+    if (ch === "'" || ch === '"' || ch === '`') {
+      quote = ch
+      continue
+    }
+    if ('([{'.includes(ch)) depth += 1
+    else if (')]}'.includes(ch)) {
+      depth -= 1
+      if (depth === 0) return source.slice(open + 1, i)
+    }
+  }
+  return null
+}
+
 function queryCalls(): Call[] {
   const calls: Call[] = []
   for (const file of walk('src/server')) {
     const text = readFileSync(file, 'utf8')
-    const re = /query(?:<[^(]*?>)?\(\s*(`[^`]*`|'[^']*')\s*,\s*\[([\s\S]*?)\]\s*,?\s*\)/g
+    // The call site only — the arguments are read by balanced scan below.
+    const re = /\.query(?:<[\s\S]*?>)?\(/g
     let match: RegExpExecArray | null
     while ((match = re.exec(text))) {
-      const sql = match[1]
+      const open = match.index + match[0].length - 1
+      const args = callArguments(text, open)
+      if (args === null) continue
+
+      const parts = topLevelArgs(args)
+      if (parts.length < 2) continue
+      const sql = parts[0].trim()
+      if (!/^[`']/.test(sql)) continue
       // A template with an interpolation builds its placeholders dynamically;
       // those shapes are covered by the tests that exercise them.
       if (/\$\{/.test(sql)) continue
+
+      // Strip a trailing `as never[]`-style cast before counting.
+      const paramsSource = parts[1].replace(/\s+as\s+[\w[\]<>| ]+$/, '').trim()
+      if (!paramsSource.startsWith('[')) continue
+      const inner = callArguments(paramsSource, 0)
+      if (inner === null) continue
+
       calls.push({
         file,
         line: text.slice(0, match.index).split('\n').length,
         sql,
-        params: topLevelArgs(match[2]).length,
+        params: topLevelArgs(inner).length,
       })
     }
   }
@@ -126,13 +177,19 @@ test('no query interpolates a value into its text', () => {
       [...text.matchAll(/(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*[\w.[\]]+\.join\(/g)].map((m) => m[1]),
     )
     /*
-     * Module-level SQL fragment constants: a `const NAME = '...'` or a
-     * backticked literal with no holes of its own. These are part of the
+     * SQL fragment constants: any `const name = '...'` or backticked literal
+     * with no holes of its own, at any indentation. These are part of the
      * statement an author wrote, not data — the point of the rule is that
-     * nothing a CALLER supplies reaches the text.
+     * nothing a CALLER supplies reaches the text, and a literal cannot carry
+     * caller data however it is spelled.
      */
     const constants = new Set(
-      [...text.matchAll(/^const\s+([A-Z_][A-Z0-9_]*)\s*=\s*(`[^`$]*`|'[^']*')/gm)].map((m) => m[1]),
+      /*
+       * A literal may contain `$1` — those are placeholders, which is the
+       * whole point. What disqualifies it is `${`, an interpolation, because
+       * that is where caller data could enter.
+       */
+      [...text.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(?:`(?:[^`$]|\$(?!\{))*`|'[^']*')/g)].map((m) => m[1]),
     )
     const re = /query(?:<[^(]*?>)?\(\s*`([^`]*)`/g
     let match: RegExpExecArray | null
@@ -146,6 +203,14 @@ test('no query interpolates a value into its text', () => {
         if (/^\w+$/.test(expression) && (composed.has(expression) || constants.has(expression))) continue
         // `x.join(', ')` inline is the same composition, written in place.
         if (/^[\w.[\]]+\.join\(/.test(expression)) continue
+        /*
+         * A ternary whose BOTH arms are string literals — `cond ? 'a' : 'b'`.
+         * Whatever the condition, the text that lands in the statement is one
+         * of two fragments the author wrote, so no caller data can reach it.
+         * This is how an optional `and archived_at is null`, or a choice of
+         * `order by`, is legitimately expressed.
+         */
+        if (/^[^?]+\?\s*(?:'[^']*'|`[^`$]*`)\s*:\s*(?:'[^']*'|`[^`$]*`)$/.test(expression)) continue
         bad.push(`${file}:${line} interpolates \${${expression}} into SQL text`)
       }
     }

@@ -2,7 +2,7 @@
 
 import { AppChrome } from '../../../components/AppChrome'
 import { crmTabs } from '../../../lib/crmData'
-import { useWorkspace } from '../../../lib/workspace'
+import { useInstallations } from '../../../lib/useInstallations'
 import {
   CrmActivities,
   CrmCalendar,
@@ -30,7 +30,14 @@ const panels: Record<string, () => React.ReactElement> = {
 }
 
 export default function Crm() {
-  const { trialDaysLeft } = useWorkspace()
+  /*
+   * The trial figure is the subscription's, computed by `entitlement()` from
+   * `subscriptions.trial_ends_at`. It used to be the constant TRIAL_DAYS = 13,
+   * so every workspace claimed thirteen days forever — including ones whose
+   * trial had ended and ones that never had one. Reading it from the shared
+   * installations context means this tab and the sidebar cannot disagree.
+   */
+  const { entitlement } = useInstallations()
 
   return (
     <AppChrome
@@ -38,7 +45,7 @@ export default function Crm() {
       tone="bg-blue-500"
       name="CRM"
       blurb="Manage your sales pipeline, track deals, and close more revenue"
-      trialDaysLeft={trialDaysLeft}
+      trialDaysLeft={entitlement?.trialDaysLeft ?? 0}
       tabs={crmTabs}
     >
       {(tab) => {

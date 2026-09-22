@@ -13,10 +13,16 @@ const Query = z
   })
   .strict()
 
-/** Order-to-cash documents, filtered by kind, state or customer. */
+/**
+ * Order-to-cash documents, filtered by kind, state or customer.
+ *
+ * `total` counts every match, and `byStatus` rolls the same filter up per
+ * status ignoring the status chip — so the figures above a list describe the
+ * whole set rather than the page that happened to load.
+ */
 export const GET = tenantRoute(async ({ request, ctx }) => {
-  const { rows, total } = await listDocuments(ctx, parseOrThrow(Query, searchParams(request)))
-  return { body: { documents: rows, total } }
+  const { rows, total, byStatus } = await listDocuments(ctx, parseOrThrow(Query, searchParams(request)))
+  return { body: { documents: rows, total, byStatus } }
 })
 
 /*

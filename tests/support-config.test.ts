@@ -6,7 +6,7 @@ import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
 import {
   archiveFieldOption, createCalendar, createEscalationRule, createFieldOption, createSlaPolicy,
-  createTeam, listCalendars, listEscalationRules, listFieldOptions, listSlaPolicies, listTeams,
+  createTeam, deleteCalendar, listCalendars, listEscalationRules, listFieldOptions, listSlaPolicies, listTeams,
   setEscalationRuleActive, setSlaPolicyActive, updateFieldOption,
 } from '../src/server/services/supportConfig.ts'
 import { createTicket, transitionTicket } from '../src/server/services/support.ts'
@@ -219,5 +219,46 @@ test('a calendar keeps its hours and holidays, and only one is default', async (
   const all = await listCalendars(ctx)
   assert.equal(all.filter((calendar) => calendar.isDefault).length, 1)
   assert.equal(all.find((calendar) => calendar.isDefault)?.id, second.id)
+  await db.close()
+})
+
+test('the default calendar cannot be deleted out from under the SLA engine', async () => {
+  const { db, ctx } = await helpdesk()
+  const calendar = await createCalendar(ctx, {
+    name: 'UK office',
+    timezone: 'Europe/London',
+    isDefault: true,
+    hours: [{ weekday: 1, opensMinute: 540, closesMinute: 1020 }],
+  })
+  // Deleting it would succeed at the database level — the foreign key nulls
+  // the reference — and every target computed afterwards would silently become
+  // round-the-clock, which is hours tighter than what was configured.
+  await assert.rejects(() => deleteCalendar(ctx, calendar.id), (e: any) => e.status === 409)
+  await db.close()
+})
+
+test('a calendar an SLA policy points at cannot be deleted', async () => {
+  const { db, ctx } = await helpdesk()
+  const calendar = await createCalendar(ctx, {
+    name: 'Weekends only',
+    timezone: 'UTC',
+    hours: [{ weekday: 6, opensMinute: 540, closesMinute: 1020 }],
+  })
+  await createSlaPolicy(ctx, { name: 'Weekend cover', calendarId: calendar.id, resolutionMinutes: 480 })
+
+  await assert.rejects(() => deleteCalendar(ctx, calendar.id), /still use/i)
+  assert.equal((await listCalendars(ctx)).length, 1, 'and nothing was removed')
+  await db.close()
+})
+
+test('an unused, non-default calendar is deleted', async () => {
+  const { db, ctx } = await helpdesk()
+  const calendar = await createCalendar(ctx, {
+    name: 'Spare',
+    timezone: 'UTC',
+    hours: [{ weekday: 2, opensMinute: 540, closesMinute: 1020 }],
+  })
+  await deleteCalendar(ctx, calendar.id)
+  assert.deepEqual((await listCalendars(ctx)).map((row) => row.name), [])
   await db.close()
 })

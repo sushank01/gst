@@ -4,7 +4,9 @@ import { freshDb, clock, seedUser } from './helpers/db.ts'
 import { createSession } from '../src/server/auth/session.ts'
 import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
-import { createPolicy, evaluate, listViolations, setPolicyActive } from '../src/server/services/guardrails.ts'
+import {
+  createPolicy, evaluate, listPolicies, listViolations, setPolicyActive, updatePolicy,
+} from '../src/server/services/guardrails.ts'
 import { grant } from '../src/server/services/credits.ts'
 
 async function workspace() {
@@ -231,6 +233,143 @@ test('a schema policy checks the payload it is given', async () => {
 
   const notJson = await evaluate(ctx, 'tool_call', 'customerId=c1')
   assert.equal(notJson.outcome, 'block')
+  await db.close()
+})
+
+test('an edit changes what the policy enforces, not just what it says', async () => {
+  const { db, ctx } = await workspace()
+  const policy = await createPolicy(ctx, {
+    name: 'Block secrets',
+    kind: 'keyword',
+    checkpoint: 'input',
+    action: 'warn',
+    config: { keywords: ['secret'] },
+  })
+
+  const edited = await updatePolicy(ctx, policy.id, {
+    version: policy.version,
+    name: 'Block confidential material',
+    kind: 'keyword',
+    checkpoint: 'output',
+    action: 'block',
+    config: { keywords: ['confidential'] },
+  })
+  assert.equal(edited.name, 'Block confidential material')
+  assert.equal(edited.version, policy.version + 1, 'violations record the version that stopped them')
+
+  assert.equal((await evaluate(ctx, 'input', 'the secret plan')).outcome, 'allow', 'the old wording is gone')
+  assert.equal((await evaluate(ctx, 'output', 'confidential')).outcome, 'block')
+  await db.close()
+})
+
+test('a stale edit is a conflict, carrying the version to merge against', async () => {
+  const { db, ctx } = await workspace()
+  const policy = await createPolicy(ctx, {
+    name: 'Block secrets',
+    kind: 'keyword',
+    checkpoint: 'input',
+    action: 'block',
+    config: { keywords: ['secret'] },
+  })
+  // Somebody else pauses it while this editor has the form open.
+  const paused = await setPolicyActive(ctx, policy.id, false)
+
+  await assert.rejects(
+    () =>
+      updatePolicy(ctx, policy.id, {
+        version: policy.version,
+        name: 'Renamed',
+        kind: 'keyword',
+        checkpoint: 'input',
+        action: 'block',
+        config: { keywords: ['secret'] },
+      }),
+    (error: unknown) => {
+      const conflict = error as { status: number; currentVersion?: number }
+      assert.equal(conflict.status, 409, 'the second writer is told, not silently overruled')
+      assert.equal(conflict.currentVersion, paused.version, 'and given the version to re-read')
+      return true
+    },
+  )
+  assert.equal((await listPolicies(ctx))[0].name, 'Block secrets', 'nothing was overwritten')
+  await db.close()
+})
+
+test('an edit cannot leave a policy that could never match', async () => {
+  const { db, ctx } = await workspace()
+  const policy = await createPolicy(ctx, {
+    name: 'Mask identifiers',
+    kind: 'pii',
+    checkpoint: 'output',
+    action: 'redact',
+    config: { types: ['email'] },
+  })
+
+  // The same rule as creation, or an edit would be the way round it.
+  await assert.rejects(
+    () =>
+      updatePolicy(ctx, policy.id, {
+        version: policy.version,
+        name: 'Mask identifiers',
+        kind: 'pii',
+        checkpoint: 'output',
+        action: 'redact',
+        config: { types: [] },
+      }),
+    /at least one identifier/i,
+  )
+  await assert.rejects(
+    () =>
+      updatePolicy(ctx, policy.id, {
+        version: policy.version,
+        name: 'Now a keyword rule',
+        kind: 'keyword',
+        checkpoint: 'output',
+        action: 'block',
+      }),
+    /at least one keyword/i,
+  )
+  assert.equal((await listPolicies(ctx))[0].kind, 'pii')
+  await db.close()
+})
+
+test('a schema policy with no required keys is refused, like every empty rule', async () => {
+  const { db, ctx } = await workspace()
+  // Its evaluator returns "no match" when the list is empty, so such a policy
+  // would appear in the table enforcing nothing at all.
+  await assert.rejects(
+    () => createPolicy(ctx, { name: 'Anything goes', kind: 'schema', checkpoint: 'tool_call', action: 'block' }),
+    /at least one required key/i,
+  )
+  await db.close()
+})
+
+test('ISOLATION: a policy cannot be edited from another workspace', async () => {
+  const { db, ctx } = await workspace()
+  const mallory = await seedUser(db, { email: 'mallory@example.com', fullName: 'Mallory' })
+  const evil = await createTenantWithOwner(db, mallory, { name: 'Evil' }, ctx.now, 'r2')
+  const { token } = await createSession(db, { userId: mallory, tenantId: evil.tenantId }, ctx.now)
+  const theirs = await withTenant(await authenticate(db, token, { now: ctx.now, requestId: 'r' }))
+
+  const ours = await createPolicy(ctx, {
+    name: 'Block secrets',
+    kind: 'keyword',
+    checkpoint: 'input',
+    action: 'block',
+    config: { keywords: ['secret'] },
+  })
+  await assert.rejects(
+    () =>
+      updatePolicy(theirs, ours.id, {
+        version: ours.version,
+        name: 'Allow everything',
+        kind: 'keyword',
+        checkpoint: 'input',
+        action: 'warn',
+        config: { keywords: ['nothing'] },
+      }),
+    /That policy/,
+  )
   await db.close()
 })
 

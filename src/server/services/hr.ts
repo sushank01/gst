@@ -117,6 +117,12 @@ const VOCABULARY_CLASH = {
   location: 'select 1 from hr_locations where tenant_id = $1 and lower(name) = lower($2)',
 } as const
 
+const VOCABULARY_ARCHIVE = {
+  department: 'update hr_departments set archived_at = $3 where id = $1 and tenant_id = $2 and archived_at is null',
+  designation: 'update hr_designations set archived_at = $3 where id = $1 and tenant_id = $2 and archived_at is null',
+  location: 'update hr_locations set archived_at = $3 where id = $1 and tenant_id = $2 and archived_at is null',
+} as const
+
 export async function listVocabulary(
   ctx: TenantContext,
   kind: VocabularyKind,
@@ -336,8 +342,13 @@ export type ListEmployeeOptions = {
   q?: string
   status?: string
   departmentId?: string
+  designationId?: string
   locationId?: string
   managerId?: string
+  employmentType?: string
+  /** Joined on or after / on or before — the directory's "Joined" range. */
+  joinedFrom?: string
+  joinedTo?: string
   includeArchived?: boolean
   limit?: number
   offset?: number
@@ -357,8 +368,12 @@ export async function listEmployees(
   if (!options.includeArchived) filters.push('e.archived_at is null')
   if (options.status) add('e.status = $?', options.status)
   if (options.departmentId) add('e.department_id = $?', options.departmentId)
+  if (options.designationId) add('e.designation_id = $?', options.designationId)
   if (options.locationId) add('e.location_id = $?', options.locationId)
   if (options.managerId) add('e.manager_id = $?', options.managerId)
+  if (options.employmentType) add('e.employment_type = $?', options.employmentType)
+  if (options.joinedFrom) add('e.joined_on >= $?', options.joinedFrom)
+  if (options.joinedTo) add('e.joined_on <= $?', options.joinedTo)
   if (options.q?.trim()) {
     params.push(`%${options.q.trim().toLowerCase()}%`)
     const index = params.length
@@ -654,4 +669,288 @@ export async function linkEmployeeAccount(ctx: TenantContext, employeeId: string
     await recordAudit(tx, ctx, { action: 'hr.account_linked', resource: 'employee', resourceId: employeeId })
     return readEmployeeOn(tx, ctx, employeeId)
   })
+}
+
+/**
+ * Retires a taxonomy entry.
+ *
+ * Archived, never deleted: employees, positions and requisitions still point
+ * at the row, and removing it would either fail on the foreign key or blank
+ * out the department somebody worked in. `listVocabulary` already hides
+ * archived entries, so the list the screens show is the list you may still
+ * choose from.
+ */
+export async function archiveVocabulary(ctx: TenantContext, kind: VocabularyKind, id: string): Promise<void> {
+  ctx.require('settings.manage')
+
+  const { rowCount } = await ctx.db.query(VOCABULARY_ARCHIVE[kind], [id, ctx.tenantId, ctx.now])
+  // Already archived reads as absent, which is the same answer a second
+  // Remove click deserves: the entry is gone from the list either way.
+  if (!rowCount) throw notFound('That entry')
+  await recordAudit(ctx.db, ctx, { action: 'hr.vocabulary_archived', resource: kind, resourceId: id })
+}
+
+/* --------------------------- lifecycle changes ---------------------------- */
+
+export type LifecycleChange = {
+  id: string
+  employeeId: string
+  employeeName: string
+  effectiveFrom: string
+  effectiveTo: string | null
+  reason: string | null
+  departmentFrom: string | null
+  departmentTo: string | null
+  designationFrom: string | null
+  designationTo: string | null
+  locationFrom: string | null
+  locationTo: string | null
+  managerFrom: string | null
+  managerTo: string | null
+}
+
+/**
+ * Every position change in the tenant, with what it changed FROM.
+ *
+ * The "from" side comes from the previous position of the same employee rather
+ * than from a stored copy, so a correction to an old row cannot leave a
+ * before/after pair that never existed.
+ *
+ * `kind` splits the two sub-tabs the screen shows. The schema records one
+ * free-text reason, not a promotion/transfer enum, so 'promotion' means "the
+ * reason says so" and 'transfer' means everything else. Partitioning it that
+ * way rather than matching both words is deliberate: a change reasoned
+ * "restructure" has to appear under one of the two tabs, not vanish between
+ * them.
+ */
+export async function lifecycleChanges(
+  ctx: TenantContext,
+  options: { kind?: 'promotion' | 'transfer'; employeeId?: string; limit?: number; offset?: number } = {},
+): Promise<{ rows: LifecycleChange[]; total: number }> {
+  ctx.require('record.read')
+
+  const filters = ["r.reason is distinct from 'hire'"]
+  const params: unknown[] = [ctx.tenantId]
+  if (options.employeeId) {
+    params.push(options.employeeId)
+    filters.push(`r.employee_id = $${params.length}`)
+  }
+  if (options.kind === 'promotion') filters.push("lower(coalesce(r.reason, '')) like '%promotion%'")
+  if (options.kind === 'transfer') filters.push("lower(coalesce(r.reason, '')) not like '%promotion%'")
+  const where = filters.join(' and ')
+
+  const ranked = `
+    with ranked as (
+      select p.*,
+             lag(p.department_id)  over w as prev_department_id,
+             lag(p.designation_id) over w as prev_designation_id,
+             lag(p.location_id)    over w as prev_location_id,
+             lag(p.manager_id)     over w as prev_manager_id
+        from hr_positions p
+       where p.tenant_id = $1
+      window w as (partition by p.employee_id order by p.effective_from, p.created_at)
+    )`
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `${ranked} select count(*)::text as n from ranked r where ${where}`,
+    params as never[],
+  )
+  params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  const { rows } = await ctx.db.query<Raw>(
+    `${ranked}
+     select r.id, r.employee_id, e.full_name as employee_name, r.effective_from, r.effective_to, r.reason,
+            dn.name as department_to, dp.name as department_from,
+            gn.name as designation_to, gp.name as designation_from,
+            ln.name as location_to, lp.name as location_from,
+            mn.full_name as manager_to, mp.full_name as manager_from
+       from ranked r
+       join hr_employees e on e.id = r.employee_id
+       left join hr_departments  dn on dn.id = r.department_id
+       left join hr_departments  dp on dp.id = r.prev_department_id
+       left join hr_designations gn on gn.id = r.designation_id
+       left join hr_designations gp on gp.id = r.prev_designation_id
+       left join hr_locations    ln on ln.id = r.location_id
+       left join hr_locations    lp on lp.id = r.prev_location_id
+       left join hr_employees    mn on mn.id = r.manager_id
+       left join hr_employees    mp on mp.id = r.prev_manager_id
+      where ${where}
+      order by r.effective_from desc, r.created_at desc
+      limit $${params.length - 1} offset $${params.length}`,
+    params as never[],
+  )
+
+  return {
+    total: Number(counted[0].n),
+    rows: rows.map((row) => ({
+      id: row.id as string,
+      employeeId: row.employee_id as string,
+      employeeName: row.employee_name as string,
+      effectiveFrom: day(row.effective_from) as string,
+      effectiveTo: day(row.effective_to),
+      reason: (row.reason as string) ?? null,
+      departmentFrom: (row.department_from as string) ?? null,
+      departmentTo: (row.department_to as string) ?? null,
+      designationFrom: (row.designation_from as string) ?? null,
+      designationTo: (row.designation_to as string) ?? null,
+      locationFrom: (row.location_from as string) ?? null,
+      locationTo: (row.location_to as string) ?? null,
+      managerFrom: (row.manager_from as string) ?? null,
+      managerTo: (row.manager_to as string) ?? null,
+    })),
+  }
+}
+
+/* ------------------------------- documents -------------------------------- */
+
+export type EmployeeDocumentRow = {
+  id: string
+  employeeId: string
+  employeeName: string
+  fileId: string
+  filename: string
+  byteSize: number
+  kind: string
+  visibility: string
+  validUntil: string | null
+  uploadedAt: string
+}
+
+/**
+ * HR-held employee documents.
+ *
+ * Expiry is returned as the date it is, not as an "expired" flag: the screen
+ * decides what to highlight against the day it is rendered, and a flag
+ * computed at query time would be stale the moment it was cached.
+ */
+export async function listEmployeeDocuments(
+  ctx: TenantContext,
+  options: { employeeId?: string; limit?: number; offset?: number } = {},
+): Promise<{ rows: EmployeeDocumentRow[]; total: number }> {
+  ctx.require('record.read')
+
+  const params: unknown[] = [ctx.tenantId]
+  let where = 'd.tenant_id = $1'
+  if (options.employeeId) {
+    params.push(options.employeeId)
+    where += ` and d.employee_id = $${params.length}`
+  }
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `select count(*)::text as n from hr_employee_documents d where ${where}`,
+    params as never[],
+  )
+  params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  const { rows } = await ctx.db.query<Raw>(
+    `select d.id, d.employee_id, e.full_name as employee_name, d.file_id, f.filename, f.byte_size,
+            d.kind, d.visibility, d.valid_until, d.created_at
+       from hr_employee_documents d
+       join hr_employees e on e.id = d.employee_id
+       join files f on f.id = d.file_id
+      where ${where}
+      order by d.created_at desc
+      limit $${params.length - 1} offset $${params.length}`,
+    params as never[],
+  )
+
+  return {
+    total: Number(counted[0].n),
+    rows: rows.map((row) => ({
+      id: row.id as string,
+      employeeId: row.employee_id as string,
+      employeeName: row.employee_name as string,
+      fileId: row.file_id as string,
+      filename: row.filename as string,
+      byteSize: Number(row.byte_size),
+      kind: row.kind as string,
+      visibility: row.visibility as string,
+      validUntil: day(row.valid_until),
+      uploadedAt: new Date(row.created_at as string).toISOString(),
+    })),
+  }
+}
+
+/* -------------------------------- overview -------------------------------- */
+
+export type HrOverview = {
+  headcount: number
+  onProbation: number
+  joinersThisMonth: number
+  leaversThisMonth: number
+  onLeaveToday: number
+  byDepartment: { departmentId: string | null; name: string | null; headcount: number }[]
+  pendingApprovals: { leave: number; timesheets: number; overtime: number }
+  /** Figures this deployment cannot compute, and why. Rendered, never zeroed. */
+  unavailable: { metric: string; reason: string }[]
+}
+
+/**
+ * What the HR dashboard shows, computed from the rows the screens themselves read.
+ *
+ * Attrition and "onboardings in flight" are deliberately absent rather than
+ * zero: nothing stores the denominator for the first, and there is no
+ * onboarding model at all for the second. They are reported in `unavailable`
+ * so the screen can say so instead of animating a 0 that looks measured.
+ */
+export async function hrOverview(ctx: TenantContext): Promise<HrOverview> {
+  ctx.require('record.read')
+
+  const monthStart = new Date(Date.UTC(ctx.now.getUTCFullYear(), ctx.now.getUTCMonth(), 1)).toISOString().slice(0, 10)
+  const monthEnd = new Date(Date.UTC(ctx.now.getUTCFullYear(), ctx.now.getUTCMonth() + 1, 1)).toISOString().slice(0, 10)
+  const today = ctx.now.toISOString().slice(0, 10)
+
+  const [people, departments, pending] = await Promise.all([
+    ctx.db.query<{ headcount: string; probation: string; joiners: string; leavers: string; on_leave: string }>(
+      `select
+         count(*) filter (where status in ('active','probation','notice'))::text as headcount,
+         count(*) filter (where status = 'probation')::text as probation,
+         count(*) filter (where joined_on >= $2 and joined_on < $3)::text as joiners,
+         count(*) filter (where exited_on >= $2 and exited_on < $3)::text as leavers,
+         (select count(*) from hr_leave_request_days d
+            join hr_leave_requests r on r.id = d.request_id
+           where d.tenant_id = $1 and d.leave_on = $4 and r.status = 'approved')::text as on_leave
+       from hr_employees where tenant_id = $1 and archived_at is null`,
+      [ctx.tenantId, monthStart, monthEnd, today],
+    ),
+    // Left join from the employee, so people with no department are their own
+    // visible bucket rather than quietly missing from the breakdown.
+    ctx.db.query<{ department_id: string | null; name: string | null; n: string }>(
+      `select e.department_id, d.name, count(*)::text as n
+         from hr_employees e
+         left join hr_departments d on d.id = e.department_id
+        where e.tenant_id = $1 and e.archived_at is null and e.status in ('active','probation','notice')
+        group by e.department_id, d.name
+        order by count(*) desc, d.name nulls last`,
+      [ctx.tenantId],
+    ),
+    ctx.db.query<{ leave: string; timesheets: string; overtime: string }>(
+      `select
+         (select count(*) from hr_leave_requests where tenant_id = $1 and status = 'submitted')::text as leave,
+         (select count(*) from hr_timesheets where tenant_id = $1 and status = 'submitted')::text as timesheets,
+         (select count(*) from hr_overtime_requests where tenant_id = $1 and status = 'submitted')::text as overtime`,
+      [ctx.tenantId],
+    ),
+  ])
+
+  return {
+    headcount: Number(people.rows[0].headcount),
+    onProbation: Number(people.rows[0].probation),
+    joinersThisMonth: Number(people.rows[0].joiners),
+    leaversThisMonth: Number(people.rows[0].leavers),
+    onLeaveToday: Number(people.rows[0].on_leave),
+    byDepartment: departments.rows.map((row) => ({
+      departmentId: row.department_id,
+      name: row.name,
+      headcount: Number(row.n),
+    })),
+    pendingApprovals: {
+      leave: Number(pending.rows[0].leave),
+      timesheets: Number(pending.rows[0].timesheets),
+      overtime: Number(pending.rows[0].overtime),
+    },
+    unavailable: [
+      { metric: 'Attrition', reason: 'Nothing stores the average headcount a rate would be measured against.' },
+      { metric: 'Open positions', reason: 'Recruitment is not available on this deployment.' },
+      { metric: 'Onboardings in flight', reason: 'There is no onboarding model on this deployment.' },
+    ],
+  }
 }

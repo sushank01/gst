@@ -21,6 +21,14 @@ export type SqlValue = string | number | boolean | null | Date | Buffer | SqlVal
 
 export type QueryResult<Row> = { rows: Row[]; rowCount: number }
 
+/** The minimum of PGlite this module needs, so `pg` is not a type dependency. */
+type PgliteHandle = {
+  query(text: string, params?: unknown[]): Promise<RawResult>
+  exec(text: string): Promise<unknown>
+  close(): Promise<void>
+  dumpDataDir(compression: 'none' | 'gzip' | 'auto'): Promise<Blob | File>
+}
+
 export interface Db {
   /** Parameterised query. Never interpolate values into `text`. */
   query<Row = Record<string, unknown>>(text: string, params?: SqlValue[]): Promise<QueryResult<Row>>
@@ -34,6 +42,16 @@ export interface Db {
    */
   transaction<T>(fn: (tx: Db) => Promise<T>): Promise<T>
   close(): Promise<void>
+  /**
+   * The underlying PGlite instance, when there is one.
+   *
+   * Exposed for one purpose: the test helper snapshots a migrated database so
+   * four hundred tests do not each spend eight seconds running the migrations.
+   * Request code must never reach for this — it is undefined against a real
+   * server, and anything that needs it is doing something PostgreSQL-specific
+   * in the wrong layer.
+   */
+  readonly pglite?: PgliteHandle
 }
 
 type RawResult = { rows: unknown[]; rowCount?: number | null }
@@ -126,22 +144,24 @@ function fromDriver(driver: Driver): Db {
   return db
 }
 
-let shared: Db | null = null
+/*
+ * The PROMISE, not the resolved handle.
+ *
+ * Memoising the handle leaves a window: the first caller awaits the open while
+ * a second finds `shared` still null and opens a second database. Against
+ * PGlite that is two processes on one directory; against `pg` it is a second
+ * pool nobody will ever close. Memoising the promise means every concurrent
+ * caller at cold start waits on the same open — and, below, on the same
+ * migration.
+ */
+let shared: Promise<Db> | null = null
 
-/** Opens a PGlite database. `dir` undefined means in-memory (tests). */
-export async function openPglite(dir?: string): Promise<Db> {
-  const { PGlite } = await import('@electric-sql/pglite')
-  if (dir) {
-    // PGlite creates its own data directory but not the parents above it.
-    const { mkdir } = await import('node:fs/promises')
-    const { dirname } = await import('node:path')
-    await mkdir(dirname(dir), { recursive: true })
-  }
-  const pg = dir ? await PGlite.create(dir) : await PGlite.create()
+/** Wraps an already-open PGlite instance. The test helper restores one from a snapshot. */
+export function fromPglite(pg: PgliteHandle): Db {
   const take = mutex()
 
-  return fromDriver({
-    query: (text, params) => pg.query(text, params as unknown[]),
+  const db = fromDriver({
+    query: (text, params) => pg.query(text, params),
     exec: async (text) => {
       await pg.exec(text)
     },
@@ -155,7 +175,7 @@ export async function openPglite(dir?: string): Promise<Db> {
     acquire: async () => {
       const release = await take()
       return {
-        query: (text, params) => pg.query(text, params as unknown[]),
+        query: (text, params) => pg.query(text, params),
         exec: async (text) => {
           await pg.exec(text)
         },
@@ -164,6 +184,20 @@ export async function openPglite(dir?: string): Promise<Db> {
     },
     end: () => pg.close(),
   })
+  return { ...db, pglite: pg }
+}
+
+/** Opens a PGlite database. `dir` undefined means in-memory (tests). */
+export async function openPglite(dir?: string): Promise<Db> {
+  const { PGlite } = await import('@electric-sql/pglite')
+  if (dir) {
+    // PGlite creates its own data directory but not the parents above it.
+    const { mkdir } = await import('node:fs/promises')
+    const { dirname } = await import('node:path')
+    await mkdir(dirname(dir), { recursive: true })
+  }
+  const pg = dir ? await PGlite.create(dir) : await PGlite.create()
+  return fromPglite(pg)
 }
 
 /** Opens a pooled connection to a real PostgreSQL server. */
@@ -199,8 +233,12 @@ export async function openPostgres(url: string): Promise<Db> {
  * request handler can accidentally talk to a different database than the one
  * migrations ran against.
  */
-export async function getDb(): Promise<Db> {
-  if (shared) return shared
+export function getDb(): Promise<Db> {
+  shared ??= open()
+  return shared
+}
+
+async function open(): Promise<Db> {
   const url = process.env.DATABASE_URL?.trim()
   if (url) {
     /*
@@ -209,25 +247,25 @@ export async function getDb(): Promise<Db> {
      * something that happens because a request arrived. Several instances
      * starting at once would otherwise race to migrate.
      */
-    shared = await openPostgres(url)
-    return shared
+    return openPostgres(url)
   }
 
   /*
    * Local PGlite. Here migrations ARE applied on open, so a fresh checkout
    * works from `npm run dev` without a separate step — the alternative is a
    * 500 saying `relation "users" does not exist`, which tells a newcomer
-   * nothing. The file lock below keeps two dev processes from racing.
+   * nothing. Because the promise above is what is memoised, a request that
+   * arrives mid-migration waits for it rather than reading a half-built schema.
    */
   const db = await openPglite(process.env.PGLITE_DIR || '.data/pg')
-  shared = db
   const { migrate } = await import('./migrate.ts')
   await migrate(db)
-  return shared
+  return db
 }
 
 /** Test/teardown hook. Not for request code. */
 export async function resetDbHandle(): Promise<void> {
-  if (shared) await shared.close().catch(() => undefined)
+  const current = shared
   shared = null
+  if (current) await current.then((db) => db.close()).catch(() => undefined)
 }

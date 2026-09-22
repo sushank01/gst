@@ -103,6 +103,26 @@ export type CreateTripInput = {
   advanceRequested?: string | null
 }
 
+/**
+ * The share of an estimate that may be advanced, from the Travel policy pane.
+ *
+ * Read straight from `app_settings` rather than through `readSettings`: this is
+ * the engine consulting its own policy on behalf of whoever is raising the
+ * trip, who need not be able to read the settings screen. A tenant that has
+ * never opened the pane advances nothing, which is what an unconfigured
+ * advance limit means.
+ */
+async function advancePercent(db: Db, ctx: TenantContext): Promise<number> {
+  const { rows } = await db.query<{ value: Record<string, unknown> }>(
+    `select value from app_settings
+      where tenant_id = $1 and app_code = 'TE' and section = 'travel_policy'
+        and company_id is not distinct from $2`,
+    [ctx.tenantId, ctx.companyId],
+  )
+  const configured = rows[0]?.value?.advancePercent
+  return typeof configured === 'number' && configured >= 0 && configured <= 100 ? configured : 0
+}
+
 export async function createTrip(ctx: TenantContext, input: CreateTripInput): Promise<TravelRequestRow> {
   ctx.require('record.create')
   if (input.returnsOn < input.departsOn) throw unprocessable('bad_dates', 'The return is before the departure.')
@@ -111,6 +131,24 @@ export async function createTrip(ctx: TenantContext, input: CreateTripInput): Pr
   }
 
   return ctx.db.transaction(async (tx) => {
+    if (input.advanceRequested) {
+      // An advance is money paid before the trip happens, so the cap is checked
+      // here rather than left to whoever approves it later.
+      if (!input.estimatedCost) {
+        throw unprocessable('estimate_required', 'State the estimated cost before requesting an advance against it.')
+      }
+      const percent = await advancePercent(tx, ctx)
+      const cap = (toMinor(input.estimatedCost) * BigInt(percent)) / 100n
+      if (toMinor(input.advanceRequested) > cap) {
+        throw unprocessable(
+          'advance_over_limit',
+          percent === 0
+            ? 'This workspace does not allow travel advances. Set an advance limit in Travel policy first.'
+            : `An advance may be at most ${percent}% of the estimate.`,
+        )
+      }
+    }
+
     const { rows: employee } = await tx.query('select 1 from hr_employees where id = $1 and tenant_id = $2 and archived_at is null', [
       input.employeeId,
       ctx.tenantId,
@@ -124,10 +162,14 @@ export async function createTrip(ctx: TenantContext, input: CreateTripInput): Pr
      */
     const { rows: clash } = await tx.query<{ reference: string }>(
       `select reference from te_travel_requests
-        where employee_id = $1 and status in ('submitted','approved','booked','in_progress')
+        where tenant_id = $4 and employee_id = $1 and status in ('submitted','approved','booked','in_progress')
           and departs_on <= $3 and returns_on >= $2
         limit 1`,
-      [input.employeeId, input.departsOn, input.returnsOn],
+      // Scoped to the tenant explicitly. The employee was checked against this
+      // tenant a moment ago, so the filter is redundant today — but every other
+      // read in this file carries it, and a rule that holds only because of a
+      // check somewhere else is the one that stops holding.
+      [input.employeeId, input.departsOn, input.returnsOn, ctx.tenantId],
     )
     if (clash[0]) throw conflict(`${clash[0].reference} already covers those dates.`)
 
@@ -333,7 +375,7 @@ export async function readTrip(ctx: TenantContext, tripId: string): Promise<Trav
 
 export async function listTrips(
   ctx: TenantContext,
-  options: { employeeId?: string; status?: string; from?: string; to?: string; limit?: number; offset?: number } = {},
+  options: { employeeId?: string; status?: string; statuses?: string[]; from?: string; to?: string; limit?: number; offset?: number } = {},
 ): Promise<{ rows: TravelRequestRow[]; total: number }> {
   ctx.require('record.read')
   const filters = ['t.tenant_id = $1']
@@ -344,6 +386,12 @@ export async function listTrips(
   }
   if (options.employeeId) add('t.employee_id = $?', options.employeeId)
   if (options.status) add('t.status = $?', options.status)
+  /*
+   * A set of states, because a trip's life has eight of them and the useful
+   * questions span several — "still live" is draft through in_progress. Asked
+   * in SQL so the count is of matching trips, not of a filtered page.
+   */
+  if (options.statuses?.length) add('t.status = any($?::text[])', options.statuses)
   if (options.from) add('t.returns_on >= $?', options.from)
   if (options.to) add('t.departs_on <= $?', options.to)
   const where = filters.join(' and ')

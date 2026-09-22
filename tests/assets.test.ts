@@ -1,5 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtemp } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { freshDb, clock, seedUser } from './helpers/db.ts'
 import { createSession } from '../src/server/auth/session.ts'
 import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
@@ -470,6 +473,61 @@ test('stock summary reports count and value separately', async () => {
   await db.close()
 })
 
+test('a chip count is the number of rows clicking that chip would show', async () => {
+  const { db, ctx } = await workspace()
+  await createAsset(ctx, { name: 'Pune laptop', assetType: 'laptop', location: 'Pune' })
+  await createAsset(ctx, { name: 'Pune monitor', assetType: 'monitor', location: 'Pune' })
+  await createAsset(ctx, { name: 'Goa laptop', assetType: 'laptop', location: 'Goa' })
+
+  const whole = await assetFacets(ctx)
+  assert.equal(whole.byStatus.in_stock, 3, 'unfiltered, the chips count the register')
+
+  /*
+   * The register applies type, location and search alongside the status
+   * chips. A chip that keeps counting the whole workspace promises rows the
+   * list will not show, so the counts and the list are checked against each
+   * other here, through the same filter.
+   */
+  const scoped = await assetFacets(ctx, { assetType: 'laptop', location: 'Pune' })
+  const listed = await listAssets(ctx, { assetType: 'laptop', location: 'Pune' })
+  assert.equal(scoped.byStatus.in_stock, 1)
+  assert.equal(
+    Object.values(scoped.byStatus).reduce((total, count) => total + count, 0),
+    listed.total,
+    'the "All" chip and the list total are the same number',
+  )
+
+  const searched = await assetFacets(ctx, { q: 'monitor' })
+  assert.equal(
+    Object.values(searched.byStatus).reduce((total, count) => total + count, 0),
+    (await listAssets(ctx, { q: 'monitor' })).total,
+    'the search narrows the counts exactly as it narrows the list',
+  )
+  await db.close()
+})
+
+test('costs in different currencies are not added together', async () => {
+  const { db, ctx } = await workspace()
+  await createAsset(ctx, { name: 'A', assetType: 'laptop', purchaseCost: '1000.0000', currency: 'INR' })
+  await createAsset(ctx, { name: 'B', assetType: 'laptop', purchaseCost: '1000.0000', currency: 'USD' })
+  await createAsset(ctx, { name: 'C', assetType: 'monitor', purchaseCost: '30000.0000', currency: 'INR' })
+  await createAsset(ctx, { name: 'D', assetType: 'webcam' })
+
+  const byType = await stockSummary(ctx, 'type')
+  const laptops = byType.find((line) => line.key === 'laptop')!
+  assert.equal(laptops.count, 2)
+  assert.equal(laptops.currencies, 2, 'two currencies: there is no single total to report')
+
+  const monitors = byType.find((line) => line.key === 'monitor')!
+  assert.equal(monitors.currencies, 1)
+  assert.equal(monitors.value, '30000.0000')
+
+  const webcams = byType.find((line) => line.key === 'webcam')!
+  assert.equal(webcams.count, 1)
+  assert.equal(webcams.currencies, 0, 'nothing priced, so the value column is not a measurement')
+  await db.close()
+})
+
 test('ISOLATION: requests and facets never cross workspaces', async () => {
   const { db, ctx, rivalCtx } = await withApprovals(1)
   const request = await requestAsset(ctx, { assetType: 'laptop' })
@@ -482,4 +540,398 @@ test('ISOLATION: requests and facets never cross workspaces', async () => {
   assert.equal((await listAssetRequests(rivalCtx, {})).total, 0)
   assert.deepEqual((await assetFacets(rivalCtx)).byStatus, {})
   await db.close()
+})
+
+/* ----------------------------- taxonomies -------------------------------- */
+
+const {
+  readAssetTaxonomies, replaceAssetTaxonomy, readApprovalLadder, replaceApprovalLadder,
+  warrantyReport, leaverHoldings,
+} = await import('../src/server/services/assets.ts')
+
+test('a workspace starts with a catalogue of types and no tag prefix it did not choose', async () => {
+  const { db, ctx } = await workspace()
+  const document = await readAssetTaxonomies(ctx)
+
+  assert.equal(document.version, 0, 'nothing has been saved yet')
+  assert.ok(document.taxonomies.asset_types.some((entry) => entry.value === 'laptop'))
+  assert.equal(
+    document.taxonomies.asset_types.every((entry) => entry.tagPrefix === null),
+    true,
+    'a shipped prefix would claim the register allocates from it before anyone chose one',
+  )
+  await db.close()
+})
+
+test('a configured tag prefix is what the register allocates from', async () => {
+  const { db, ctx } = await workspace()
+  const before = await createAsset(ctx, { name: 'Untyped laptop', assetType: 'laptop' })
+  assert.equal(before.tag, 'AST-0001', 'no prefix configured, so the default sequence')
+
+  const { version } = await readAssetTaxonomies(ctx)
+  await replaceAssetTaxonomy(
+    ctx,
+    'asset_types',
+    [
+      { value: 'laptop', label: 'Laptop', tagPrefix: 'lap-' },
+      { value: 'monitor', label: 'Monitor', tagPrefix: null },
+    ],
+    version,
+  )
+
+  const laptop = await createAsset(ctx, { name: 'ThinkPad', assetType: 'laptop' })
+  const monitor = await createAsset(ctx, { name: 'Dell U2724', assetType: 'monitor' })
+  assert.equal(laptop.tag, 'LAP-0001', 'the prefix is normalised: "lap-" and "LAP" are the same sticker')
+  assert.equal(monitor.tag, 'AST-0002', 'a type with no prefix keeps the default sequence')
+
+  const second = await createAsset(ctx, { name: 'ThinkPad II', assetType: 'laptop' })
+  assert.equal(second.tag, 'LAP-0002', 'each prefix has its own locked sequence')
+  await db.close()
+})
+
+test('a taxonomy entry cannot be removed while records still store its value', async () => {
+  const { db, ctx } = await workspace()
+  await createAsset(ctx, { name: 'ThinkPad', assetType: 'laptop' })
+  const { version, taxonomies } = await readAssetTaxonomies(ctx)
+
+  await assert.rejects(
+    () =>
+      replaceAssetTaxonomy(
+        ctx,
+        'asset_types',
+        taxonomies.asset_types.filter((entry) => entry.value !== 'laptop'),
+        version,
+      ),
+    /still use it/i,
+    'the screen promises nothing is orphaned; a filtered array in the browser cannot keep that promise',
+  )
+
+  // An unused entry goes freely, so the refusal is about use and not about removal.
+  const saved = await replaceAssetTaxonomy(
+    ctx,
+    'asset_types',
+    taxonomies.asset_types.filter((entry) => entry.value !== 'speaker'),
+    version,
+  )
+  assert.equal(saved.taxonomies.asset_types.some((entry) => entry.value === 'speaker'), false)
+  assert.equal(saved.version, 1)
+  await db.close()
+})
+
+test('a taxonomy save carrying a stale version is refused with the current one', async () => {
+  const { db, ctx } = await workspace()
+  const { version, taxonomies } = await readAssetTaxonomies(ctx)
+  await replaceAssetTaxonomy(ctx, 'makes', taxonomies.makes, version)
+
+  await assert.rejects(
+    () => replaceAssetTaxonomy(ctx, 'makes', [], version),
+    (error: Error & { currentVersion?: number }) => error.currentVersion === 1,
+    'a second editor must be told what to merge against rather than overwriting',
+  )
+  await db.close()
+})
+
+test('a taxonomy refuses duplicate and unusable values', async () => {
+  const { db, ctx } = await workspace()
+  const { version } = await readAssetTaxonomies(ctx)
+  const entry = { value: 'laptop', label: 'Laptop', tagPrefix: null }
+
+  await assert.rejects(() => replaceAssetTaxonomy(ctx, 'asset_types', [entry, entry], version), /listed twice/i)
+  await assert.rejects(
+    () => replaceAssetTaxonomy(ctx, 'asset_types', [{ value: 'my type!', label: 'My type', tagPrefix: null }], version),
+    /not a usable value/i,
+  )
+  await assert.rejects(() => replaceAssetTaxonomy(ctx, 'nonsense', [], version), /not found/i)
+  await db.close()
+})
+
+/* --------------------------- approval levels ------------------------------ */
+
+test('configuring an approval ladder is what puts a request in front of an approver', async () => {
+  const { db, ctx } = await workspace()
+  const empty = await readApprovalLadder(ctx)
+  assert.deepEqual(empty.levels, [])
+  assert.equal(empty.version, 0)
+
+  const saved = await replaceApprovalLadder(ctx, {
+    version: 0,
+    levels: [
+      { level: 1, approverKind: 'role', approverRole: 'IT Admin' },
+      { level: 2, approverKind: 'role', approverRole: 'Finance' },
+    ],
+  })
+  assert.equal(saved.version, 1)
+  assert.deepEqual(saved.levels.map((level) => level.approverRole), ['IT Admin', 'Finance'])
+
+  const request = await requestAsset(ctx, { assetType: 'laptop' })
+  assert.equal(request.status, 'submitted', 'with a ladder configured a request waits for a decision')
+  assert.equal(request.currentLevel, 1)
+  await db.close()
+})
+
+test('two people saving the approval ladder at once: the second is told, not overwritten', async () => {
+  const { db, ctx } = await workspace()
+  await replaceApprovalLadder(ctx, { version: 0, levels: [{ level: 1, approverKind: 'role', approverRole: 'IT Admin' }] })
+
+  await assert.rejects(
+    () => replaceApprovalLadder(ctx, { version: 0, levels: [] }),
+    (error: Error & { currentVersion?: number }) => error.currentVersion === 1,
+  )
+  assert.equal((await readApprovalLadder(ctx)).levels.length, 1, 'the refused save changed nothing')
+  await db.close()
+})
+
+test('an approval level with nobody named is refused, and the previous ladder survives', async () => {
+  const { db, ctx } = await workspace()
+  await replaceApprovalLadder(ctx, { version: 0, levels: [{ level: 1, approverKind: 'role', approverRole: 'IT Admin' }] })
+
+  await assert.rejects(
+    () => replaceApprovalLadder(ctx, { version: 1, levels: [{ level: 1, approverKind: 'role', approverRole: '  ' }] }),
+    /needs an approver/i,
+    'a gate nobody can open stops every request for ever',
+  )
+  await assert.rejects(
+    () =>
+      replaceApprovalLadder(ctx, {
+        version: 1,
+        levels: [
+          { level: 1, approverKind: 'role', approverRole: 'IT Admin' },
+          { level: 1, approverKind: 'role', approverRole: 'Finance' },
+        ],
+      }),
+    /listed twice/i,
+  )
+
+  const ladder = await readApprovalLadder(ctx)
+  assert.equal(ladder.levels.length, 1)
+  assert.equal(ladder.version, 1, 'a refused write records no replacement')
+  await db.close()
+})
+
+test('a named approver must belong to the workspace', async () => {
+  const { db, ctx, other } = await workspace()
+  await assert.rejects(
+    () => replaceApprovalLadder(ctx, { version: 0, levels: [{ level: 1, approverKind: 'user', userIds: [other] }] }),
+    /That person/,
+  )
+  assert.deepEqual((await readApprovalLadder(ctx)).levels, [], 'the whole ladder rolls back with the bad level')
+  await db.close()
+})
+
+/* ------------------------------- reports ---------------------------------- */
+
+test('the warranty report lists rows with days left, measured from the server day', async () => {
+  const { db, ctx } = await workspace()
+  const day = (offset: number) => new Date(ctx.now.getTime() + offset * 86_400_000).toISOString().slice(0, 10)
+  await createAsset(ctx, { name: 'Expired', assetType: 'laptop', warrantyExpiresOn: day(-10) })
+  await createAsset(ctx, { name: 'Soon', assetType: 'laptop', warrantyExpiresOn: day(30) })
+  await createAsset(ctx, { name: 'Later', assetType: 'laptop', warrantyExpiresOn: day(200) })
+  await createAsset(ctx, { name: 'Unknown', assetType: 'laptop' })
+
+  const report = await warrantyReport(ctx, { withinDays: 60 })
+  assert.deepEqual(report.rows.map((row) => row.name), ['Expired', 'Soon'])
+  assert.equal(report.rows[0].daysLeft, -10, 'a lapsed warranty reads negative rather than zero')
+  assert.equal(report.rows[1].daysLeft, 30)
+  assert.equal(report.expired, 1)
+  assert.equal(report.expiring, 1, 'the one 200 days out is outside the window')
+  assert.equal(
+    report.rows.some((row) => row.name === 'Unknown'),
+    false,
+    'an asset with no warranty date recorded is unknown, not expired',
+  )
+
+  const upcoming = await warrantyReport(ctx, { withinDays: 60, includeExpired: false })
+  assert.deepEqual(upcoming.rows.map((row) => row.name), ['Soon'])
+  assert.equal(upcoming.total, 1)
+  await db.close()
+})
+
+test('the warranty tile and the list beneath it count over the same window', async () => {
+  const { db, ctx } = await workspace()
+  const day = (offset: number) => new Date(ctx.now.getTime() + offset * 86_400_000).toISOString().slice(0, 10)
+  await createAsset(ctx, { name: 'In 80 days', assetType: 'laptop', warrantyExpiresOn: day(80) })
+
+  const facets = await assetFacets(ctx, { warrantyWithinDays: 60 })
+  const report = await warrantyReport(ctx, { withinDays: 60, includeExpired: false })
+  assert.equal(facets.warrantyExpiring, 0)
+  assert.equal(facets.warrantyWithinDays, 60, 'the horizon travels with the count so a tile can name it')
+  assert.equal(report.rows.length, facets.warrantyExpiring)
+  await db.close()
+})
+
+test('leaver holdings report how much of the workforce they can actually see', async () => {
+  const { db, ctx, owner } = await workspace()
+  const asset = await createAsset(ctx, { name: 'ThinkPad', assetType: 'laptop' })
+  await assignAsset(ctx, asset.id, { holderUserId: owner })
+
+  const blind = await leaverHoldings(ctx)
+  assert.equal(blind.total, 0)
+  assert.equal(blind.employees, 0, 'with no employee records at all, zero is "cannot see" and the caller is told')
+
+  await db.query(
+    `insert into hr_employees (tenant_id, employee_no, user_id, full_name, status, exited_on)
+     values ($1, 'E-1', $2, 'Ops Lead', 'exited', $3)`,
+    [ctx.tenantId, owner, '2026-01-01'],
+  )
+  await db.query(
+    `insert into hr_employees (tenant_id, employee_no, full_name, status)
+     values ($1, 'E-2', 'Unlinked Leaver', 'exited')`,
+    [ctx.tenantId],
+  )
+
+  const seen = await leaverHoldings(ctx)
+  assert.equal(seen.total, 1)
+  assert.equal(seen.rows[0].tag, asset.tag)
+  assert.equal(seen.rows[0].holderName, 'Ops Lead')
+  assert.equal(seen.exited, 2)
+  assert.equal(seen.exitedUnlinked, 1, 'anything the unlinked leaver holds cannot be counted, and the screen says so')
+
+  await returnAsset(ctx, asset.id)
+  assert.equal((await leaverHoldings(ctx)).total, 0, 'a returned asset is no longer outstanding')
+
+  /*
+   * Custody recorded as a typed name has no account behind it, so no employee
+   * can ever be matched to it. It is counted separately rather than folded
+   * into a zero that reads as "nobody who left is holding anything".
+   */
+  const typed = await createAsset(ctx, { name: 'Loaner', assetType: 'laptop' })
+  await assignAsset(ctx, typed.id, { holderLabel: 'Ops Lead' })
+  const blindSpot = await leaverHoldings(ctx)
+  assert.equal(blindSpot.total, 0, 'a typed name is invisible to an employee match')
+  assert.equal(blindSpot.unlinkedCustody, 1, 'and the report says how much it cannot see')
+  await db.close()
+})
+
+test('a request list carries the names the table renders, not the ids it stores', async () => {
+  const { db, ctx } = await workspace()
+  await replaceApprovalLadder(ctx, { version: 0, levels: [{ level: 1, approverKind: 'role', approverRole: 'IT Admin' }] })
+  const request = await requestAsset(ctx, { assetType: 'laptop', reason: 'new joiner' })
+
+  const pending = (await listAssetRequests(ctx, {})).rows[0]
+  assert.equal(pending.requesterName, 'Ops Lead')
+  assert.equal(pending.decidedByName, null, 'nobody has decided it yet')
+
+  await decideAssetRequest(ctx, request.id, { decision: 'approved', version: request.version })
+  const decided = (await listAssetRequests(ctx, {})).rows[0]
+  assert.equal(decided.decidedByName, 'Ops Lead')
+  assert.ok(decided.decidedAt, 'the decision carries when it happened')
+  await db.close()
+})
+
+/* ------------------------- routes, at the boundary ------------------------ */
+
+/*
+ * The service tests above prove the rules. These prove the rules are reachable
+ * through the door a browser knocks on: that the route reads the taxonomy code
+ * out of its own path, that a stale version comes back as a 409 carrying the
+ * version to merge against, and that the reports parse the query the screens
+ * send. A service can be perfect and still unreachable.
+ */
+process.env.PGLITE_DIR = await mkdtemp(join(tmpdir(), 'apragya-asset-routes-'))
+
+const registerUser = (await import('../src/app/api/v1/auth/register/route.ts')).POST
+const createTenant = (await import('../src/app/api/v1/tenants/route.ts')).POST
+const taxonomiesRoute = await import('../src/app/api/v1/assets/taxonomies/route.ts')
+const taxonomyRoute = await import('../src/app/api/v1/assets/taxonomies/[code]/route.ts')
+const approvalLevelsRoute = await import('../src/app/api/v1/assets/approval-levels/route.ts')
+const warrantyRoute = await import('../src/app/api/v1/assets/reports/warranty/route.ts')
+const leaverRoute = await import('../src/app/api/v1/assets/reports/leaver-holdings/route.ts')
+const facetsRoute = await import('../src/app/api/v1/assets/facets/route.ts')
+
+const BASE = 'http://test.local'
+const jsonRequest = (method: string, path: string, body: unknown, cookie?: string) =>
+  new Request(BASE + path, {
+    method,
+    headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) },
+    body: JSON.stringify(body),
+  })
+const getRequest = (path: string, cookie: string) => new Request(BASE + path, { headers: { cookie } })
+const cookieOf = (response: Response) => (response.headers.get('set-cookie') ?? '').split(';')[0]
+
+let sequence = 0
+/** A signed-in owner with a workspace. Creating one rotates the session token. */
+async function signedInOwner(): Promise<string> {
+  sequence += 1
+  const signedUp = cookieOf(
+    await registerUser(
+      jsonRequest('POST', '/api/v1/auth/register', {
+        email: `assets${sequence}@example.com`,
+        fullName: `Owner ${sequence}`,
+        password: 'correct horse battery staple',
+      }),
+    ),
+  )
+  const created = await createTenant(jsonRequest('POST', '/api/v1/tenants', { name: `Assets ${sequence}` }, signedUp))
+  assert.equal(created.status, 201, 'workspace creation failed')
+  return cookieOf(created)
+}
+
+test('ROUTE: a taxonomy is read and replaced through its own path', async () => {
+  const cookie = await signedInOwner()
+
+  const read = await taxonomiesRoute.GET(getRequest('/api/v1/assets/taxonomies', cookie))
+  const document = (await read.json()) as { taxonomies: Record<string, unknown[]>; version: number }
+  assert.equal(read.status, 200)
+  assert.ok(document.taxonomies.asset_types.length)
+
+  const saved = await taxonomyRoute.PUT(
+    jsonRequest(
+      'PUT',
+      '/api/v1/assets/taxonomies/asset_types',
+      { entries: [{ value: 'laptop', label: 'Laptop', tagPrefix: 'LAP' }], version: document.version },
+      cookie,
+    ),
+  )
+  assert.equal(saved.status, 200)
+  const after = (await saved.json()) as { taxonomies: Record<string, { value: string; tagPrefix: string }[]> }
+  assert.deepEqual(after.taxonomies.asset_types, [{ value: 'laptop', label: 'Laptop', tagPrefix: 'LAP' }])
+
+  const stale = await taxonomyRoute.PUT(
+    jsonRequest('PUT', '/api/v1/assets/taxonomies/asset_types', { entries: [], version: document.version }, cookie),
+  )
+  assert.equal(stale.status, 409)
+  const conflict = (await stale.json()) as { error: { currentVersion: number } }
+  assert.equal(conflict.error.currentVersion, 1, 'the client is told what to merge against')
+
+  const unknown = await taxonomyRoute.PUT(
+    jsonRequest('PUT', '/api/v1/assets/taxonomies/invented', { entries: [], version: 0 }, cookie),
+  )
+  assert.equal(unknown.status, 404)
+})
+
+test('ROUTE: the approval ladder round-trips, and the reports parse what the screens send', async () => {
+  const cookie = await signedInOwner()
+
+  const empty = await approvalLevelsRoute.GET(getRequest('/api/v1/assets/approval-levels', cookie))
+  assert.deepEqual(await empty.json(), { levels: [], version: 0 })
+
+  const saved = await approvalLevelsRoute.PUT(
+    jsonRequest(
+      'PUT',
+      '/api/v1/assets/approval-levels',
+      { levels: [{ level: 1, approverKind: 'role', approverRole: 'IT Admin' }], version: 0 },
+      cookie,
+    ),
+  )
+  assert.equal(saved.status, 200)
+  assert.equal(((await saved.json()) as { version: number }).version, 1)
+
+  const facets = await facetsRoute.GET(getRequest('/api/v1/assets/facets?warrantyWithinDays=60', cookie))
+  assert.equal(((await facets.json()) as { warrantyWithinDays: number }).warrantyWithinDays, 60)
+
+  const warranty = await warrantyRoute.GET(
+    getRequest('/api/v1/assets/reports/warranty?withinDays=60&includeExpired=false', cookie),
+  )
+  const report = (await warranty.json()) as { rows: unknown[]; withinDays: number }
+  assert.equal(warranty.status, 200)
+  assert.equal(report.withinDays, 60)
+  assert.deepEqual(report.rows, [])
+
+  const leavers = await leaverRoute.GET(getRequest('/api/v1/assets/reports/leaver-holdings', cookie))
+  const holdings = (await leavers.json()) as { rows: unknown[]; employees: number }
+  assert.equal(leavers.status, 200)
+  assert.equal(holdings.employees, 0, 'a workspace with no employee records says so rather than implying a zero')
+
+  const rejected = await facetsRoute.GET(getRequest('/api/v1/assets/facets?nonsense=1', cookie))
+  assert.equal(rejected.status, 422, 'an unknown query parameter is a visible failure, not a silently ignored one')
 })

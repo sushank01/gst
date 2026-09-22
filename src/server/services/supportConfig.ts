@@ -574,3 +574,37 @@ export async function createCalendar(
     return all.find((calendar) => calendar.id === calendarId)!
   })
 }
+
+/**
+ * Deletes a working calendar.
+ *
+ * Refused while an SLA policy points at it, and refused for the default. The
+ * foreign key is `on delete set null`, so either deletion would succeed and
+ * quietly move those policies onto round-the-clock time — every target they
+ * set would become hours tighter, with nothing on any screen looking
+ * different. There is no archived_at on this table, so refusing is the only
+ * honest answer.
+ */
+export async function deleteCalendar(ctx: TenantContext, calendarId: string): Promise<void> {
+  ctx.require('settings.manage')
+
+  const { rows } = await ctx.db.query<{ name: string; is_default: boolean }>(
+    'select name, is_default from business_calendars where id = $1 and tenant_id = $2',
+    [calendarId, ctx.tenantId],
+  )
+  if (!rows[0]) throw notFound('That calendar')
+  if (rows[0].is_default) {
+    throw conflict(`"${rows[0].name}" is the default calendar. Make another one the default first.`)
+  }
+
+  const { rows: used } = await ctx.db.query<{ n: string }>(
+    'select count(*)::text as n from sla_policies where tenant_id = $1 and calendar_id = $2',
+    [ctx.tenantId, calendarId],
+  )
+  if (Number(used[0].n) > 0) {
+    throw conflict(`${used[0].n} SLA policy(ies) still use "${rows[0].name}". Point them at another calendar first.`)
+  }
+
+  await ctx.db.query('delete from business_calendars where id = $1 and tenant_id = $2', [calendarId, ctx.tenantId])
+  await recordAudit(ctx.db, ctx, { action: 'support.calendar_deleted', resource: 'business_calendar', resourceId: calendarId })
+}

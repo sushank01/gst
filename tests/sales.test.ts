@@ -5,8 +5,9 @@ import { createSession } from '../src/server/auth/session.ts'
 import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
 import {
-  computeTotals, toMinor, toDecimal, createDocument, postDocument, updateDocumentLines,
-  recordPayment, runSubscriptionBilling, scheduleSubscriptionPeriods,
+  computeTotals, toMinor, toDecimal, archiveTaxCategory, cancelDocument, createDocument,
+  createTaxCategory, listTaxCategories, postDocument, readMatchPolicy, updateDocumentLines,
+  recordPayment, runSubscriptionBilling, scheduleSubscriptionPeriods, writeMatchPolicy,
 } from '../src/server/services/sales.ts'
 
 async function shop() {
@@ -324,4 +325,233 @@ test('ISOLATION: a sweep only bills its own tenant', async () => {
   assert.equal(summary.invoiced, 0, "another tenant's subscriptions are invisible")
   await a.db.close()
   await b.db.close()
+})
+
+/* ------------------------------- cancelling ------------------------------- */
+
+test('cancelling marks the document; the number never disappears', async () => {
+  const { db, ctx, customerId } = await shop()
+  const draft = await createDocument(ctx, {
+    kind: 'order',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '50' }],
+  })
+
+  const cancelled = await cancelDocument(ctx, draft.id, draft.version)
+  assert.ok(cancelled.cancelledAt)
+
+  const { rows } = await db.query<{ status: string; reference: string; cancelled_at: Date | null }>(
+    'select status, reference, cancelled_at from sales_documents where id = $1',
+    [draft.id],
+  )
+  // The row survives: a gap in a numbered sequence is something somebody has
+  // to account for later, and "it was deleted" is not an account of it.
+  assert.equal(rows[0].reference, draft.reference)
+  assert.equal(rows[0].status, 'cancelled')
+  assert.ok(rows[0].cancelled_at)
+  await db.close()
+})
+
+test('cancelling twice is not an error, and a posted document is refused', async () => {
+  const { db, ctx, customerId } = await shop()
+  const draft = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '50' }],
+  })
+  const first = await cancelDocument(ctx, draft.id, draft.version)
+  // The state the caller asked for already holds, so a retried request is not
+  // a conflict — the same timestamp comes back.
+  const again = await cancelDocument(ctx, draft.id, draft.version)
+  assert.equal(again.cancelledAt, first.cancelledAt)
+
+  const posted = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '50' }],
+  })
+  await postDocument(ctx, posted.id, posted.version)
+  await assert.rejects(() => cancelDocument(ctx, posted.id, posted.version + 1), /credit note/i)
+  await db.close()
+})
+
+test('a stale cancel is a conflict, not a silent erasure', async () => {
+  const { db, ctx, customerId } = await shop()
+  const draft = await createDocument(ctx, {
+    kind: 'quotation',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '50' }],
+  })
+  await updateDocumentLines(ctx, draft.id, draft.version, [{ description: 'Widget', quantity: '2', unitPrice: '50' }])
+  await assert.rejects(() => cancelDocument(ctx, draft.id, draft.version), /Someone else changed/)
+  await db.close()
+})
+
+/* ----------------------------- tax categories ----------------------------- */
+
+test('a tax slab is archived, never deleted, because posted lines point at it', async () => {
+  const { db, ctx } = await shop()
+  const slab = await createTaxCategory(ctx, { name: 'GST 18%', ratePercent: '18' })
+  assert.equal(slab.ratePercent, '18.000')
+  await assert.rejects(() => createTaxCategory(ctx, { name: 'gst 18%', ratePercent: '18' }), /already a category/)
+
+  await archiveTaxCategory(ctx, slab.id)
+  assert.deepEqual(await listTaxCategories(ctx), [])
+
+  const { rows } = await db.query<{ n: string }>('select count(*)::text as n from tax_categories where id = $1', [slab.id])
+  assert.equal(rows[0].n, '1', 'an invoice that cannot say which slab taxed it is not evidence of much')
+  // The name is free again once archived, which is what the partial index is for.
+  const remade = await createTaxCategory(ctx, { name: 'GST 18%', ratePercent: '18' })
+  assert.notEqual(remade.id, slab.id)
+  await db.close()
+})
+
+/* ------------------------------ match policy ------------------------------ */
+
+test('with no policy saved, nothing is enforced and nothing claims to be', async () => {
+  const { db, ctx, customerId } = await shop()
+  const policy = await readMatchPolicy(ctx)
+  // Null says plainly that these are defaults on display rather than a rule
+  // somebody chose — the screen has to be able to tell the difference.
+  assert.equal(policy.updatedAt, null)
+
+  const invoice = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '100' }],
+  })
+  const posted = await postDocument(ctx, invoice.id, invoice.version)
+  assert.ok(posted.postedAt, 'an unsaved policy must not start refusing posts')
+  await db.close()
+})
+
+test('require-an-order refuses an invoice that answers no order', async () => {
+  const { db, ctx, customerId } = await shop()
+  await writeMatchPolicy(ctx, {
+    priceTolerancePercent: '5',
+    priceAction: 'warn',
+    quantityTolerancePercent: '2',
+    quantityAction: 'warn',
+    requireOrder: true,
+    requireDelivery: false,
+    updatedAt: null,
+  })
+
+  const loose = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '100' }],
+  })
+  await assert.rejects(() => postDocument(ctx, loose.id, loose.version), /not linked to a sales order/)
+
+  const order = await createDocument(ctx, {
+    kind: 'order',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '100' }],
+  })
+  const billed = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId,
+    sourceDocumentId: order.id,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '100' }],
+  })
+  assert.ok((await postDocument(ctx, billed.id, billed.version)).postedAt)
+  await db.close()
+})
+
+test('a price beyond tolerance blocks the post only when the action says block', async () => {
+  const { db, ctx, customerId } = await shop()
+  const order = await createDocument(ctx, {
+    kind: 'order',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '100' }],
+  })
+  const overbilled = () =>
+    createDocument(ctx, {
+      kind: 'invoice',
+      customerId,
+      sourceDocumentId: order.id,
+      currency: 'USD',
+      lines: [{ description: 'Widget', quantity: '1', unitPrice: '120' }],
+    })
+
+  const policy = await writeMatchPolicy(ctx, {
+    priceTolerancePercent: '5',
+    priceAction: 'warn',
+    quantityTolerancePercent: '2',
+    quantityAction: 'warn',
+    requireOrder: false,
+    requireDelivery: false,
+    updatedAt: null,
+  })
+  const warned = await overbilled()
+  // "Warn" means exactly that: flagged in the audit trail, allowed through.
+  assert.ok((await postDocument(ctx, warned.id, warned.version)).postedAt)
+
+  await writeMatchPolicy(ctx, {
+    priceTolerancePercent: '5',
+    priceAction: 'block',
+    quantityTolerancePercent: '2',
+    quantityAction: 'warn',
+    requireOrder: false,
+    requireDelivery: false,
+    updatedAt: policy.updatedAt,
+  })
+  const blocked = await overbilled()
+  await assert.rejects(() => postDocument(ctx, blocked.id, blocked.version), /more than the 5(\.0+)?% allowed/)
+
+  const within = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId,
+    sourceDocumentId: order.id,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '104' }],
+  })
+  assert.ok((await postDocument(ctx, within.id, within.version)).postedAt, '4% drift is inside a 5% tolerance')
+  await db.close()
+})
+
+test('a stale match-policy save is a conflict', async () => {
+  const { db, ctx } = await shop()
+  const body = {
+    priceTolerancePercent: '5',
+    priceAction: 'warn' as const,
+    quantityTolerancePercent: '2',
+    quantityAction: 'warn' as const,
+    requireOrder: false,
+    requireDelivery: false,
+  }
+  const read = await readMatchPolicy(ctx)
+  await writeMatchPolicy(ctx, { ...body, updatedAt: read.updatedAt })
+  await assert.rejects(() => writeMatchPolicy(ctx, { ...body, updatedAt: read.updatedAt }), /Someone else/)
+  await db.close()
+})
+
+/* --------------------------- subscription periods ------------------------- */
+
+test('only a subscription can be given billing periods, and only in this workspace', async () => {
+  const { db, ctx, customerId } = await shop()
+  const invoice = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId,
+    currency: 'USD',
+    lines: [{ description: 'Widget', quantity: '1', unitPrice: '10' }],
+  })
+  await assert.rejects(() => scheduleSubscriptionPeriods(ctx, invoice.id, new Date(), 1), /Only a subscription/)
+  // A missing id reads as "no such subscription" rather than as a foreign-key
+  // failure, which is what an id from another workspace would otherwise be.
+  await assert.rejects(
+    () => scheduleSubscriptionPeriods(ctx, '00000000-0000-0000-0000-000000000000', new Date(), 1),
+    /That subscription/,
+  )
+  await db.close()
 })

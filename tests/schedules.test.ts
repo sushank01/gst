@@ -133,6 +133,39 @@ test('a queued job can be cancelled; a running one cannot be cancelled out from 
   await db.close()
 })
 
+test('one unreadable expression does not hide every other schedule', async () => {
+  const { db, ctx } = await workspace()
+  // A row the cron engine refuses. The dispatcher already survives one of
+  // these; listing them must too, or a single bad row answers the whole
+  // workspace with a 500 and the screen says there are no schedules at all.
+  await db.query(
+    `insert into schedules (tenant_id, name, kind, cron, timezone) values ($1, 'Broken', 'x', 'not a cron', 'UTC')`,
+    [ctx.tenantId],
+  )
+  await createSchedule(ctx, NIGHTLY)
+
+  const rows = await listSchedules(ctx)
+  assert.equal(rows.length, 2, 'the readable schedule is still listed')
+  const broken = rows.find((row) => row.name === 'Broken')!
+  assert.deepEqual(broken.upcoming, [], 'no occurrence is invented for an expression that cannot be read')
+  assert.equal(rows.find((row) => row.name === 'Nightly sweep')!.upcoming.length, 3)
+  await db.close()
+})
+
+test('a running job is not cancelled out from under its worker', async () => {
+  const { db, ctx } = await workspace()
+  const schedule = await createSchedule(ctx, NIGHTLY)
+  const { jobId } = await runScheduleNow(ctx, schedule.id)
+
+  const { claimJobs } = await import('../src/server/jobs/queue.ts')
+  await claimJobs(db, 'worker-1', ctx.now, { limit: 1 })
+
+  await assert.rejects(() => cancelQueuedJob(ctx, jobId!), /already started or finished/i)
+  const { rows } = await db.query<{ status: string }>('select status from jobs where id = $1', [jobId])
+  assert.equal(rows[0].status, 'running', 'the worker still owns it')
+  await db.close()
+})
+
 test('every attempt is kept, including ones a retry overwrote', async () => {
   const { db, ctx } = await workspace()
   const schedule = await createSchedule(ctx, NIGHTLY)
@@ -194,5 +227,32 @@ test('ISOLATION: schedules and jobs never cross workspaces', async () => {
   assert.deepEqual(await listSchedules(rivalCtx), [])
   assert.equal((await listJobs(rivalCtx, {})).total, 0)
   assert.deepEqual(await missedRuns(rivalCtx), [])
+  await db.close()
+})
+
+test('a page of jobs reports the total for the filter, and no row lands on two pages', async () => {
+  const { db, ctx } = await workspace()
+  // Three schedules, because the same instant on one schedule can only ever
+  // become one job — so all three land on the same created_at.
+  const names = ['One', 'Two', 'Three']
+  for (const name of names) {
+    const schedule = await createSchedule(ctx, { ...NIGHTLY, name })
+    await runScheduleNow(ctx, schedule.id)
+  }
+
+  const first = await listJobs(ctx, { limit: 2 })
+  const second = await listJobs(ctx, { limit: 2, offset: 2 })
+
+  assert.equal(first.rows.length, 2)
+  assert.equal(second.rows.length, 1)
+  // A screen that showed the page length would say "2 jobs" on page one, which
+  // is the count of what was loaded rather than of what exists.
+  assert.equal(first.total, 3, 'the total describes the filter, not the page')
+  assert.equal(second.total, 3)
+
+  // Ties on created_at are broken by id. Without that, limit/offset over an
+  // unstable order can repeat one job and never reach another.
+  const seen = [...first.rows, ...second.rows].map((job) => job.id)
+  assert.equal(new Set(seen).size, 3, 'every job appears exactly once across the pages')
   await db.close()
 })

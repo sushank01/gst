@@ -5,20 +5,22 @@ import { createSession } from '../src/server/auth/session.ts'
 import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
 import {
-  confirmEmployee, createVocabulary, employmentHistory, exitEmployee, hireEmployee,
-  linkEmployeeAccount, listEmployees, readEmployee, selfEmployee, transferEmployee,
+  archiveVocabulary, confirmEmployee, createVocabulary, employmentHistory, exitEmployee, hireEmployee,
+  hrOverview, lifecycleChanges, linkEmployeeAccount, listEmployeeDocuments, listEmployees, listVocabulary,
+  readEmployee, selfEmployee, transferEmployee,
 } from '../src/server/services/hr.ts'
 import { standardWeek } from '../src/server/services/calendar.ts'
 import {
-  attendanceBetween, closeAbandonedPunches, openPunch, punchIn, punchOut, settleDay,
+  assignShift, attendanceAcross, attendanceBetween, closeAbandonedPunches, createShift, listShiftAssignments,
+  listShifts, openPunch, punchIn, punchOut, settleDay,
 } from '../src/server/services/attendance.ts'
 import {
-  cancelLeave, createLeaveType, decideLeave, grantLeave, leaveBalances, leaveDaysBetween,
-  leaveLedger, requestLeave,
+  archiveLeaveType, cancelLeave, createLeaveType, decideLeave, grantLeave, leaveBalances, leaveDaysBetween,
+  leaveLedger, listLeaveEntries, listLeaveRequests, listLeaveTypes, recordLeaveEntry, requestLeave,
 } from '../src/server/services/leave.ts'
 import {
-  addEntry, decideOvertime, decideTimesheet, listEntries, openTimesheet, removeEntry,
-  requestOvertime, submitTimesheet,
+  addEntry, decideOvertime, decideTimesheet, listEntries, listOvertime, listTimesheets, openTimesheet,
+  removeEntry, requestOvertime, submitTimesheet,
 } from '../src/server/services/timesheets.ts'
 
 async function workspace() {
@@ -571,5 +573,294 @@ test('one live overtime claim per person per day, decided once', async () => {
   const approved = await decideOvertime(ctx, claim.id, { decision: 'approved', version: claim.version })
   assert.equal(approved.status, 'approved')
   await assert.rejects(() => decideOvertime(ctx, claim.id, { decision: 'rejected', version: approved.version }), /already approved/i)
+  await db.close()
+})
+
+/* ------------------------ what the screens read back ---------------------- */
+
+test('an archived taxonomy entry leaves the list but keeps the history that points at it', async () => {
+  const { db, ctx } = await workspace()
+  const sales = await createVocabulary(ctx, 'department', { name: 'Sales' })
+  const employee = await hireEmployee(ctx, { ...HIRE, departmentId: sales.id })
+
+  await archiveVocabulary(ctx, 'department', sales.id)
+  assert.deepEqual(await listVocabulary(ctx, 'department'), [], 'an archived entry is no longer choosable')
+  assert.equal((await listVocabulary(ctx, 'department', true)).length, 1)
+  assert.equal((await readEmployee(ctx, employee.id)).departmentName, 'Sales', 'the person still worked there')
+
+  // A second Remove is the same outcome the first had; it must not look like
+  // a different failure.
+  await assert.rejects(() => archiveVocabulary(ctx, 'department', sales.id), /not found|That entry/i)
+  await db.close()
+})
+
+test('lifecycle changes carry what each move changed FROM, and the hire is not a change', async () => {
+  const { db, ctx } = await workspace()
+  const sales = await createVocabulary(ctx, 'department', { name: 'Sales' })
+  const support = await createVocabulary(ctx, 'department', { name: 'Support' })
+  const employee = await hireEmployee(ctx, { ...HIRE, departmentId: sales.id })
+
+  const moved = await transferEmployee(ctx, employee.id, {
+    effectiveFrom: '2026-04-01',
+    departmentId: support.id,
+    reason: 'Transfer to Support',
+    version: employee.version,
+  })
+  await transferEmployee(ctx, employee.id, {
+    effectiveFrom: '2026-07-01',
+    reason: 'Promotion to lead',
+    version: moved.version,
+  })
+
+  const all = await lifecycleChanges(ctx)
+  assert.equal(all.total, 2, 'the opening position is a hire, not a promotion or a transfer')
+  assert.equal(all.rows[0].reason, 'Promotion to lead')
+  assert.equal(all.rows[1].departmentFrom, 'Sales')
+  assert.equal(all.rows[1].departmentTo, 'Support')
+
+  /*
+   * The two sub-tabs partition the changes rather than each matching a word:
+   * a move reasoned something else entirely still has to appear somewhere.
+   */
+  const promotions = await lifecycleChanges(ctx, { kind: 'promotion' })
+  const transfers = await lifecycleChanges(ctx, { kind: 'transfer' })
+  assert.equal(promotions.total + transfers.total, all.total)
+  assert.equal(promotions.rows[0].reason, 'Promotion to lead')
+  assert.equal(transfers.rows[0].reason, 'Transfer to Support')
+  await db.close()
+})
+
+test('the HR overview counts what is pending and reports what it cannot measure', async () => {
+  const { db, ctx, c } = await workspace()
+  const sales = await createVocabulary(ctx, 'department', { name: 'Sales' })
+  const ada = await hireEmployee(ctx, { ...HIRE, departmentId: sales.id, joinedOn: c.now().toISOString().slice(0, 10) })
+  await hireEmployee(ctx, { fullName: 'Grace Hopper', joinedOn: '2025-06-01' })
+
+  const annual = await createLeaveType(ctx, { name: 'Annual leave', code: 'AL' })
+  await grantLeave(ctx, { employeeId: ada.id, leaveTypeId: annual.id, year: 2026, days: '12', reason: 'opening' })
+  await requestLeave(ctx, { employeeId: ada.id, leaveTypeId: annual.id, startsOn: '2026-02-03', endsOn: '2026-02-03' }, standardWeek('UTC'))
+  await requestOvertime(ctx, { employeeId: ada.id, workedOn: '2026-01-20', minutes: 90 })
+
+  const overview = await hrOverview(ctx)
+  assert.equal(overview.headcount, 2)
+  assert.equal(overview.joinersThisMonth, 1, 'only the person who joined this month')
+  assert.equal(overview.pendingApprovals.leave, 1)
+  assert.equal(overview.pendingApprovals.overtime, 1)
+  assert.equal(overview.pendingApprovals.timesheets, 0)
+
+  const buckets = new Map(overview.byDepartment.map((row) => [row.name, row.headcount]))
+  assert.equal(buckets.get('Sales'), 1)
+  assert.equal(buckets.get(null), 1, 'people with no department are a visible bucket, not a silent omission')
+
+  /*
+   * Attrition is absent rather than zero. A rate with no stored denominator and
+   * a rate that is genuinely zero are different facts, and rendering the second
+   * for the first is the fabrication this whole migration exists to remove.
+   */
+  assert.ok(overview.unavailable.some((entry) => entry.metric === 'Attrition'))
+  await db.close()
+})
+
+test('attendance totals cover the whole filter, not the page that was loaded', async () => {
+  const { db, ctx, employee } = await withShift()
+  for (const day of ['2026-01-05', '2026-01-06', '2026-01-07']) {
+    await punchIn(ctx, employee.id, { at: new Date(`${day}T09:00:00Z`) })
+    await punchOut(ctx, employee.id, { at: new Date(`${day}T20:00:00Z`) })
+    await settleDay(ctx, employee.id, day, standardWeek('UTC'))
+  }
+
+  const page = await attendanceAcross(ctx, { from: '2026-01-01', to: '2026-01-31', limit: 1 })
+  assert.equal(page.rows.length, 1, 'one row was asked for')
+  assert.equal(page.total, 3, 'three days match')
+  assert.equal(page.totals.overtimeMinutes, 3 * (660 - 480), 'the total is of the match, not of the page')
+  assert.equal(page.rows[0].employeeName, 'Ada Lovelace')
+
+  const overtimeOnly = await attendanceAcross(ctx, { from: '2026-01-01', to: '2026-01-31', minOvertimeMinutes: 1 })
+  assert.equal(overtimeOnly.total, 3)
+  const quiet = await attendanceAcross(ctx, { from: '2026-02-01', to: '2026-02-28' })
+  assert.equal(quiet.total, 0)
+  assert.equal(quiet.totals.overtimeMinutes, 0, 'nothing settled in February is a real zero')
+  await db.close()
+})
+
+test('assigning a shift closes the open assignment the day before, and cannot predate it', async () => {
+  const { db, ctx } = await workspace()
+  const employee = await hireEmployee(ctx, HIRE)
+  const general = await createShift(ctx, { name: 'General', startsMinute: 540, endsMinute: 1080, breakMinutes: 60, graceMinutes: 10, weekdays: [1, 2, 3, 4, 5] })
+  const night = await createShift(ctx, { name: 'Night', startsMinute: 1320, endsMinute: 1800 })
+
+  await assignShift(ctx, { employeeId: employee.id, shiftId: general.id, effectiveFrom: '2026-01-05' })
+  /*
+   * Settlement reads the assignment covering the day being settled, so the old
+   * one is closed rather than replaced — otherwise moving somebody onto a new
+   * shift would silently re-grade every day they already worked.
+   */
+  await assert.rejects(
+    () => assignShift(ctx, { employeeId: employee.id, shiftId: night.id, effectiveFrom: '2026-01-01' }),
+    /must begin after/i,
+  )
+
+  await assignShift(ctx, { employeeId: employee.id, shiftId: night.id, effectiveFrom: '2026-02-01' })
+  const assignments = await listShiftAssignments(ctx, { employeeId: employee.id })
+  assert.equal(assignments.total, 2)
+  const closed = assignments.rows.find((row) => row.shiftName === 'General')
+  assert.equal(closed?.effectiveTo, '2026-01-31', 'the previous assignment ends the day before the next begins')
+  assert.equal((await listShifts(ctx)).length, 2)
+  await db.close()
+})
+
+test('a shift cannot be defined with a break longer than itself, or a duplicate name', async () => {
+  const { db, ctx } = await workspace()
+  await createShift(ctx, { name: 'General', startsMinute: 540, endsMinute: 1080 })
+  await assert.rejects(() => createShift(ctx, { name: 'general', startsMinute: 0, endsMinute: 60 }), /already exists/i)
+  await assert.rejects(
+    () => createShift(ctx, { name: 'Broken', startsMinute: 540, endsMinute: 600, breakMinutes: 90 }),
+    /break is longer/i,
+  )
+  await db.close()
+})
+
+test('overtime and timesheet lists report the count for the filter, not the page length', async () => {
+  const { db, ctx } = await workspace()
+  const employee = await hireEmployee(ctx, HIRE)
+  for (const day of ['2026-03-02', '2026-03-03', '2026-03-04']) {
+    await requestOvertime(ctx, { employeeId: employee.id, workedOn: day, minutes: 60 })
+  }
+  const claim = (await listOvertime(ctx, { limit: 1 })).rows[0]
+  await decideOvertime(ctx, claim.id, { decision: 'approved', version: claim.version })
+
+  const page = await listOvertime(ctx, { limit: 1 })
+  assert.equal(page.rows.length, 1)
+  assert.equal(page.total, 3, 'a list that reports its page length tells you you have fewer claims than you do')
+  assert.equal((await listOvertime(ctx, { status: 'submitted' })).total, 2)
+  assert.equal(page.rows[0].employeeName, 'Ada Lovelace')
+
+  await openTimesheet(ctx, { employeeId: employee.id, periodStart: '2026-03-02', periodEnd: '2026-03-06' })
+  await openTimesheet(ctx, { employeeId: employee.id, periodStart: '2026-03-09', periodEnd: '2026-03-13' })
+  const sheets = await listTimesheets(ctx, { limit: 1 })
+  assert.equal(sheets.total, 2)
+  assert.equal(sheets.rows[0].employeeName, 'Ada Lovelace')
+  await db.close()
+})
+
+test('an encashment is a debit: it is refused without the balance and shows in the ledger', async () => {
+  const { db, ctx, employee, annual } = await withLeave()
+
+  await assert.rejects(
+    () => recordLeaveEntry(ctx, { employeeId: employee.id, leaveTypeId: annual.id, year: 2026, days: '20', reason: 'cash out', kind: 'encashment' }),
+    /Only 12.00 day/i,
+    'paying for days somebody has not accrued is paying for days that do not exist',
+  )
+
+  const paid = await recordLeaveEntry(ctx, {
+    employeeId: employee.id, leaveTypeId: annual.id, year: 2026, days: '5', reason: 'cash out', kind: 'encashment',
+  })
+  assert.equal(paid.recorded, true)
+  assert.equal((await leaveBalances(ctx, employee.id, 2026))[0].available, '7.00')
+
+  // The once-key carries the kind, so a grant and an encashment stating the
+  // same reason are two facts rather than one that swallowed the other.
+  const granted = await recordLeaveEntry(ctx, {
+    employeeId: employee.id, leaveTypeId: annual.id, year: 2026, days: '5', reason: 'cash out', kind: 'grant',
+  })
+  assert.equal(granted.recorded, true)
+  assert.equal(
+    (await recordLeaveEntry(ctx, { employeeId: employee.id, leaveTypeId: annual.id, year: 2026, days: '5', reason: 'cash out', kind: 'encashment' })).recorded,
+    false,
+    'the same encashment submitted twice pays out once',
+  )
+
+  const ledger = await listLeaveEntries(ctx, { kind: 'encashment' })
+  assert.equal(ledger.total, 1)
+  assert.equal(ledger.rows[0].employeeName, 'Ada Lovelace')
+  assert.equal(ledger.rows[0].leaveTypeName, 'Annual leave')
+  assert.equal((await listLeaveEntries(ctx, { employeeId: employee.id })).total, 3)
+  await db.close()
+})
+
+test('a leave type in live use cannot be archived, and an archived one cannot be requested', async () => {
+  const { db, ctx, employee, annual } = await withLeave()
+  const booked = await requestLeave(
+    ctx,
+    { employeeId: employee.id, leaveTypeId: annual.id, startsOn: '2026-06-01', endsOn: '2026-06-02' },
+    standardWeek('UTC'),
+  )
+  await assert.rejects(() => archiveLeaveType(ctx, annual.id), /still use that leave type/i)
+
+  await cancelLeave(ctx, booked.id, booked.version)
+  await archiveLeaveType(ctx, annual.id)
+  assert.deepEqual(await listLeaveTypes(ctx), [], 'an archived type is out of the library')
+  assert.equal((await listLeaveTypes(ctx, true)).length, 1)
+  await assert.rejects(
+    () => requestLeave(ctx, { employeeId: employee.id, leaveTypeId: annual.id, startsOn: '2026-09-01', endsOn: '2026-09-01' }, standardWeek('UTC')),
+    /leave type/i,
+  )
+  await db.close()
+})
+
+test('the document count is the count of documents, and an empty store is empty', async () => {
+  const { db, ctx } = await workspace()
+  const employee = await hireEmployee(ctx, HIRE)
+  assert.deepEqual(await listEmployeeDocuments(ctx), { rows: [], total: 0 })
+
+  const { rows: file } = await db.query<{ id: string }>(
+    `insert into files (tenant_id, filename, content_type, byte_size, status)
+     values ($1, 'contract.pdf', 'application/pdf', 1024, 'clean') returning id`,
+    [ctx.tenantId],
+  )
+  await db.query(
+    `insert into hr_employee_documents (tenant_id, employee_id, file_id, kind, valid_until)
+     values ($1,$2,$3,'contract','2027-01-01')`,
+    [ctx.tenantId, employee.id, file[0].id],
+  )
+
+  const documents = await listEmployeeDocuments(ctx)
+  assert.equal(documents.total, 1)
+  assert.equal(documents.rows[0].filename, 'contract.pdf')
+  assert.equal(documents.rows[0].validUntil, '2027-01-01')
+  assert.equal(documents.rows[0].employeeName, 'Ada Lovelace')
+  await db.close()
+})
+
+test('a reader may list, but only a settings manager may retire a taxonomy entry', async () => {
+  const { db, ctx, staffCtx } = await workspace()
+  const sales = await createVocabulary(ctx, 'department', { name: 'Sales' })
+
+  // A refusal has to reach the screen as a refusal; rendering it as an empty
+  // list is how "you may not see this" becomes "there is nothing here".
+  await assert.rejects(() => archiveVocabulary(staffCtx, 'department', sales.id), /cannot settings manage/i)
+  assert.equal((await listVocabulary(staffCtx, 'department')).length, 1)
+  await db.close()
+})
+
+test("a manager's queue is their own reports' requests, not the whole tenant's", async () => {
+  const { db, ctx } = await workspace()
+  const lead = await hireEmployee(ctx, { fullName: 'Grace Hopper', joinedOn: '2025-06-01' })
+  const reports = await hireEmployee(ctx, { ...HIRE, managerId: lead.id })
+  const other = await hireEmployee(ctx, { fullName: 'Alan Turing', joinedOn: '2025-09-01' })
+
+  const annual = await createLeaveType(ctx, { name: 'Annual leave', code: 'AL' })
+  for (const person of [reports, other]) {
+    await grantLeave(ctx, { employeeId: person.id, leaveTypeId: annual.id, year: 2026, days: '10', reason: 'opening' })
+    await requestLeave(
+      ctx,
+      { employeeId: person.id, leaveTypeId: annual.id, startsOn: '2026-02-03', endsOn: '2026-02-03' },
+      standardWeek('UTC'),
+    )
+    await requestOvertime(ctx, { employeeId: person.id, workedOn: '2026-01-20', minutes: 60 })
+  }
+
+  /*
+   * Team approvals must not show a manager work that is not theirs to decide;
+   * filtering the whole tenant's queue in the browser would leak every other
+   * team's absences to anybody who could read the list.
+   */
+  const queue = await listLeaveRequests(ctx, { managerId: lead.id, status: 'submitted' })
+  assert.equal(queue.total, 1)
+  assert.equal(queue.rows[0].employeeId, reports.id)
+  assert.equal(queue.rows[0].employeeName, 'Ada Lovelace')
+  assert.equal(queue.rows[0].leaveTypeName, 'Annual leave')
+  assert.equal((await listOvertime(ctx, { managerId: lead.id })).total, 1)
+  assert.equal((await listLeaveRequests(ctx, { status: 'submitted' })).total, 2, 'HR still sees both')
   await db.close()
 })

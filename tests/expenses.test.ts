@@ -6,9 +6,10 @@ import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
 import { hireEmployee } from '../src/server/services/hr.ts'
 import {
-  attachExpense, convert, decideReport, detachExpense, importCardTransactions, listExpenses,
-  matchCardTransaction, openReport, readReport, recordExpense, runReimbursement, submitReport,
-  unmatchedTransactions,
+  attachExpense, convert, createCategory, decideReport, detachExpense, expenseSummary,
+  importCardTransactions, listApprovalLevels, listCardTransactions, listCategories, listExpenses,
+  listReimbursementRuns, listReports, matchCardTransaction, openReport, readReport, recordExpense,
+  replaceApprovalLevels, runReimbursement, submitReport, updateCategory,
 } from '../src/server/services/expenses.ts'
 
 async function workspace() {
@@ -25,7 +26,10 @@ async function workspace() {
   const ctx = await ctxFor(finance, acme.tenantId)
   const employee = await hireEmployee(ctx, { fullName: 'Ada Lovelace', joinedOn: '2026-01-05' })
   const other = await hireEmployee(ctx, { fullName: 'Grace Hopper', joinedOn: '2026-01-05' })
-  return { db, c, ctx, rivalCtx: await ctxFor(outsider, rival.tenantId), employee, other }
+  // `ctxFor` is handed back so a test can act at a later instant: every
+  // context carries the clock it was built with, and a turnaround is a
+  // measurement across two of them.
+  return { db, c, ctx, ctxFor: () => ctxFor(finance, acme.tenantId), rivalCtx: await ctxFor(outsider, rival.tenantId), employee, other }
 }
 
 const SPEND = { spentOn: '2026-03-02', amount: '1200.0000', currency: 'INR', baseCurrency: 'INR', merchant: 'Taxi Co' }
@@ -295,15 +299,22 @@ test('re-importing a statement adds nothing, and a card line matches one expense
   assert.deepEqual(await importCardTransactions(ctx, lines), { imported: 2, duplicates: 0 })
   assert.deepEqual(await importCardTransactions(ctx, lines), { imported: 0, duplicates: 2 }, 'a re-imported statement is not a second set of charges')
 
-  const unmatched = await unmatchedTransactions(ctx)
+  const { rows: unmatched, total } = await listCardTransactions(ctx, { matched: false })
   assert.equal(unmatched.length, 2)
+  assert.equal(total, 2)
 
   const expense = await recordExpense(ctx, { ...SPEND, employeeId: employee.id })
   await matchCardTransaction(ctx, unmatched[1].id, expense.id)
 
   await assert.rejects(() => matchCardTransaction(ctx, unmatched[0].id, expense.id), /already matched/i)
   await assert.rejects(() => matchCardTransaction(ctx, unmatched[1].id, expense.id), /already matched/i)
-  assert.equal((await unmatchedTransactions(ctx)).length, 1)
+  assert.equal((await listCardTransactions(ctx, { matched: false })).total, 1)
+  // The matched side has to be answerable too, or a "Matched" badge can only
+  // ever be guessed from what the unmatched query left out.
+  const matched = await listCardTransactions(ctx, { matched: true })
+  assert.equal(matched.total, 1)
+  assert.equal(matched.rows[0].matchedExpenseId, expense.id)
+  assert.equal((await listCardTransactions(ctx, {})).total, 2, 'no filter means every line')
   await db.close()
 })
 
@@ -501,5 +512,264 @@ test('ISOLATION: trips never cross workspaces', async () => {
   await assert.rejects(() => readTrip(rivalCtx, trip.id), /That travel request/)
   await assert.rejects(() => submitTrip(rivalCtx, trip.id, trip.version), /That travel request/)
   assert.equal((await listTrips(rivalCtx, {})).total, 0)
+  await db.close()
+})
+
+/* ------------------------------ expense policy ---------------------------- */
+
+/** The Expense policy pane writes here; the engine reads it from the same place. */
+async function savePolicy(
+  context: Awaited<ReturnType<typeof workspace>>,
+  section: string,
+  value: Record<string, unknown>,
+) {
+  await context.db.query(
+    `insert into app_settings (tenant_id, company_id, app_code, section, value) values ($1,$2,'TE',$3,$4)`,
+    [context.ctx.tenantId, context.ctx.companyId, section, JSON.stringify(value)],
+  )
+}
+
+async function claimOf(context: Awaited<ReturnType<typeof workspace>>, amount: string, merchant = 'Hotel') {
+  const report = await openReport(context.ctx, { employeeId: context.employee.id, title: 'March', currency: 'INR' })
+  const expense = await recordExpense(context.ctx, { ...SPEND, employeeId: context.employee.id, amount, merchant })
+  await attachExpense(context.ctx, report.id, expense.id)
+  return report
+}
+
+test('block mode refuses a claim that breaks policy; warn mode lets it through', async () => {
+  const warned = await workspace()
+  await savePolicy(warned, 'expense_policy', { enforcement: 'warn', receiptRequiredAbove: '500' })
+  const flagged = await claimOf(warned, '1200.0000')
+  const submitted = await submitReport(warned.ctx, flagged.id, flagged.version)
+  assert.ok(
+    submitted.policyFlags.some((flag) => flag.code === 'receipt_missing'),
+    'warn mode is the default behaviour: flag it and let the approver decide',
+  )
+  await warned.db.close()
+
+  const blocked = await workspace()
+  await savePolicy(blocked, 'expense_policy', { enforcement: 'block', receiptRequiredAbove: '500' })
+  const bad = await claimOf(blocked, '1200.0000')
+  await assert.rejects(
+    () => submitReport(blocked.ctx, bad.id, bad.version),
+    /breaks policy/i,
+    'the pane has always promised block mode stops submission; saving it must do that',
+  )
+  await blocked.db.close()
+})
+
+test('a category with its own receipt threshold overrides the workspace-wide one', async () => {
+  const context = await workspace()
+  const { db, ctx, employee } = context
+  await savePolicy(context, 'expense_policy', { receiptRequiredAbove: '100' })
+  const lenient = await createCategory(ctx, { name: 'Meals', code: 'MEAL', receiptRequiredAbove: '5000' })
+
+  const uncategorised = await recordExpense(ctx, { ...SPEND, employeeId: employee.id, amount: '600.0000' })
+  assert.deepEqual(
+    uncategorised.policyFlags.map((flag) => flag.code),
+    ['receipt_missing'],
+    'the workspace threshold applies where nothing more specific does',
+  )
+
+  const meal = await recordExpense(ctx, { ...SPEND, employeeId: employee.id, amount: '600.0000', categoryId: lenient.id, merchant: 'Cafe' })
+  assert.deepEqual(meal.policyFlags, [], 'the more specific rule wins, rather than both being applied')
+  await db.close()
+})
+
+test('turning duplicate detection off stops the flag being raised', async () => {
+  const context = await workspace()
+  const { db, ctx, employee } = context
+  await savePolicy(context, 'expense_policy', { flagDuplicates: false })
+  await recordExpense(ctx, { ...SPEND, employeeId: employee.id })
+  const second = await recordExpense(ctx, { ...SPEND, employeeId: employee.id })
+  assert.deepEqual(second.policyFlags, [], 'a checkbox that changes nothing is a checkbox that lies')
+  await db.close()
+})
+
+/* --------------------------------- figures -------------------------------- */
+
+test('the dashboard summary never adds two currencies into one figure', async () => {
+  const context = await workspace()
+  const { db, ctx, employee } = context
+
+  const rupees = await openReport(ctx, { employeeId: employee.id, title: 'Mumbai', currency: 'INR' })
+  await attachExpense(ctx, rupees.id, (await recordExpense(ctx, { ...SPEND, employeeId: employee.id, amount: '1200.0000' })).id)
+  const dollars = await openReport(ctx, { employeeId: employee.id, title: 'Austin', currency: 'USD' })
+  await attachExpense(
+    ctx,
+    dollars.id,
+    (await recordExpense(ctx, { ...SPEND, employeeId: employee.id, amount: '90.0000', currency: 'USD', baseCurrency: 'USD', merchant: 'Cab' })).id,
+  )
+
+  const summary = await expenseSummary(ctx)
+  const drafts = summary.byStatus.filter((row) => row.status === 'draft')
+  assert.deepEqual(
+    drafts.map((row) => [row.currency, row.total, row.reports]),
+    [['INR', '1200.0000', 1], ['USD', '90.0000', 1]],
+    'the screen this replaces printed 1290 with no currency at all',
+  )
+  await db.close()
+})
+
+test('average turnaround is absent until something has actually been reimbursed', async () => {
+  const context = await workspace()
+  const { db, ctx } = context
+  assert.equal(await expenseSummary(ctx).then((s) => s.turnaround), null, 'no completed claim is not a turnaround of zero')
+
+  await approvedReport(context, '1200.0000', 'March')
+  context.c.advance(2 * 86_400_000)
+  await runReimbursement(await context.ctxFor(), { currency: 'INR' })
+
+  const summary = await expenseSummary(ctx)
+  assert.ok(summary.turnaround)
+  assert.equal(summary.turnaround.reports, 1)
+  assert.equal(summary.turnaround.days, '2.0')
+  await db.close()
+})
+
+test('spend by category is measured from the lines, and uncategorised spend says so', async () => {
+  const context = await workspace()
+  const { db, ctx, employee } = context
+  const hotels = await createCategory(ctx, { name: 'Hotel', code: 'HOTEL' })
+  const report = await openReport(ctx, { employeeId: employee.id, title: 'March', currency: 'INR' })
+  await attachExpense(ctx, report.id, (await recordExpense(ctx, { ...SPEND, employeeId: employee.id, amount: '8000.0000', categoryId: hotels.id })).id)
+  await attachExpense(ctx, report.id, (await recordExpense(ctx, { ...SPEND, employeeId: employee.id, amount: '500.0000', merchant: 'Kiosk' })).id)
+
+  // Only approved spend counts; a draft claim is not spend anybody has agreed to.
+  assert.deepEqual(await expenseSummary(ctx).then((s) => s.byCategory), [])
+
+  const submitted = await submitReport(ctx, report.id, report.version)
+  await decideReport(ctx, report.id, { decision: 'approved', version: submitted.version })
+
+  assert.deepEqual(
+    (await expenseSummary(ctx)).byCategory.map((row) => [row.name, row.currency, row.total]),
+    [['Hotel', 'INR', '8000.0000'], [null, 'INR', '500.0000']],
+    'the screen this replaces derived the category from the length of the title',
+  )
+  await db.close()
+})
+
+test('a claim carries when it was raised, and the range filter is applied in SQL', async () => {
+  const context = await workspace()
+  const { db, ctx, employee } = context
+  const report = await openReport(ctx, { employeeId: employee.id, title: 'March', currency: 'INR' })
+  // `created_at` is a column default, so it is the database's clock rather than
+  // the context's — and that is the clock the range compares against.
+  assert.match(report.createdAt, /^\d{4}-\d{2}-\d{2}T/)
+  const raisedOn = report.createdAt.slice(0, 10)
+
+  assert.equal((await listReports(ctx, { from: raisedOn, to: raisedOn })).total, 1, 'the day it was raised is inside the range')
+  assert.equal(
+    (await listReports(ctx, { from: '2099-01-01' })).total,
+    0,
+    'a range the screen filters client-side silently means nothing beyond the loaded page',
+  )
+  await db.close()
+})
+
+test('a payout run can be read back with the batch it paid', async () => {
+  const context = await workspace()
+  const { db, ctx } = context
+  await approvedReport(context, '1200.0000', 'March')
+  await approvedReport(context, '800.0000', 'April')
+  const run = await runReimbursement(ctx, { currency: 'INR' })
+
+  const { rows, total } = await listReimbursementRuns(ctx)
+  assert.equal(total, 1)
+  assert.equal(rows[0].reference, run.reference)
+  assert.equal(rows[0].status, 'paid')
+  assert.equal(rows[0].reports, 2, 'runs were written and never readable, so the screen kept its own copy')
+  assert.equal(rows[0].totalAmount, '2000.0000')
+  assert.equal(rows[0].currency, 'INR')
+  await db.close()
+})
+
+/* ------------------------- categories and approvals ----------------------- */
+
+test('a spend limit without a currency is refused, and a null clears one', async () => {
+  const { db, ctx } = await workspace()
+  await assert.rejects(
+    () => createCategory(ctx, { name: 'Meals', code: 'MEAL', limitAmount: '1000' }),
+    /State the currency/i,
+    'a cap with no currency cannot be compared with a converted amount',
+  )
+
+  const meals = await createCategory(ctx, { name: 'Meals', code: 'MEAL', limitAmount: '1000', limitCurrency: 'INR' })
+  assert.equal(meals.limitAmount, '1000.0000')
+  await assert.rejects(() => createCategory(ctx, { name: 'Meals again', code: 'meal' }), /already exists/i)
+
+  const relaxed = await updateCategory(ctx, meals.id, { limitAmount: null, limitCurrency: null, glAccount: '5100' })
+  assert.equal(relaxed.limitAmount, null, 'clearing a limit must be possible, not only raising it')
+  assert.equal(relaxed.glAccount, '5100')
+
+  const untouched = await updateCategory(ctx, meals.id, { receiptRequiredAbove: '250' })
+  assert.equal(untouched.glAccount, '5100', 'an omitted key leaves its column alone')
+  assert.equal((await listCategories(ctx)).length, 1)
+  await db.close()
+})
+
+test('replacing the approval ladder renumbers it, and the chain then uses it', async () => {
+  const context = await workspace()
+  const { db, ctx } = context
+  await replaceApprovalLevels(ctx, 'expense', [
+    { label: 'Manager' },
+    { label: 'Finance', threshold: '5000' },
+  ])
+  assert.deepEqual(
+    (await listApprovalLevels(ctx, 'expense')).map((row) => [row.level, row.label, row.threshold]),
+    [[1, 'Manager', '0.0000'], [2, 'Finance', '5000.0000']],
+    'a blank threshold means the level always applies',
+  )
+
+  // Removing the first row renumbers the rest; done row by row this collides on
+  // the unique (tenant, scope, level) key halfway through.
+  await replaceApprovalLevels(ctx, 'expense', [{ label: 'Finance', threshold: '5000' }])
+  assert.deepEqual(
+    (await listApprovalLevels(ctx, 'expense')).map((row) => [row.level, row.label]),
+    [[1, 'Finance']],
+  )
+  assert.deepEqual(await listApprovalLevels(ctx, 'travel'), [], 'the scopes are separate ladders')
+
+  const small = await claimOf(context, '1000.0000')
+  const submitted = await submitReport(ctx, small.id, small.version)
+  assert.equal(
+    (await decideReport(ctx, small.id, { decision: 'approved', version: submitted.version })).status,
+    'approved',
+    'a claim below every threshold clears the chain at once',
+  )
+  await db.close()
+})
+
+/* ---------------------------- travel advances ----------------------------- */
+
+test('an advance above the policy share of the estimate is refused', async () => {
+  const context = await workspace()
+  const { db, ctx, employee } = context
+  await assert.rejects(
+    () => createTrip(ctx, { ...TRIP, employeeId: employee.id, advanceRequested: '1000.0000' }),
+    /does not allow travel advances/i,
+    'an unconfigured advance limit is not an unlimited one',
+  )
+
+  await savePolicy(context, 'travel_policy', { advancePercent: 50 })
+  await assert.rejects(
+    () => createTrip(ctx, { ...TRIP, employeeId: employee.id, advanceRequested: '25000.0000' }),
+    /at most 50%/i,
+  )
+  const within = await createTrip(ctx, { ...TRIP, employeeId: employee.id, advanceRequested: '20000.0000' })
+  assert.equal(within.status, 'draft')
+  await db.close()
+})
+
+test('trips can be listed by a set of states, so "still live" is one query', async () => {
+  const { db, ctx, employee, other } = await workspace()
+  const live = await createTrip(ctx, { ...TRIP, employeeId: employee.id })
+  await submitTrip(ctx, live.id, live.version)
+  const calledOff = await createTrip(ctx, { ...TRIP, employeeId: other.id })
+  await cancelTrip(ctx, calledOff.id, calledOff.version)
+
+  assert.equal((await listTrips(ctx, { statuses: ['draft', 'submitted', 'approved', 'booked', 'in_progress'] })).total, 1)
+  assert.equal((await listTrips(ctx, { statuses: ['rejected', 'completed', 'cancelled'] })).total, 1)
+  assert.equal((await listTrips(ctx, {})).total, 2)
   await db.close()
 })

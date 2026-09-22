@@ -5,7 +5,8 @@ import { createSession } from '../src/server/auth/session.ts'
 import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
 import {
-  closeShift, listShifts, openShift, readShift, recordSale, varianceReport, voidSale,
+  closeShift, listShifts, openShift, readShift, readVariancePolicy, recordSale, varianceReport,
+  voidSale, writeVariancePolicy,
 } from '../src/server/services/pos.ts'
 
 async function till() {
@@ -239,6 +240,173 @@ test('ISOLATION: a till in another workspace is not found', async () => {
     /That till/,
   )
   await assert.rejects(() => closeShift(rivalCtx, shift.id, { countedCash: '0', version: shift.version }), /That till/)
-  assert.deepEqual(await listShifts(rivalCtx, {}), [])
+  assert.deepEqual(await listShifts(rivalCtx, {}), { rows: [], total: 0, cashiers: 0 })
+  await db.close()
+})
+
+/* ------------------------- what the list has to carry --------------------- */
+
+test('the shift list carries the cashier’s name and the tenders taken', async () => {
+  const { db, ctx } = await till()
+  const shift = await openShift(ctx, { currency: 'INR', openingFloat: '100.0000' })
+  await recordSale(ctx, {
+    shiftId: shift.id,
+    total: '250.0000',
+    currency: 'INR',
+    tenders: [
+      { method: 'cash', amount: '150.0000' },
+      { method: 'card', amount: '100.0000' },
+    ],
+  })
+
+  const listed = await listShifts(ctx, {})
+  assert.equal(listed.rows.length, 1)
+  /*
+   * Without these two the manager's dashboard shows a uuid where a name belongs
+   * and every takings figure reads zero — and resolving the name through the
+   * members endpoint needs a permission a cashier may not hold.
+   */
+  assert.equal(listed.rows[0].cashierName, 'Owner')
+  assert.equal(listed.rows[0].totals.byMethod.cash, '150.0000')
+  assert.equal(listed.rows[0].totals.byMethod.card, '100.0000')
+  assert.equal(listed.rows[0].totals.sales, 1)
+  // 100 float + 150 cash. The card never reaches the drawer.
+  assert.equal(listed.rows[0].totals.expectedCash, '250.0000')
+  await db.close()
+})
+
+test('the list total counts matching tills, not the page', async () => {
+  const { db, ctx } = await till()
+  for (let index = 0; index < 3; index += 1) {
+    const shift = await openShift(ctx, { currency: 'INR' })
+    await closeShift(ctx, shift.id, { countedCash: '0', version: shift.version })
+  }
+  const open = await openShift(ctx, { currency: 'INR' })
+
+  const page = await listShifts(ctx, { limit: 1 })
+  assert.equal(page.rows.length, 1)
+  assert.equal(page.total, 4, 'a count taken from the page length is wrong past the first page')
+
+  const openOnly = await listShifts(ctx, { open: true })
+  assert.equal(openOnly.total, 1)
+  assert.equal(openOnly.rows[0].id, open.id)
+
+  const closedOnly = await listShifts(ctx, { closed: true })
+  assert.equal(closedOnly.total, 3)
+  await db.close()
+})
+
+/* --------------------------- cash variance policy ------------------------- */
+
+test('with no policy saved, the defaults are reported and marked as unsaved', async () => {
+  const { db, ctx } = await till()
+  const policy = await readVariancePolicy(ctx)
+  // Null is the honest answer to "when was this configured": never. A screen
+  // that showed a timestamp here would be inventing an administrative act.
+  assert.equal(policy.updatedAt, null)
+  assert.equal(policy.reasonRequiredAbove, '1.0000')
+  await db.close()
+})
+
+test('the saved threshold is the one the drawer enforces', async () => {
+  const { db, ctx, c } = await till()
+  const first = await readVariancePolicy(ctx)
+  await writeVariancePolicy(ctx, {
+    reasonRequiredAbove: '50.0000',
+    amberWorstShift: '50.0000',
+    redWorstShift: '100.0000',
+    amberAverage: '20.0000',
+    redAverage: '40.0000',
+    updatedAt: first.updatedAt,
+  })
+
+  const shift = await openShift(ctx, { currency: 'INR', openingFloat: '1000.0000' })
+  /*
+   * The whole reason this policy has its own table: closeShift reads it. A
+   * threshold saved into app settings would show on the screen and change
+   * nothing here, and a shift 20 short would still be refused.
+   */
+  const closed = await closeShift(ctx, shift.id, { countedCash: '980.0000', version: shift.version })
+  assert.equal(closed.variance, '-20.0000')
+
+  const next = await openShift(ctx, { currency: 'INR', openingFloat: '1000.0000' })
+  await assert.rejects(
+    () => closeShift(ctx, next.id, { countedCash: '900.0000', version: next.version }),
+    /Record why before closing/,
+  )
+  c.advance(1000)
+  await db.close()
+})
+
+test('two admins editing the policy: the second is told, not silently replaced', async () => {
+  const { db, ctx } = await till()
+  const read = await readVariancePolicy(ctx)
+  const saved = await writeVariancePolicy(ctx, {
+    reasonRequiredAbove: '2.0000',
+    amberWorstShift: '2.0000',
+    redWorstShift: '9.0000',
+    amberAverage: '1.0000',
+    redAverage: '4.0000',
+    updatedAt: read.updatedAt,
+  })
+  assert.ok(saved.updatedAt)
+
+  // The stale editor still holds the pre-save token.
+  await assert.rejects(
+    () =>
+      writeVariancePolicy(ctx, {
+        reasonRequiredAbove: '3.0000',
+        amberWorstShift: '3.0000',
+        redWorstShift: '9.0000',
+        amberAverage: '1.0000',
+        redAverage: '4.0000',
+        updatedAt: read.updatedAt,
+      }),
+    /Someone else/,
+  )
+  await db.close()
+})
+
+test('red below amber is refused before the check constraint has to say so', async () => {
+  const { db, ctx } = await till()
+  await assert.rejects(
+    () =>
+      writeVariancePolicy(ctx, {
+        reasonRequiredAbove: '1.0000',
+        amberWorstShift: '5.0000',
+        redWorstShift: '1.0000',
+        amberAverage: '0.5000',
+        redAverage: '2.0000',
+        updatedAt: null,
+      }),
+    /at least the amber/,
+    'the table would reject this too, but as a 500 nobody can act on',
+  )
+  await db.close()
+})
+
+test('the variance report counts shifts per band using the saved thresholds', async () => {
+  const { db, ctx } = await till()
+  await writeVariancePolicy(ctx, {
+    reasonRequiredAbove: '1000.0000',
+    amberWorstShift: '5.0000',
+    redWorstShift: '20.0000',
+    amberAverage: '5.0000',
+    redAverage: '20.0000',
+    updatedAt: null,
+  })
+
+  for (const counted of ['1000.0000', '990.0000', '950.0000']) {
+    const shift = await openShift(ctx, { currency: 'INR', openingFloat: '1000.0000' })
+    await closeShift(ctx, shift.id, { countedCash: counted, version: shift.version })
+  }
+
+  const report = await varianceReport(ctx)
+  assert.equal(report.shifts, 3)
+  assert.equal(report.cashiers, 1)
+  // 0 short is green, 10 short is amber, 50 short is red — the bands the
+  // manager's scorecard prints are the ones the till was closed against.
+  assert.deepEqual(report.byBand, { green: 1, amber: 1, red: 1 })
+  assert.equal(report.bands.redWorstShift, '20.0000')
   await db.close()
 })

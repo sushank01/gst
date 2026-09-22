@@ -52,7 +52,9 @@ export type ReportRow = {
   totalAmount: string
   approvedAmount: string | null
   policyFlags: PolicyFlag[]
+  submittedAt: string | null
   reimbursedAt: string | null
+  createdAt: string
   version: number
 }
 
@@ -92,7 +94,11 @@ const mapReport = (row: Raw): ReportRow => ({
   totalAmount: decimalText(row.total_amount) as string,
   approvedAmount: decimalText(row.approved_amount),
   policyFlags: (row.policy_flags as PolicyFlag[]) ?? [],
+  submittedAt: row.submitted_at ? new Date(row.submitted_at as string).toISOString() : null,
   reimbursedAt: row.reimbursed_at ? new Date(row.reimbursed_at as string).toISOString() : null,
+  // Carried because a claim's age is only answerable from when it was raised;
+  // a screen that has to guess it ends up inventing one.
+  createdAt: new Date(row.created_at as string).toISOString(),
   version: row.version as number,
 })
 
@@ -171,12 +177,53 @@ export function convert(amount: string, fxRate: string): string {
   return toDecimal(remainder * 2n >= divisor ? quotient + 1n : quotient)
 }
 
+/**
+ * The tenant's expense policy, as the Expense policy pane saves it.
+ *
+ * Read straight from `app_settings` rather than through `readSettings`,
+ * because this is the engine consulting its own configuration on behalf of
+ * whoever is filing a claim — not that person reading the settings screen, for
+ * which they may well have no permission.
+ *
+ * The defaults are the behaviour a tenant that has never opened the pane
+ * already had: flag, never block, and always look for duplicates.
+ */
+export type ExpensePolicy = { enforcement: 'warn' | 'block'; flagDuplicates: boolean; receiptRequiredAbove: string | null }
+
+/** Flags an approver is expected to act on; the rest are advisory. */
+const HARD_FLAGS = new Set(['over_category_limit', 'receipt_missing'])
+
+async function expensePolicy(db: Db, ctx: TenantContext): Promise<ExpensePolicy> {
+  const { rows } = await db.query<{ value: Record<string, unknown> }>(
+    `select value from app_settings
+      where tenant_id = $1 and app_code = 'TE' and section = 'expense_policy'
+        and company_id is not distinct from $2`,
+    [ctx.tenantId, ctx.companyId],
+  )
+  const value = rows[0]?.value ?? {}
+  const threshold = typeof value.receiptRequiredAbove === 'string' ? value.receiptRequiredAbove.trim() : ''
+  return {
+    enforcement: value.enforcement === 'block' ? 'block' : 'warn',
+    flagDuplicates: value.flagDuplicates !== false,
+    // An empty box means "no workspace-wide threshold", which is not the same
+    // statement as a threshold of zero.
+    receiptRequiredAbove: threshold === '' ? null : threshold,
+  }
+}
+
 async function policyFlagsFor(
   db: Db,
   ctx: TenantContext,
   input: { employeeId: string; categoryId?: string | null; spentOn: string; merchant?: string | null; amount: string; baseAmount: string; receiptFileId?: string | null; excludeExpenseId?: string },
 ): Promise<PolicyFlag[]> {
   const flags: PolicyFlag[] = []
+  const policy = await expensePolicy(db, ctx)
+  /*
+   * The workspace-wide threshold is a floor, not an override: a category that
+   * states its own is the more specific rule and wins. Without the fallback the
+   * pane's "Receipt required at/above" box would save a number nothing reads.
+   */
+  let receiptAbove = policy.receiptRequiredAbove
 
   if (input.categoryId) {
     const { rows } = await db.query<{ name: string; limit_amount: string | null; receipt_required_above: string | null }>(
@@ -188,19 +235,17 @@ async function policyFlagsFor(
       if (category.limit_amount !== null && toMinor(input.baseAmount) > toMinor(category.limit_amount)) {
         flags.push({ code: 'over_category_limit', message: `Above the ${category.name} limit of ${category.limit_amount}.` })
       }
-      if (
-        category.receipt_required_above !== null &&
-        toMinor(input.baseAmount) > toMinor(category.receipt_required_above) &&
-        !input.receiptFileId
-      ) {
-        flags.push({ code: 'receipt_missing', message: `A receipt is required above ${category.receipt_required_above}.` })
-      }
+      if (category.receipt_required_above !== null) receiptAbove = category.receipt_required_above
     }
+  }
+
+  if (receiptAbove !== null && toMinor(input.baseAmount) > toMinor(receiptAbove) && !input.receiptFileId) {
+    flags.push({ code: 'receipt_missing', message: `A receipt is required above ${receiptAbove}.` })
   }
 
   // Same person, same day, same merchant, same amount: usually one bill
   // claimed twice. Flagged rather than blocked — two identical fares happen.
-  if (input.merchant) {
+  if (policy.flagDuplicates && input.merchant) {
     const { rows } = await db.query<{ n: string }>(
       `select count(*)::text as n from te_expenses
         where tenant_id = $1 and employee_id = $2 and spent_on = $3
@@ -429,6 +474,17 @@ export async function submitReport(ctx: TenantContext, reportId: string, version
     )
     const flags = flagged.flatMap((row) => row.policy_flags ?? [])
 
+    /*
+     * Block mode is what the Expense policy pane has always promised and never
+     * did. Duplicate detection stays advisory in both modes, as the pane says:
+     * two identical fares on one day are a real thing that happens.
+     */
+    const policy = await expensePolicy(tx, ctx)
+    const hard = flags.filter((flag) => HARD_FLAGS.has(flag.code))
+    if (policy.enforcement === 'block' && hard.length) {
+      throw unprocessable('policy_violation', `This claim breaks policy: ${hard.map((flag) => flag.message).join(' ')}`)
+    }
+
     const levels = await levelsFor(tx, ctx, 'expense', total)
     const firstLevel = levels[0] ?? 1
     /*
@@ -534,7 +590,7 @@ export async function readReport(ctx: TenantContext, reportId: string): Promise<
 
 export async function listReports(
   ctx: TenantContext,
-  options: { employeeId?: string; status?: string; limit?: number; offset?: number } = {},
+  options: { employeeId?: string; status?: string; from?: string; to?: string; limit?: number; offset?: number } = {},
 ): Promise<{ rows: ReportRow[]; total: number }> {
   ctx.require('record.read')
   const filters = ['r.tenant_id = $1']
@@ -545,6 +601,10 @@ export async function listReports(
   }
   if (options.employeeId) add('r.employee_id = $?', options.employeeId)
   if (options.status) add('r.status = $?', options.status)
+  // The range is applied in SQL so the count beside a date filter is the count
+  // of claims in that range, not of the page that happened to load.
+  if (options.from) add('r.created_at >= $?::date', options.from)
+  if (options.to) add('r.created_at < $?::date + 1', options.to)
   const where = filters.join(' and ')
 
   const { rows: counted } = await ctx.db.query<{ n: string }>(
@@ -618,22 +678,56 @@ export async function matchCardTransaction(ctx: TenantContext, transactionId: st
   })
 }
 
-export async function unmatchedTransactions(
+export type CardTransactionRow = {
+  id: string
+  postedOn: string
+  merchant: string
+  amount: string
+  currency: string
+  cardLast4: string | null
+  /** Non-null exactly when the line is reconciled against a claimed expense. */
+  matchedExpenseId: string | null
+}
+
+/**
+ * Card lines, optionally narrowed to the matched or the unmatched ones.
+ *
+ * The filter is a query rather than something the screen does to a loaded page,
+ * so the "Matched / Unmatched / All" toggle counts rows in the workspace and
+ * not rows that happened to arrive.
+ */
+export async function listCardTransactions(
   ctx: TenantContext,
-): Promise<{ id: string; postedOn: string; merchant: string; amount: string; currency: string }[]> {
+  options: { matched?: boolean; limit?: number; offset?: number } = {},
+): Promise<{ rows: CardTransactionRow[]; total: number }> {
   ctx.require('record.read')
-  const { rows } = await ctx.db.query<Raw>(
-    `select id, posted_on, merchant, amount::text as amount, currency from te_card_transactions
-      where tenant_id = $1 and matched_expense_id is null order by posted_on desc limit 500`,
+  const filters = ['tenant_id = $1']
+  if (options.matched === true) filters.push('matched_expense_id is not null')
+  if (options.matched === false) filters.push('matched_expense_id is null')
+  const where = filters.join(' and ')
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `select count(*)::text as n from te_card_transactions where ${where}`,
     [ctx.tenantId],
   )
-  return rows.map((row) => ({
-    id: row.id as string,
-    postedOn: day(row.posted_on),
-    merchant: row.merchant as string,
-    amount: decimalText(row.amount) as string,
-    currency: row.currency as string,
-  }))
+  const { rows } = await ctx.db.query<Raw>(
+    `select id, posted_on, merchant, amount::text as amount, currency, card_last4, matched_expense_id
+       from te_card_transactions where ${where}
+      order by posted_on desc, created_at desc limit $2 offset $3`,
+    [ctx.tenantId, Math.min(options.limit ?? 100, 500), Math.max(options.offset ?? 0, 0)],
+  )
+  return {
+    total: Number(counted[0].n),
+    rows: rows.map((row) => ({
+      id: row.id as string,
+      postedOn: day(row.posted_on),
+      merchant: row.merchant as string,
+      amount: decimalText(row.amount) as string,
+      currency: row.currency as string,
+      cardLast4: (row.card_last4 as string) ?? null,
+      matchedExpenseId: (row.matched_expense_id as string) ?? null,
+    })),
+  }
 }
 
 /* ------------------------------ reimbursement ----------------------------- */
@@ -716,5 +810,379 @@ export async function runReimbursement(
       detail: { paid, skipped, total: totalDecimal, currency },
     })
     return { runId, reference, paid, skipped, total: totalDecimal }
+  })
+}
+
+export type RunRow = {
+  id: string
+  reference: string
+  status: string
+  currency: string
+  totalAmount: string
+  paidAt: string | null
+  /** Claims in the batch. A run with none paid nobody and says so. */
+  reports: number
+}
+
+/**
+ * Reimbursement runs, newest first.
+ *
+ * Runs were written on every payout and could never be read back, so the
+ * screen listing them had to keep its own copy in the browser and invented
+ * four stages for it. There is one real stage — a run is paid or it is not —
+ * and this reports which, with the batch it actually paid.
+ */
+export async function listReimbursementRuns(
+  ctx: TenantContext,
+  options: { from?: string; to?: string; limit?: number; offset?: number } = {},
+): Promise<{ rows: RunRow[]; total: number }> {
+  ctx.require('record.read')
+  /*
+   * `from`/`to` are nullable parameters rather than a clause built in
+   * TypeScript, so the statement text is the same however the screen filters —
+   * a predicate that is either applied or trivially true.
+   */
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `select count(*)::text as n from te_reimbursement_runs r
+      where r.tenant_id = $1
+        and ($2::date is null or r.created_at >= $2::date)
+        and ($3::date is null or r.created_at < $3::date + 1)`,
+    [ctx.tenantId, options.from ?? null, options.to ?? null],
+  )
+  const { rows } = await ctx.db.query<Raw>(
+    `select r.id, r.reference, r.status, r.currency, r.total_amount::text as total_amount, r.paid_at,
+            (select count(*) from te_reimbursement_items i where i.run_id = r.id)::int as reports
+       from te_reimbursement_runs r
+      where r.tenant_id = $1
+        and ($2::date is null or r.created_at >= $2::date)
+        and ($3::date is null or r.created_at < $3::date + 1)
+      order by r.created_at desc limit $4 offset $5`,
+    [
+      ctx.tenantId,
+      options.from ?? null,
+      options.to ?? null,
+      Math.min(options.limit ?? 50, 200),
+      Math.max(options.offset ?? 0, 0),
+    ],
+  )
+  return {
+    total: Number(counted[0].n),
+    rows: rows.map((row) => ({
+      id: row.id as string,
+      reference: row.reference as string,
+      status: row.status as string,
+      currency: row.currency as string,
+      totalAmount: decimalText(row.total_amount) as string,
+      paidAt: row.paid_at ? new Date(row.paid_at as string).toISOString() : null,
+      reports: row.reports as number,
+    })),
+  }
+}
+
+/* --------------------------------- figures -------------------------------- */
+
+export type StatusTotal = { status: string; currency: string; reports: number; total: string }
+export type CategoryTotal = { categoryId: string | null; name: string | null; currency: string; total: string }
+export type ClaimantTotal = { employeeId: string; name: string; currency: string; reports: number; total: string }
+
+export type ExpenseSummary = {
+  /** One row per state and currency. Two currencies are never one number. */
+  byStatus: StatusTotal[]
+  byCategory: CategoryTotal[]
+  /** The ten largest claimants, by what they actually claimed. */
+  byEmployee: ClaimantTotal[]
+  /** Mean days from submission to payment, or null when nothing has completed. */
+  turnaround: { days: string; reports: number } | null
+  cards: { unmatched: number }
+}
+
+/**
+ * The figures behind the Travel & Expense dashboard.
+ *
+ * Summed in SQL over every matching row, not over a loaded page, and grouped
+ * by currency throughout: the screen this replaces added a dollar claim to a
+ * rupee claim and printed the result as one figure. A measurement that cannot
+ * be made — an average turnaround with nothing yet reimbursed — is absent
+ * rather than reported as zero.
+ */
+export async function expenseSummary(
+  ctx: TenantContext,
+  options: { from?: string; to?: string } = {},
+): Promise<ExpenseSummary> {
+  ctx.require('record.read')
+  /*
+   * The range is a nullable parameter in every statement below rather than a
+   * clause assembled here: the text stays literal, and a filtered figure and
+   * an unfiltered one are the same query asked with different arguments. The
+   * argument list is written out at each call for the same reason — a shared
+   * array hides a placeholder mismatch from the static check over this file.
+   */
+  const { rows: byStatus } = await ctx.db.query<{ status: string; currency: string; n: string; total: string }>(
+    `select r.status, r.currency, count(*)::text as n,
+            coalesce(sum(coalesce(r.approved_amount, r.total_amount)), 0)::text as total
+       from te_expense_reports r
+      where r.tenant_id = $1
+        and ($2::date is null or r.created_at >= $2::date)
+        and ($3::date is null or r.created_at < $3::date + 1)
+      group by r.status, r.currency
+      order by r.status, r.currency`,
+    [ctx.tenantId, options.from ?? null, options.to ?? null],
+  )
+
+  const { rows: byCategory } = await ctx.db.query<{ id: string | null; name: string | null; currency: string; total: string }>(
+    `select c.id, c.name, e.base_currency as currency, sum(e.base_amount)::text as total
+       from te_expenses e
+       join te_expense_reports r on r.id = e.report_id
+       left join te_expense_categories c on c.id = e.category_id
+      where e.tenant_id = $1 and e.reimbursable and r.status in ('approved', 'reimbursed')
+        and ($2::date is null or r.created_at >= $2::date)
+        and ($3::date is null or r.created_at < $3::date + 1)
+      group by c.id, c.name, e.base_currency
+      order by sum(e.base_amount) desc`,
+    [ctx.tenantId, options.from ?? null, options.to ?? null],
+  )
+
+  const { rows: byEmployee } = await ctx.db.query<{ employee_id: string; full_name: string; currency: string; n: string; total: string }>(
+    `select r.employee_id, e.full_name, r.currency, count(*)::text as n,
+            coalesce(sum(coalesce(r.approved_amount, r.total_amount)), 0)::text as total
+       from te_expense_reports r
+       join hr_employees e on e.id = r.employee_id
+      where r.tenant_id = $1 and r.status in ('submitted', 'approved', 'reimbursed')
+        and ($2::date is null or r.created_at >= $2::date)
+        and ($3::date is null or r.created_at < $3::date + 1)
+      group by r.employee_id, e.full_name, r.currency
+      order by sum(coalesce(r.approved_amount, r.total_amount)) desc
+      limit 10`,
+    [ctx.tenantId, options.from ?? null, options.to ?? null],
+  )
+
+  const { rows: completed } = await ctx.db.query<{ n: string; seconds: string | null }>(
+    `select count(*)::text as n, avg(extract(epoch from (r.reimbursed_at - r.submitted_at)))::text as seconds
+       from te_expense_reports r
+      where r.tenant_id = $1 and r.reimbursed_at is not null and r.submitted_at is not null
+        and ($2::date is null or r.created_at >= $2::date)
+        and ($3::date is null or r.created_at < $3::date + 1)`,
+    [ctx.tenantId, options.from ?? null, options.to ?? null],
+  )
+  const done = Number(completed[0].n)
+
+  const { rows: cards } = await ctx.db.query<{ n: string }>(
+    'select count(*)::text as n from te_card_transactions where tenant_id = $1 and matched_expense_id is null',
+    [ctx.tenantId],
+  )
+
+  return {
+    byStatus: byStatus.map((row) => ({
+      status: row.status,
+      currency: row.currency,
+      reports: Number(row.n),
+      total: decimalText(row.total) as string,
+    })),
+    byCategory: byCategory.map((row) => ({
+      categoryId: row.id,
+      name: row.name,
+      currency: row.currency,
+      total: decimalText(row.total) as string,
+    })),
+    byEmployee: byEmployee.map((row) => ({
+      employeeId: row.employee_id,
+      name: row.full_name,
+      currency: row.currency,
+      reports: Number(row.n),
+      total: decimalText(row.total) as string,
+    })),
+    // A duration, not money: it is measured in days and rounded for display.
+    turnaround: done > 0 ? { days: (Number(completed[0].seconds) / 86_400).toFixed(1), reports: done } : null,
+    cards: { unmatched: Number(cards[0].n) },
+  }
+}
+
+/* -------------------------------- categories ------------------------------ */
+
+export type CategoryRow = {
+  id: string
+  name: string
+  code: string
+  glAccount: string | null
+  limitAmount: string | null
+  limitCurrency: string | null
+  receiptRequiredAbove: string | null
+}
+
+const mapCategory = (row: Raw): CategoryRow => ({
+  id: row.id as string,
+  name: row.name as string,
+  code: row.code as string,
+  glAccount: (row.gl_account as string) ?? null,
+  limitAmount: decimalText(row.limit_amount),
+  limitCurrency: (row.limit_currency as string) ?? null,
+  receiptRequiredAbove: decimalText(row.receipt_required_above),
+})
+
+/**
+ * Expense categories.
+ *
+ * These rows are where the policy engine actually looks: `limit_amount`,
+ * `receipt_required_above` and `gl_account` are read by `policyFlagsFor`, so a
+ * limits grid saved anywhere else changes nothing. Nothing exposed them, which
+ * is why the settings panes were editing twelve hard-coded strings instead.
+ */
+export async function listCategories(ctx: TenantContext): Promise<CategoryRow[]> {
+  ctx.require('settings.read')
+  const { rows } = await ctx.db.query<Raw>(
+    'select * from te_expense_categories where tenant_id = $1 and archived_at is null order by name',
+    [ctx.tenantId],
+  )
+  return rows.map(mapCategory)
+}
+
+export type CategoryInput = {
+  glAccount?: string | null
+  limitAmount?: string | null
+  limitCurrency?: string | null
+  receiptRequiredAbove?: string | null
+}
+
+/** A cap with no currency is not a cap anybody can apply to a converted amount. */
+function checkLimit(limitAmount: string | null | undefined, limitCurrency: string | null | undefined): void {
+  if (limitAmount != null && limitAmount !== '' && !limitCurrency) {
+    throw unprocessable('currency_required', 'State the currency the limit is in.')
+  }
+}
+
+export async function createCategory(
+  ctx: TenantContext,
+  input: CategoryInput & { name: string; code: string },
+): Promise<CategoryRow> {
+  ctx.require('settings.manage')
+  checkLimit(input.limitAmount, input.limitCurrency)
+
+  // The unique index decides, not a preceding select: two admins adding the
+  // same code at once would both pass a check-then-insert and one would hit a
+  // raw constraint error instead of being told what happened.
+  const { rows } = await ctx.db.query<Raw>(
+    `insert into te_expense_categories
+       (tenant_id, name, code, gl_account, limit_amount, limit_currency, receipt_required_above)
+     values ($1,$2,$3,$4,$5,$6,$7)
+     on conflict (tenant_id, lower(code)) do nothing
+     returning *`,
+    [
+      ctx.tenantId,
+      input.name,
+      input.code,
+      input.glAccount ?? null,
+      input.limitAmount ?? null,
+      input.limitCurrency?.toUpperCase() ?? null,
+      input.receiptRequiredAbove ?? null,
+    ],
+  )
+  if (!rows[0]) throw conflict(`A category with the code ${input.code} already exists.`)
+  return mapCategory(rows[0])
+}
+
+/**
+ * Changes one category's policy columns.
+ *
+ * Per row rather than per grid, and only the keys the caller sent: the table
+ * carries no version column, so a whole-grid save would let one admin's blank
+ * box erase a limit another admin had just typed into a different row.
+ */
+export async function updateCategory(ctx: TenantContext, categoryId: string, patch: CategoryInput): Promise<CategoryRow> {
+  ctx.require('settings.manage')
+
+  return ctx.db.transaction(async (tx) => {
+    const { rows } = await tx.query<Raw>(
+      'select * from te_expense_categories where id = $1 and tenant_id = $2 for update',
+      [categoryId, ctx.tenantId],
+    )
+    if (!rows[0]) throw notFound('That expense category')
+    const current = mapCategory(rows[0])
+
+    const next = {
+      glAccount: patch.glAccount === undefined ? current.glAccount : patch.glAccount || null,
+      limitAmount: patch.limitAmount === undefined ? current.limitAmount : patch.limitAmount || null,
+      limitCurrency: patch.limitCurrency === undefined ? current.limitCurrency : patch.limitCurrency || null,
+      receiptRequiredAbove:
+        patch.receiptRequiredAbove === undefined ? current.receiptRequiredAbove : patch.receiptRequiredAbove || null,
+    }
+    checkLimit(next.limitAmount, next.limitCurrency)
+
+    const { rows: after } = await tx.query<Raw>(
+      `update te_expense_categories
+          set gl_account = $2, limit_amount = $3, limit_currency = $4, receipt_required_above = $5
+        where id = $1 returning *`,
+      [categoryId, next.glAccount, next.limitAmount, next.limitCurrency?.toUpperCase() ?? null, next.receiptRequiredAbove],
+    )
+    await recordAudit(tx, ctx, {
+      action: 'expense.category_updated',
+      resource: 'expense_category',
+      resourceId: categoryId,
+      detail: { name: current.name },
+    })
+    return mapCategory(after[0])
+  })
+}
+
+/* ----------------------------- approval levels ---------------------------- */
+
+export type ApprovalLevelRow = { level: number; label: string; threshold: string; approverRole: string | null }
+
+export async function listApprovalLevels(ctx: TenantContext, scope: 'expense' | 'travel'): Promise<ApprovalLevelRow[]> {
+  ctx.require('settings.read')
+  const { rows } = await ctx.db.query<{ level: number; label: string; threshold: string; approver_role: string | null }>(
+    `select level, label, threshold::text as threshold, approver_role
+       from te_approval_levels where tenant_id = $1 and scope = $2 order by level`,
+    [ctx.tenantId, scope],
+  )
+  return rows.map((row) => ({
+    level: row.level,
+    label: row.label,
+    threshold: decimalText(row.threshold) as string,
+    approverRole: row.approver_role,
+  }))
+}
+
+/**
+ * Replaces one scope's whole ladder in a transaction.
+ *
+ * Whole-set, not row-by-row: `te_approval_level_key` is unique on
+ * (tenant, scope, level), so renumbering after a delete collides halfway
+ * through and leaves a tenant with a chain nobody can climb. Levels are
+ * numbered from the order they arrive, which is the order the pane shows.
+ */
+export async function replaceApprovalLevels(
+  ctx: TenantContext,
+  scope: 'expense' | 'travel',
+  levels: { label: string; threshold?: string | null; approverRole?: string | null }[],
+): Promise<ApprovalLevelRow[]> {
+  ctx.require('settings.manage')
+
+  return ctx.db.transaction(async (tx) => {
+    await tx.query('delete from te_approval_levels where tenant_id = $1 and scope = $2', [ctx.tenantId, scope])
+    for (const [index, level] of levels.entries()) {
+      await tx.query(
+        `insert into te_approval_levels (tenant_id, level, label, threshold, approver_role, scope)
+         values ($1,$2,$3,$4,$5,$6)`,
+        [ctx.tenantId, index + 1, level.label, level.threshold || '0', level.approverRole ?? null, scope],
+      )
+    }
+    await recordAudit(tx, ctx, {
+      action: 'expense.approval_levels_replaced',
+      resource: 'approval_levels',
+      resourceId: ctx.tenantId,
+      detail: { scope, levels: levels.length },
+    })
+    const { rows } = await tx.query<{ level: number; label: string; threshold: string; approver_role: string | null }>(
+      `select level, label, threshold::text as threshold, approver_role
+         from te_approval_levels where tenant_id = $1 and scope = $2 order by level`,
+      [ctx.tenantId, scope],
+    )
+    return rows.map((row) => ({
+      level: row.level,
+      label: row.label,
+      threshold: decimalText(row.threshold) as string,
+      approverRole: row.approver_role,
+    }))
   })
 }

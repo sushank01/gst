@@ -198,11 +198,14 @@ export async function createReturn(
       kind,
       reference,
       customerId: invoice[0].customer_id,
+      // Not joined here: the caller already knows whose invoice it credited.
+      customerName: null,
       status: 'posted',
       currency: invoice[0].currency,
       ...totals,
       paidTotal: '0.0000',
       postedAt: ctx.now.toISOString(),
+      cancelledAt: null,
       version: created[0].version,
       lines: totals.lines,
     }

@@ -4,16 +4,23 @@ import { useState } from 'react'
 import { Button } from '../../../components/ui'
 import { Icon } from '../../../components/Icon'
 import { agentsByAppCode } from '../../../lib/agentCatalog'
-import {
-  customFieldTypes,
-  posSettingsTabs,
-  standardCustomerGroups,
-  standardGstSlabs,
-} from '../../../lib/posData'
-import { useWorkspace, type PosSettings } from '../../../lib/workspace'
+import { api } from '../../../lib/api'
+import { useResource } from '../../../lib/useResource'
+import { useInstallations } from '../../../lib/useInstallations'
+import { customFieldTypes, posSettingsTabs, standardCustomerGroups } from '../../../lib/posData'
 import { Dialog, Label, inputClass } from '../../../components/EnterpriseUi'
-
-const id = () => crypto.randomUUID()
+import { Failure, Loading, NotAvailable, WriteError } from './parts'
+import {
+  compareAmounts,
+  money,
+  useAppSettings,
+  useCustomerGroups,
+  useLoyaltyProgrammes,
+  useSettingsChanges,
+  useTaxCategories,
+  useVariancePolicy,
+  useWorkspaceCurrency,
+} from './usePos'
 
 /** Heading + blurb pair each settings pane opens with. */
 function PaneHead({ title, blurb }: { title: string; blurb: string }) {
@@ -40,25 +47,42 @@ function EmptyBox({ icon, title, hint, actions }: { icon?: string; title: string
   )
 }
 
+/** Trash control shared by the three master-data lists. */
+function DeleteButton({ label, disabled, onDelete }: { label: string; disabled?: boolean; onDelete: () => void }) {
+  const [confirming, setConfirming] = useState(false)
+  return confirming ? (
+    <span className="flex items-center gap-2 text-[12px]">
+      <button onClick={onDelete} disabled={disabled} className="font-medium text-bad hover:underline">
+        Confirm
+      </button>
+      <button onClick={() => setConfirming(false)} className="text-fg-muted hover:underline">
+        Keep
+      </button>
+    </span>
+  ) : (
+    <button
+      aria-label={`Delete ${label}`}
+      disabled={disabled}
+      onClick={() => setConfirming(true)}
+      className="text-fg-muted transition hover:text-bad"
+    >
+      <Icon name="trash" size={15} />
+    </button>
+  )
+}
+
 /* ------------------------------------------------------------------ panes */
 
 function TaxPane() {
-  const { posSettings, updatePosSettings } = useWorkspace()
-  const rows = posSettings.taxCategories
+  const categories = useTaxCategories()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState({ name: '', rate: '' })
-
-  const seedSlabs = () =>
-    updatePosSettings(
-      { taxCategories: [...rows, ...standardGstSlabs.map((slab) => ({ id: id(), ...slab }))] },
-      'Added the standard GST slabs (0 / 5 / 12 / 18 / 28%)',
-    )
 
   return (
     <div>
       <PaneHead
         title="Tax categories"
-        blurb="Named tax rates and how each one splits. Items point at a category, so changing a rate is one edit here rather than an edit on every affected item."
+        blurb="Named tax rates. Items point at a category, so changing a rate is one edit here rather than an edit on every affected item."
       />
 
       <Card>
@@ -67,59 +91,63 @@ function TaxPane() {
             <Icon name="percent" size={16} className="text-accent" />
             Tax categories
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button variant="secondary" className="!py-2 !text-[13px]" onClick={seedSlabs}>
-              <Icon name="sparkles" size={14} className="mr-1.5 inline align-[-2px]" />
-              Add standard GST slabs
-            </Button>
-            <Button variant="accent" className="!py-2 !text-[13px]" onClick={() => setOpen(true)}>
-              + New category
-            </Button>
-          </div>
+          <Button variant="accent" className="!py-2 !text-[13px]" onClick={() => setOpen(true)}>
+            + New category
+          </Button>
         </div>
 
         <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-fg-muted">
-          A named tax slab and how it splits. Items point at a category instead of carrying a loose percentage, so
-          changing a rate is one edit here rather than an edit on every affected item. The{' '}
-          <span className="font-semibold text-fg-2">within-state</span> split is what a local sale charges; the{' '}
-          <span className="font-semibold text-fg-2">inter-state</span> split applies when the buyer's GSTIN is
-          registered in another state.
+          A posted invoice keeps the rate it was posted with, so a later change here never restates a document that has
+          already gone out. Archiving a category leaves those invoices able to say which slab taxed them.
         </p>
 
-        {rows.length ? (
+        <NotAvailable>
+          Statutory rates are not shipped with this deployment: there is no built-in GST ladder to seed, because the
+          correct rates and their within-state and inter-state split are a decision about your tax position, not a
+          default. Enter the rates you are registered for. Component splits are not editable on this screen.
+        </NotAvailable>
+
+        {categories.loading ? (
+          <div className="mt-5">
+            <Loading what="tax categories" />
+          </div>
+        ) : categories.error ? (
+          <div className="mt-5">
+            <Failure
+              what="tax categories"
+              error={categories.error}
+              denied={categories.denied}
+              canRetry={categories.canRetry}
+              onRetry={categories.refetch}
+            />
+          </div>
+        ) : categories.rows.length ? (
           <ul className="mt-5 divide-y divide-line overflow-hidden rounded-xl border border-line">
-            {rows.map((row) => (
+            {categories.rows.map((row) => (
               <li key={row.id} className="flex flex-wrap items-center gap-4 px-4 py-3 text-[13px]">
                 <span className="w-28 shrink-0 font-medium">{row.name}</span>
                 <span className="min-w-[10rem] flex-1 text-fg-muted">
-                  Within state: {row.withinState} · Inter-state: {row.interState}
+                  {row.ratePercent}%
+                  {row.withinRegion.length
+                    ? ` · within region: ${row.withinRegion.map((part) => `${part.name} ${part.percent}%`).join(' + ')}`
+                    : ''}
+                  {row.crossRegion.length
+                    ? ` · across: ${row.crossRegion.map((part) => `${part.name} ${part.percent}%`).join(' + ')}`
+                    : ''}
                 </span>
-                <button
-                  aria-label={`Delete ${row.name}`}
-                  onClick={() =>
-                    updatePosSettings(
-                      { taxCategories: rows.filter((item) => item.id !== row.id) },
-                      `Deleted tax category ${row.name}`,
-                    )
-                  }
-                  className="text-fg-muted transition hover:text-bad"
-                >
-                  <Icon name="trash" size={15} />
-                </button>
+                <DeleteButton
+                  label={row.name}
+                  disabled={categories.writing}
+                  onDelete={() => void categories.remove(row.id)}
+                />
               </li>
             ))}
           </ul>
         ) : (
-          <EmptyBox
-            title="No tax categories yet. Items will fall back to whatever percentage is typed on each one."
-            actions={
-              <Button variant="accent" onClick={seedSlabs}>
-                <Icon name="sparkles" size={14} className="mr-1.5 inline align-[-2px]" />
-                Add the standard GST slabs (0 / 5 / 12 / 18 / 28%)
-              </Button>
-            }
-          />
+          <EmptyBox title="No tax categories yet. Items will fall back to whatever percentage is typed on each one." />
         )}
+
+        <WriteError error={categories.writeError} />
       </Card>
 
       {open && (
@@ -130,23 +158,20 @@ function TaxPane() {
               <input
                 value={draft.name}
                 onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="GST 18%"
+                placeholder="Standard rate"
                 className={inputClass}
               />
             </label>
             <label>
               <Label>Rate (%)</Label>
               <input
-                type="number"
-                min={0}
+                inputMode="decimal"
                 value={draft.rate}
                 onChange={(event) => setDraft((prev) => ({ ...prev, rate: event.target.value }))}
                 className={inputClass}
               />
             </label>
-            <p className="text-[12px] text-fg-muted">
-              The split is derived: half CGST and half SGST within a state, the whole rate as IGST across one.
-            </p>
+            <WriteError error={categories.writeError} />
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -154,29 +179,16 @@ function TaxPane() {
             </Button>
             <Button
               variant="accent"
-              disabled={!draft.name.trim()}
-              onClick={() => {
-                const rate = Number(draft.rate) || 0
-                updatePosSettings(
-                  {
-                    taxCategories: [
-                      ...rows,
-                      {
-                        id: id(),
-                        name: draft.name.trim(),
-                        rate,
-                        withinState: rate === 0 ? 'Exempt' : `CGST ${rate / 2}% + SGST ${rate / 2}%`,
-                        interState: rate === 0 ? 'Exempt' : `IGST ${rate}%`,
-                      },
-                    ],
-                  },
-                  `Created tax category ${draft.name.trim()}`,
-                )
-                setDraft({ name: '', rate: '' })
-                setOpen(false)
+              disabled={!draft.name.trim() || !draft.rate.trim() || categories.writing}
+              onClick={async () => {
+                const created = await categories.create({ name: draft.name.trim(), ratePercent: draft.rate.trim() })
+                if (created) {
+                  setDraft({ name: '', rate: '' })
+                  setOpen(false)
+                }
               }}
             >
-              Create
+              {categories.writing ? 'Saving…' : 'Create'}
             </Button>
           </div>
         </Dialog>
@@ -186,10 +198,13 @@ function TaxPane() {
 }
 
 function GroupsPane() {
-  const { posSettings, updatePosSettings } = useWorkspace()
-  const rows = posSettings.customerGroups
+  const groups = useCustomerGroups()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
+
+  const seed = async () => {
+    for (const item of standardCustomerGroups) await groups.create({ name: item })
+  }
 
   return (
     <div>
@@ -198,11 +213,25 @@ function GroupsPane() {
         blurb="Segments a customer belongs to — Regulars, Walk-in, Wholesale. Chosen from a list on the customer record so a report grouped by segment stays consistent."
       />
       <p className="mt-4 max-w-3xl text-[14px] leading-relaxed text-fg-muted">
-        Segments a customer belongs to — Regulars, Walk-in, Wholesale. Chosen from a list on the customer record
-        rather than typed, so a report grouped by segment can't split across "Regulars" and "regulars".
+        Chosen from a list rather than typed, so a report grouped by segment cannot split across &ldquo;Regulars&rdquo;
+        and &ldquo;regulars&rdquo;. Deleting a group archives it: the customers in it keep the segment they were given.
       </p>
 
-      {rows.length ? (
+      {groups.loading ? (
+        <div className="mt-5">
+          <Loading what="customer groups" />
+        </div>
+      ) : groups.error ? (
+        <div className="mt-5">
+          <Failure
+            what="customer groups"
+            error={groups.error}
+            denied={groups.denied}
+            canRetry={groups.canRetry}
+            onRetry={groups.refetch}
+          />
+        </div>
+      ) : groups.rows.length ? (
         <>
           <div className="mt-5 flex justify-end">
             <Button variant="secondary" className="!py-2 !text-[13px]" onClick={() => setOpen(true)}>
@@ -210,21 +239,13 @@ function GroupsPane() {
             </Button>
           </div>
           <ul className="mt-3 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
-            {rows.map((row) => (
+            {groups.rows.map((row) => (
               <li key={row.id} className="flex items-center gap-4 px-5 py-3.5 text-[14px]">
                 <span className="flex-1">{row.name}</span>
-                <button
-                  aria-label={`Delete ${row.name}`}
-                  onClick={() =>
-                    updatePosSettings(
-                      { customerGroups: rows.filter((item) => item.id !== row.id) },
-                      `Deleted customer group ${row.name}`,
-                    )
-                  }
-                  className="text-fg-muted transition hover:text-bad"
-                >
-                  <Icon name="trash" size={15} />
-                </button>
+                <span className="text-[12px] text-fg-muted">
+                  {row.customers} customer{row.customers === 1 ? '' : 's'}
+                </span>
+                <DeleteButton label={row.name} disabled={groups.writing} onDelete={() => void groups.remove(row.id)} />
               </li>
             ))}
           </ul>
@@ -232,18 +253,10 @@ function GroupsPane() {
       ) : (
         <EmptyBox
           icon="users"
-          title="No customer groups yet — customers can't be segmented."
+          title="No customer groups yet — customers cannot be segmented."
           actions={
             <>
-              <Button
-                variant="accent"
-                onClick={() =>
-                  updatePosSettings(
-                    { customerGroups: standardCustomerGroups.map((item) => ({ id: id(), name: item })) },
-                    'Added the Walk-in / Regulars / Wholesale groups',
-                  )
-                }
-              >
+              <Button variant="accent" disabled={groups.writing} onClick={() => void seed()}>
                 <Icon name="sparkles" size={14} className="mr-1.5 inline align-[-2px]" />
                 Add Walk-in / Regulars / Wholesale
               </Button>
@@ -255,29 +268,31 @@ function GroupsPane() {
         />
       )}
 
+      <WriteError error={groups.writeError} />
+
       {open && (
         <Dialog title="New group" onClose={() => setOpen(false)}>
           <label className="mt-5 block">
             <Label>Group name</Label>
             <input value={name} onChange={(event) => setName(event.target.value)} className={inputClass} />
           </label>
+          <WriteError error={groups.writeError} />
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setOpen(false)}>
               Cancel
             </Button>
             <Button
               variant="accent"
-              disabled={!name.trim()}
-              onClick={() => {
-                updatePosSettings(
-                  { customerGroups: [...rows, { id: id(), name: name.trim() }] },
-                  `Created customer group ${name.trim()}`,
-                )
-                setName('')
-                setOpen(false)
+              disabled={!name.trim() || groups.writing}
+              onClick={async () => {
+                const created = await groups.create({ name: name.trim() })
+                if (created) {
+                  setName('')
+                  setOpen(false)
+                }
               }}
             >
-              Create
+              {groups.writing ? 'Saving…' : 'Create'}
             </Button>
           </div>
         </Dialog>
@@ -287,16 +302,16 @@ function GroupsPane() {
 }
 
 function LoyaltyPane() {
-  const { posSettings, updatePosSettings } = useWorkspace()
-  const rows = posSettings.loyalty
+  const programmes = useLoyaltyProgrammes()
+  const workspaceCurrency = useWorkspaceCurrency()
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState({ name: '', pointsPer: '1', pointValue: '0.01' })
 
   return (
     <div>
       <PaneHead
-        title="Loyalty & tiers"
-        blurb="How points accrue and what they are worth, plus the tier ladder customers climb on lifetime spend. Points are spent at the till as a discount on the bill."
+        title="Loyalty &amp; tiers"
+        blurb="How points accrue and what they are worth. A point is money, so a programme carries its own currency."
       />
 
       <Card>
@@ -310,37 +325,46 @@ function LoyaltyPane() {
           </Button>
         </div>
 
-        <p className="mt-3 max-w-3xl text-[13px] leading-relaxed text-fg-muted">
-          Points accrue on the net subtotal of every sale attached to a customer, and are spent at the till as a
-          discount on the bill.
-        </p>
+        <NotAvailable>
+          A programme records the accrual rate and what a point is worth. Nothing accrues or redeems yet on this
+          deployment: there is no sale-entry screen for the till to attach points to, and no tier ladder.
+        </NotAvailable>
 
-        {rows.length ? (
+        {programmes.loading ? (
+          <div className="mt-5">
+            <Loading what="loyalty programmes" />
+          </div>
+        ) : programmes.error ? (
+          <div className="mt-5">
+            <Failure
+              what="loyalty programmes"
+              error={programmes.error}
+              denied={programmes.denied}
+              canRetry={programmes.canRetry}
+              onRetry={programmes.refetch}
+            />
+          </div>
+        ) : programmes.rows.length ? (
           <ul className="mt-5 divide-y divide-line overflow-hidden rounded-xl border border-line">
-            {rows.map((row) => (
+            {programmes.rows.map((row) => (
               <li key={row.id} className="flex flex-wrap items-center gap-4 px-4 py-3 text-[13px]">
                 <span className="w-40 shrink-0 font-medium">{row.name}</span>
                 <span className="flex-1 text-fg-muted">
-                  {row.pointsPer} point per unit spent · each point worth {row.pointValue}
+                  {row.pointsPerUnit} point per unit spent · each point worth {money(row.pointValue, row.currency)}
                 </span>
-                <button
-                  aria-label={`Delete ${row.name}`}
-                  onClick={() =>
-                    updatePosSettings(
-                      { loyalty: rows.filter((item) => item.id !== row.id) },
-                      `Deleted loyalty programme ${row.name}`,
-                    )
-                  }
-                  className="text-fg-muted transition hover:text-bad"
-                >
-                  <Icon name="trash" size={15} />
-                </button>
+                <DeleteButton
+                  label={row.name}
+                  disabled={programmes.writing}
+                  onDelete={() => void programmes.remove(row.id)}
+                />
               </li>
             ))}
           </ul>
         ) : (
-          <p className="mt-4 text-[13px] text-fg-muted">No programme yet. Create one to start accruing points.</p>
+          <p className="mt-4 text-[13px] text-fg-muted">No programme yet.</p>
         )}
+
+        <WriteError error={programmes.writeError} />
       </Card>
 
       {open && (
@@ -357,25 +381,22 @@ function LoyaltyPane() {
             <label>
               <Label>Points per unit spent</Label>
               <input
-                type="number"
-                min={0}
-                step="0.1"
+                inputMode="decimal"
                 value={draft.pointsPer}
                 onChange={(event) => setDraft((prev) => ({ ...prev, pointsPer: event.target.value }))}
                 className={inputClass}
               />
             </label>
             <label>
-              <Label>What one point is worth</Label>
+              <Label>What one point is worth{workspaceCurrency ? ` (${workspaceCurrency})` : ''}</Label>
               <input
-                type="number"
-                min={0}
-                step="0.01"
+                inputMode="decimal"
                 value={draft.pointValue}
                 onChange={(event) => setDraft((prev) => ({ ...prev, pointValue: event.target.value }))}
                 className={inputClass}
               />
             </label>
+            <WriteError error={programmes.writeError} />
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -383,28 +404,21 @@ function LoyaltyPane() {
             </Button>
             <Button
               variant="accent"
-              disabled={!draft.name.trim()}
-              onClick={() => {
-                updatePosSettings(
-                  {
-                    loyalty: [
-                      ...rows,
-                      {
-                        id: id(),
-                        name: draft.name.trim(),
-                        pointsPer: Number(draft.pointsPer) || 0,
-                        pointValue: Number(draft.pointValue) || 0,
-                        tiers: [],
-                      },
-                    ],
-                  },
-                  `Created loyalty programme ${draft.name.trim()}`,
-                )
-                setDraft({ name: '', pointsPer: '1', pointValue: '0.01' })
-                setOpen(false)
+              disabled={!draft.name.trim() || !workspaceCurrency || programmes.writing}
+              onClick={async () => {
+                const created = await programmes.create({
+                  name: draft.name.trim(),
+                  currency: workspaceCurrency ?? '',
+                  pointsPerUnit: draft.pointsPer.trim() || '1',
+                  pointValue: draft.pointValue.trim() || '0',
+                })
+                if (created) {
+                  setDraft({ name: '', pointsPer: '1', pointValue: '0.01' })
+                  setOpen(false)
+                }
               }}
             >
-              Create
+              {programmes.writing ? 'Saving…' : 'Create'}
             </Button>
           </div>
         </Dialog>
@@ -415,17 +429,17 @@ function LoyaltyPane() {
 
 const varianceFields = [
   {
-    key: 'reasonAbove',
+    key: 'reasonRequiredAbove',
     label: 'Reason required above',
-    hint: 'A cashier can close a shift silently while the drawer is off by this much or less. Anything larger blocks the close until they pick a reason.',
+    hint: 'A cashier can close a shift silently while the drawer is off by this much or less. Anything larger blocks the close until they give a reason — and the till itself enforces this figure.',
   },
   {
-    key: 'amberWorst',
+    key: 'amberWorstShift',
     label: 'Amber — worst single shift',
     hint: "A cashier's worst shift at or above this is flagged amber on the manager dashboard.",
   },
   {
-    key: 'redWorst',
+    key: 'redWorstShift',
     label: 'Red — worst single shift',
     hint: 'Worst shift at or above this is flagged red. Must be at least the amber figure.',
   },
@@ -441,21 +455,34 @@ const varianceFields = [
   },
 ] as const
 
-const varianceDefaults = { reasonAbove: 1, amberWorst: 1, redWorst: 5, amberAverage: 0.5, redAverage: 2 }
-
 function VariancePane() {
-  const { posSettings, updatePosSettings } = useWorkspace()
-  const saved = posSettings.cashVariance
-  const [draft, setDraft] = useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.entries(saved).map(([key, value]) => [key, String(value)])),
-  )
+  const policy = useVariancePolicy()
+  const currency = useWorkspaceCurrency()
+  const [draft, setDraft] = useState<Record<string, string> | null>(null)
 
-  const parsed = Object.fromEntries(
-    Object.entries(draft).map(([key, value]) => [key, Number(value) || 0]),
-  ) as typeof varianceDefaults
-  const dirty = varianceFields.some((field) => parsed[field.key] !== saved[field.key])
-  // The hints promise these orderings, so a save that breaks one is refused.
-  const valid = parsed.redWorst >= parsed.amberWorst && parsed.redAverage >= parsed.amberAverage
+  if (policy.loading) return <Loading what="the variance policy" />
+  if (policy.error || !policy.policy) {
+    return policy.error ? (
+      <Failure
+        what="the variance policy"
+        error={policy.error}
+        denied={policy.denied}
+        canRetry={policy.canRetry}
+        onRetry={policy.refetch}
+      />
+    ) : null
+  }
+
+  const saved = policy.policy
+  const current = Object.fromEntries(
+    varianceFields.map((field) => [field.key, draft?.[field.key] ?? saved[field.key]]),
+  ) as Record<(typeof varianceFields)[number]['key'], string>
+  const dirty = draft !== null
+  // The hints promise these orderings, and the table's own check constraint
+  // enforces them, so a save that breaks one is stopped here first.
+  const valid =
+    compareAmounts(current.redWorstShift || '0', current.amberWorstShift || '0') >= 0 &&
+    compareAmounts(current.redAverage || '0', current.amberAverage || '0') >= 0
 
   return (
     <div>
@@ -464,9 +491,17 @@ function VariancePane() {
         blurb="How far the cash drawer may be off at close before the cashier has to explain it, and where the manager dashboard turns amber and red."
       />
       <p className="mt-4 max-w-3xl text-[14px] leading-relaxed text-fg-muted">
-        How far the cash drawer may be off at close before the cashier has to explain it, and where the manager
-        dashboard turns amber and red. Amounts are in the till's own currency.
+        These figures are the ones the till enforces at close, not a display setting: they live beside the drawer, so
+        what a manager sees here and what a cashier is refused are the same numbers. Amounts are in the till&apos;s own
+        currency{currency ? ` — ${currency} for this workspace` : ''}.
       </p>
+
+      {saved.updatedAt === null && (
+        <NotAvailable>
+          No policy has been saved for this workspace. The figures below are the platform defaults currently in force;
+          saving makes them explicit.
+        </NotAvailable>
+      )}
 
       <div className="mt-6 space-y-5">
         {varianceFields.map((field) => (
@@ -476,11 +511,11 @@ function VariancePane() {
             </label>
             <input
               id={field.key}
-              type="number"
-              min={0}
-              step="0.5"
-              value={draft[field.key]}
-              onChange={(event) => setDraft((prev) => ({ ...prev, [field.key]: event.target.value }))}
+              inputMode="decimal"
+              value={current[field.key]}
+              onChange={(event) =>
+                setDraft((prev) => ({ ...(prev ?? current), [field.key]: event.target.value }))
+              }
               className="w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[14px] focus:border-accent focus:outline-none"
             />
             <p className="pt-1 text-[12px] leading-relaxed text-fg-muted">{field.hint}</p>
@@ -494,38 +529,54 @@ function VariancePane() {
         </p>
       )}
 
+      <WriteError error={policy.saveError} />
+
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <Button
           variant="accent"
-          disabled={!dirty || !valid}
-          onClick={() => updatePosSettings({ cashVariance: parsed }, 'Updated cash variance tolerance')}
-        >
-          Save
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            setDraft(Object.fromEntries(Object.entries(varianceDefaults).map(([k, v]) => [k, String(v)])))
-            updatePosSettings({ cashVariance: varianceDefaults }, 'Restored the default cash variance tolerance')
+          disabled={!dirty || !valid || policy.saving}
+          onClick={async () => {
+            const result = await policy.save({ ...current, updatedAt: saved.updatedAt })
+            if (result) setDraft(null)
           }}
         >
-          <Icon name="refresh" size={14} className="mr-1.5 inline align-[-2px]" />
-          Restore defaults
+          {policy.saving ? 'Saving…' : 'Save'}
         </Button>
       </div>
     </div>
   )
 }
 
+type CustomField = { id: string; label: string; type: string }
+
 function FieldsPane() {
-  const { posSettings, updatePosSettings } = useWorkspace()
-  const rows = posSettings.customFields
+  const settings = useAppSettings<{ fields: CustomField[] }>('customFields')
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<{ label: string; type: string }>({ label: '', type: customFieldTypes[0] })
 
+  if (settings.loading) return <Loading what="custom fields" />
+  if (settings.error) {
+    return (
+      <Failure
+        what="custom fields"
+        error={settings.error}
+        denied={settings.denied}
+        canRetry={settings.canRetry}
+        onRetry={settings.refetch}
+      />
+    )
+  }
+
+  const rows = settings.value?.fields ?? []
+
   return (
     <div>
-      <PaneHead title="Custom Fields" blurb="Add extra data fields to capture information specific to your business." />
+      <PaneHead title="Custom Fields" blurb="Extra data fields to capture information specific to your business." />
+
+      <NotAvailable>
+        These are recorded as a workspace setting, with history and a revert. No form in Sales &amp; POS renders them
+        yet, so adding one here does not add a box to the invoice screen.
+      </NotAvailable>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <p className="text-[14px] text-fg-2">
@@ -536,24 +587,24 @@ function FieldsPane() {
         </Button>
       </div>
 
+      <WriteError error={settings.saveError} />
+
       {rows.length ? (
         <ul className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
           {rows.map((row) => (
             <li key={row.id} className="flex items-center gap-4 px-5 py-3.5 text-[14px]">
               <span className="flex-1">{row.label}</span>
               <span className="rounded-lg px-2.5 py-1 text-[11px] font-medium tone-slate">{row.type}</span>
-              <button
-                aria-label={`Delete ${row.label}`}
-                onClick={() =>
-                  updatePosSettings(
-                    { customFields: rows.filter((item) => item.id !== row.id) },
+              <DeleteButton
+                label={row.label}
+                disabled={settings.saving}
+                onDelete={() =>
+                  void settings.save(
+                    { fields: rows.filter((item) => item.id !== row.id) },
                     `Deleted custom field ${row.label}`,
                   )
                 }
-                className="text-fg-muted transition hover:text-bad"
-              >
-                <Icon name="trash" size={15} />
-              </button>
+              />
             </li>
           ))}
         </ul>
@@ -561,7 +612,7 @@ function FieldsPane() {
         <EmptyBox
           icon="settings"
           title="No custom fields"
-          hint="Add custom fields to capture additional sales & pos information."
+          hint="Add custom fields to record additional sales & POS information."
         />
       )}
 
@@ -588,6 +639,7 @@ function FieldsPane() {
                 ))}
               </select>
             </label>
+            <WriteError error={settings.saveError} />
           </div>
           <div className="mt-6 flex justify-end gap-3">
             <Button variant="secondary" onClick={() => setOpen(false)}>
@@ -595,17 +647,19 @@ function FieldsPane() {
             </Button>
             <Button
               variant="accent"
-              disabled={!draft.label.trim()}
-              onClick={() => {
-                updatePosSettings(
-                  { customFields: [...rows, { id: id(), label: draft.label.trim(), type: draft.type }] },
+              disabled={!draft.label.trim() || settings.saving}
+              onClick={async () => {
+                const saved = await settings.save(
+                  { fields: [...rows, { id: crypto.randomUUID(), label: draft.label.trim(), type: draft.type }] },
                   `Added custom field ${draft.label.trim()}`,
                 )
-                setDraft({ label: '', type: customFieldTypes[0] })
-                setOpen(false)
+                if (saved) {
+                  setDraft({ label: '', type: customFieldTypes[0] })
+                  setOpen(false)
+                }
               }}
             >
-              Add
+              {settings.saving ? 'Saving…' : 'Add'}
             </Button>
           </div>
         </Dialog>
@@ -614,29 +668,58 @@ function FieldsPane() {
   )
 }
 
+type AgentControls = { pauseAll: boolean; autoRunOnNew: boolean; autoPauseAt: string; disabled: string[] }
+
+const AGENT_DEFAULTS: AgentControls = { pauseAll: false, autoRunOnNew: true, autoPauseAt: '', disabled: [] }
+
 function AgentsPane() {
-  const { posSettings, updatePosSettings, creditsUsed } = useWorkspace()
-  const controls = posSettings.agents
+  const settings = useAppSettings<AgentControls>('agents')
+  const credits = useResource<{ credits: { granted: number; used: number; available: number } }>(
+    'credits-balance',
+    (signal) => api.get('/credits/balance', undefined, signal),
+  )
   const agents = agentsByAppCode.get('POS') ?? []
-  const running = agents.filter((agent) => !controls.disabled.includes(agent.name)).length
-  const setAgents = (patch: Partial<PosSettings['agents']>, summary: string) =>
-    updatePosSettings({ agents: { ...controls, ...patch } }, summary)
+
+  if (settings.loading) return <Loading what="agent preferences" />
+  if (settings.error) {
+    return (
+      <Failure
+        what="agent preferences"
+        error={settings.error}
+        denied={settings.denied}
+        canRetry={settings.canRetry}
+        onRetry={settings.refetch}
+      />
+    )
+  }
+
+  const controls: AgentControls = { ...AGENT_DEFAULTS, ...(settings.value ?? {}) }
+  const setAgents = (patch: Partial<AgentControls>, summary: string) =>
+    void settings.save({ ...controls, ...patch }, summary)
 
   return (
     <div>
-      <PaneHead title="AI Agents" blurb="The AI working on your records — review and adjust what it does." />
+      <PaneHead title="AI Agents" blurb="What the AI would do with your records, and your preferences for it." />
 
-      <h4 className="mt-6 text-[16px] font-semibold">AI Agents</h4>
-      <p className="mt-1.5 text-[14px] text-fg-muted">
-        Switch an agent off to stop it running — and stop it spending AI Credits.
-      </p>
+      <NotAvailable>
+        No agent runs on this deployment — there is no AI provider connected — so nothing below is running, paused or
+        spending. The switches are recorded as preferences and will govern the agents if they are turned on.
+      </NotAvailable>
 
       <section className="mt-5 rounded-2xl border border-line bg-surface-2/50 p-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="text-[14px] font-medium">AI Credit spend</p>
           <p className="text-[13px] text-fg-muted">
-            <span className="font-semibold text-fg">{creditsUsed.toLocaleString()}</span> AI Credits this month ·{' '}
-            {running} of {agents.length} agent{agents.length === 1 ? '' : 's'} running
+            {credits.error ? (
+              'Credit balance not available'
+            ) : credits.data ? (
+              <>
+                <span className="font-semibold text-fg">{credits.data.credits.used.toLocaleString()}</span> AI Credits
+                used · {credits.data.credits.available.toLocaleString()} available
+              </>
+            ) : (
+              'Loading…'
+            )}
           </p>
         </div>
 
@@ -645,6 +728,7 @@ function AgentsPane() {
             <input
               type="checkbox"
               checked={controls.pauseAll}
+              disabled={settings.saving}
               onChange={(event) =>
                 setAgents(
                   { pauseAll: event.target.checked },
@@ -659,6 +743,7 @@ function AgentsPane() {
             <input
               type="checkbox"
               checked={controls.autoRunOnNew}
+              disabled={settings.saving}
               onChange={(event) =>
                 setAgents(
                   { autoRunOnNew: event.target.checked },
@@ -672,8 +757,11 @@ function AgentsPane() {
           <label className="flex items-center gap-2.5 text-[13px]">
             Auto-pause at
             <input
-              value={controls.autoPauseAt}
-              onChange={(event) => setAgents({ autoPauseAt: event.target.value }, 'Changed the auto-pause threshold')}
+              defaultValue={controls.autoPauseAt}
+              onBlur={(event) =>
+                event.target.value !== controls.autoPauseAt &&
+                setAgents({ autoPauseAt: event.target.value }, 'Changed the auto-pause threshold')
+              }
               placeholder="off"
               aria-label="Auto-pause at (AI Credits)"
               className="w-24 rounded-xl border border-line bg-bg px-3 py-1.5 text-[13px] placeholder:text-fg-muted focus:border-accent focus:outline-none"
@@ -681,6 +769,8 @@ function AgentsPane() {
             AI Credits
           </label>
         </div>
+
+        <WriteError error={settings.saveError} />
       </section>
 
       <ul className="mt-5 space-y-3">
@@ -696,12 +786,15 @@ function AgentsPane() {
               </span>
               <span className="min-w-[12rem] flex-1">
                 <span className="block text-[14px] font-medium">{agent.name}</span>
-                <span className="mt-0.5 block text-[12px] text-fg-muted">Runs automatically on create</span>
+                <span className="mt-0.5 block text-[12px] text-fg-muted">
+                  {off ? 'Switched off' : 'Switched on — not running on this deployment'}
+                </span>
               </span>
               <button
                 role="switch"
                 aria-checked={!off}
                 aria-label={`${off ? 'Enable' : 'Disable'} ${agent.name}`}
+                disabled={settings.saving}
                 onClick={() =>
                   setAgents(
                     {
@@ -720,9 +813,6 @@ function AgentsPane() {
                   }`}
                 />
               </button>
-              <span aria-hidden className="text-fg-muted">
-                <Icon name="trash" size={16} />
-              </span>
             </li>
           )
         })}
@@ -745,92 +835,107 @@ function SchedulesPane() {
 }
 
 function HistoryPane() {
-  const { posSettings, updatePosSettings } = useWorkspace()
+  const history = useSettingsChanges()
   const [showReverted, setShowReverted] = useState(false)
-  const changes = posSettings.changes
-  const visible = showReverted ? changes : changes.filter((change) => !change.reverted)
+  const visible = showReverted ? history.changes : history.changes.filter((change) => !change.reverted)
 
   return (
     <div>
       <PaneHead
         title="Change History"
-        blurb="Every change made here, with who made it and when — and how to undo it."
+        blurb="Every settings change made here, with who made it and when — and a revert that restores what was there before."
       />
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
         <p className="text-[14px] text-fg-2">
-          v1.0.0 — {changes.length} change{changes.length === 1 ? '' : '(s)'} made so far
+          {history.loaded
+            ? `${history.changes.length} change${history.changes.length === 1 ? '' : 's'} recorded`
+            : 'Loading…'}
         </p>
-        <div className="flex flex-wrap items-center gap-4">
-          <label className="flex items-center gap-2.5 text-[13px]">
-            <input
-              type="checkbox"
-              checked={showReverted}
-              onChange={(event) => setShowReverted(event.target.checked)}
-              className="h-4 w-4 accent-accent"
-            />
-            Show reverted
-          </label>
-          <Button
-            variant="secondary"
-            className="!py-2 !text-[13px]"
-            disabled={!changes.length}
-            onClick={() =>
-              updatePosSettings(
-                {
-                  taxCategories: [],
-                  customerGroups: [],
-                  loyalty: [],
-                  cashVariance: varianceDefaults,
-                  customFields: [],
-                  agents: { pauseAll: false, autoRunOnNew: true, autoPauseAt: '', disabled: [] },
-                },
-                'Reset Sales & POS settings to the platform default',
-              )
-            }
-          >
-            <Icon name="refresh" size={14} className="mr-1.5 inline align-[-2px]" />
-            Reset to Default
-          </Button>
-        </div>
+        <label className="flex items-center gap-2.5 text-[13px]">
+          <input
+            type="checkbox"
+            checked={showReverted}
+            onChange={(event) => setShowReverted(event.target.checked)}
+            className="h-4 w-4 accent-accent"
+          />
+          Show reverted
+        </label>
       </div>
 
-      {visible.length ? (
+      <NotAvailable>
+        This covers the settings documents kept for this app — custom fields and agent preferences. Tax categories,
+        customer groups, loyalty programmes and the cash-variance thresholds are records of their own, with their own
+        audit trail, and are not reverted from here.
+      </NotAvailable>
+
+      <WriteError error={history.revertError} />
+
+      {history.loading ? (
+        <div className="mt-4">
+          <Loading what="the change history" />
+        </div>
+      ) : history.error ? (
+        <div className="mt-4">
+          <Failure
+            what="the change history"
+            error={history.error}
+            denied={history.denied}
+            canRetry={history.canRetry}
+            onRetry={history.refetch}
+          />
+        </div>
+      ) : visible.length ? (
         <ul className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
           {visible.map((change) => (
             <li key={change.id} className="flex flex-wrap items-center gap-4 px-5 py-3.5 text-[13px]">
               <span className="min-w-[14rem] flex-1">{change.summary}</span>
-              <span className="text-fg-muted">{change.by}</span>
-              <span className="font-mono text-[12px] text-fg-muted">{change.at.slice(0, 16).replace('T', ' ')}</span>
+              <span className="text-fg-muted">{change.changedByName ?? 'Unknown'}</span>
+              <span className="font-mono text-[12px] text-fg-muted">
+                {change.changedAt.slice(0, 16).replace('T', ' ')}
+              </span>
+              {change.reverted ? (
+                <span className="rounded-lg px-2.5 py-1 text-[11px] font-medium tone-slate">Reverted</span>
+              ) : (
+                <button
+                  disabled={history.reverting}
+                  onClick={() => void history.revert(change.id)}
+                  className="text-[12px] font-medium text-accent hover:underline disabled:opacity-50"
+                >
+                  Revert
+                </button>
+              )}
             </li>
           ))}
         </ul>
       ) : (
-        <EmptyBox icon="history" title="No customizations yet" hint="Running platform default (v1.0.0)" />
+        <EmptyBox icon="history" title="No customisations yet" hint="Running the platform defaults." />
       )}
     </div>
   )
 }
 
 function AppearancePane() {
-  const { posSettings } = useWorkspace()
+  const installations = useInstallations()
+  const entry = installations.apps.find((item) => item.code === 'POS')
+  const fields = useAppSettings<{ fields: CustomField[] }>('customFields')
+
   return (
     <div>
-      <PaneHead
-        title="Appearance"
-        blurb="How the app presents itself — its tile, its name, and the density of its lists."
-      />
+      <PaneHead title="Appearance" blurb="How the app presents itself inside the workspace." />
       <p className="mt-5 max-w-2xl text-[14px] leading-relaxed text-fg-muted">
-        This pane was not in the screenshots the rebuild was transcribed from, so nothing here is invented. What the
-        app actually renders with today:
+        Only what the server actually records about this installation. The app has no theme of its own to configure:
+        it renders in the workspace palette.
       </p>
       <dl className="mt-5 max-w-lg space-y-3 text-[13px]">
         {[
-          ['App name', 'Sales & POS'],
-          ['Version', 'v1.0.0'],
-          ['Tile colour', 'Emerald (from the marketplace catalogue)'],
-          ['Palette', 'Workspace teal — no scoped override'],
-          ['Custom fields on records', String(posSettings.customFields.length)],
+          ['App name', entry?.name ?? 'Not available'],
+          ['Code', entry?.code ?? 'Not available'],
+          ['Installation status', entry?.status ?? 'Not installed'],
+          [
+            'Custom fields on records',
+            fields.loading ? 'Loading…' : fields.error ? 'Not available' : String(fields.value?.fields?.length ?? 0),
+          ],
         ].map(([label, value]) => (
           <div key={label} className="flex justify-between gap-4">
             <dt className="text-fg-muted">{label}</dt>
@@ -842,7 +947,7 @@ function AppearancePane() {
   )
 }
 
-const panes: Record<string, () => React.ReactElement> = {
+const panes: Record<string, () => React.ReactElement | null> = {
   tax: TaxPane,
   groups: GroupsPane,
   loyalty: LoyaltyPane,
@@ -871,9 +976,9 @@ export function PosSettingsPane() {
             Need a change? Just ask
           </p>
           <p className="mt-1.5 text-[13px] leading-relaxed text-fg-muted">
-            Describe what you want in plain English — "add a field for the customer's region", "have the AI summarize
-            new records", "rename the Status column". No technical setup needed. Every change is saved in Change
-            History and can be undone.
+            Describe what you want in plain English — &ldquo;add a field for the customer&apos;s region&rdquo;,
+            &ldquo;rename the Status column&rdquo;. Changes to this app&apos;s settings are recorded in Change History
+            and can be reverted from there.
           </p>
         </div>
         <Button variant="accent" onClick={() => window.dispatchEvent(new Event('apragya:copilot'))}>

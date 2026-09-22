@@ -1,10 +1,12 @@
 'use client'
 
+import { useState } from 'react'
 import { Link, useSearchParams } from '../../../lib/router'
 import { Icon } from '../../../components/Icon'
 import { marketApps } from '../../../lib/appData'
 import { teTabs } from '../../../lib/travelExpenseData'
-import { useWorkspace } from '../../../lib/workspace'
+import { useInstallations } from '../../../lib/useInstallations'
+import type { Entitlement } from '../../../lib/useWorkspaceSummary'
 import {
   AgencyReviewPane,
   ApprovalInboxPane,
@@ -19,12 +21,65 @@ import { SettingsPane } from './settings'
 
 const app = marketApps.find((item) => item.code === 'TE')
 
+/**
+ * The plan's own countdown, which is null when there is no trial.
+ *
+ * Two things a bare `trialDaysLeft` gets wrong. A subscription that converted
+ * to a paid plan keeps the date its trial ended on, so counting days off it
+ * puts a "Trial" badge on a workspace that is paying — the status is what says
+ * whether this is a trial. And the count is floored at zero, so a trial that
+ * ends tonight and one that ended last March both arrive as 0; the end date is
+ * what separates them.
+ */
+function TrialPill({ entitlement }: { entitlement: Entitlement | undefined }) {
+  // The clock is read once, when this mounts, rather than on every render: a
+  // pill that changed its mind halfway through a session would be worse than
+  // one that is a few minutes stale.
+  const [now] = useState(() => Date.now())
+  const daysLeft = entitlement?.trialDaysLeft
+  if (entitlement?.status !== 'trialing' || daysLeft === null || daysLeft === undefined) return null
+
+  const endsAt = entitlement.trialEndsAt ? new Date(entitlement.trialEndsAt) : null
+  const over = endsAt !== null && endsAt.getTime() <= now
+
+  return (
+    <span
+      className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium ${
+        over ? 'bg-surface-2 text-fg-muted' : 'bg-warn-muted text-warn'
+      }`}
+    >
+      {over ? 'Trial ended' : `Trial · ${daysLeft === 0 ? 'last day' : `${daysLeft} day${daysLeft === 1 ? '' : 's'} left`}`}
+    </span>
+  )
+}
+
 export default function TravelExpense() {
   const [params, setParams] = useSearchParams()
-  const { installed, trialDaysLeft } = useWorkspace()
-  const tab = (teTabs.find((item) => item.id === params.get('tab'))?.id ?? 'dashboard')
+  const { apps, entitlement, loading, error } = useInstallations()
+  const tab = teTabs.find((item) => item.id === params.get('tab'))?.id ?? 'dashboard'
+  const installed = apps.find((item) => item.code === 'TE')?.status
 
-  if (!app || !installed.includes('TE')) {
+  // Whether the app is installed is the server's answer, so until it arrives
+  // the screen says it is asking rather than showing the "not installed" page
+  // to somebody who has installed it.
+  if (loading) {
+    return (
+      <div role="status" className="mx-auto max-w-2xl pt-10 text-center text-[14px] text-fg-muted">
+        Loading this workspace…
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="mx-auto max-w-2xl pt-10 text-center">
+        <h1 className="text-[20px] font-bold tracking-tight">We could not check this workspace&apos;s apps</h1>
+        <p className="mt-2 text-[14px] text-fg-muted">{error.message}</p>
+      </div>
+    )
+  }
+
+  if (!app || !installed) {
     return (
       <div className="mx-auto max-w-2xl pt-2">
         <h1 className="text-[22px] font-bold tracking-tight">Travel &amp; Expense is not installed</h1>
@@ -46,15 +101,16 @@ export default function TravelExpense() {
         </span>
         <div className="min-w-[18rem] flex-1">
           <h1 className="text-[24px] font-bold tracking-tight">{app.name}</h1>
+          {/* What these tabs actually do. Receipt capture has no control
+              anywhere in this app — an expense carries a receipt id the server
+              will store and nothing here can produce one — and a per-diem has
+              nowhere to be recorded at all, so neither is advertised. */}
           <p className="mt-1 max-w-4xl text-[14px] leading-relaxed text-fg-2">
-            Expense reports with receipt capture, travel requests, per-diem, corporate cards, and reimbursements.
-            Submit → approve → reimburse on one platform.
+            Expense claims, corporate-card reconciliation, travel requests and reimbursement runs. Raise a claim,
+            submit it, have it approved, and record it as reimbursed.
           </p>
-          <p className="mt-1 text-[13px] text-fg-muted">v1.0.0</p>
         </div>
-        <span className="rounded-full bg-warn-muted px-3.5 py-1.5 text-[13px] font-medium text-warn">
-          Trial · {trialDaysLeft} days left
-        </span>
+        <TrialPill entitlement={entitlement} />
       </header>
 
       <nav aria-label="Travel & Expense" className="mt-5 flex flex-wrap gap-1 border-b border-line pb-3">

@@ -1,16 +1,27 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Button } from '../../components/ui'
 import { marketApps } from '../../lib/appData'
-import { useWorkspace } from '../../lib/workspace'
+import { useInstallations } from '../../lib/useInstallations'
 import { SchedulesCard } from './ScheduledJobs'
+import { describeCron, useServerSchedules, type SchedulesHandle } from './useSchedules'
 
 const cadences = ['Hourly', 'Daily', 'Weekly', 'Monthly'] as const
 type Cadence = (typeof cadences)[number]
 
 const hours = Array.from({ length: 24 }, (_, hour) => `${String(hour).padStart(2, '0')}:00`)
+
+/**
+ * The handler key the schedule is stored under.
+ *
+ * `kind` is what the dispatcher looks up to find the code that runs a job. No
+ * handler is registered on this deployment, which is why the card says a queued
+ * job stays queued; the key is still stored honestly rather than invented per
+ * row from a display label.
+ */
+const HANDLER_KIND = 'agent.run'
 
 /** The cron the schedule compiles to, shown under the pickers as the live dialog does. */
 function cron(cadence: Cadence, time: string) {
@@ -21,44 +32,41 @@ function cron(cadence: Cadence, time: string) {
   return `0 ${hour} 1 * *`
 }
 
-function describe(cadence: Cadence, time: string) {
-  if (cadence === 'Hourly') return 'Every hour, on the hour'
-  if (cadence === 'Daily') return `Every day at ${time}`
-  if (cadence === 'Weekly') return `Every Monday at ${time}`
-  return `The 1st of every month at ${time}`
+type IntlWithZones = typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] }
+
+/**
+ * The zones this browser knows, or the two it certainly knows.
+ *
+ * The zone is stored with the schedule and every occurrence is computed in it,
+ * so it is chosen here rather than assumed to be UTC — "every day at 02:00" is
+ * a different instant in summer and winter.
+ */
+function zoneOptions(browserZone: string): string[] {
+  const all = (Intl as IntlWithZones).supportedValuesOf?.('timeZone') ?? []
+  return all.length ? all : [...new Set([browserZone, 'UTC'])]
 }
 
-/** The next time this schedule is due, from now, in the UTC. */
-function nextRun(cadence: Cadence, time: string) {
-  const hour = Number(time.slice(0, 2))
-  const next = new Date()
-  next.setUTCSeconds(0, 0)
+function NewAutomation({ schedules, onClose }: { schedules: SchedulesHandle; onClose: () => void }) {
+  const installations = useInstallations()
+  // Only what this workspace has actually installed and left enabled; the
+  // catalogue's other cards are advertising, not something to schedule.
+  const apps = useMemo(() => {
+    const enabled = new Set(installations.apps.filter((app) => app.status === 'installed').map((app) => app.code))
+    return marketApps.filter((app) => enabled.has(app.code))
+  }, [installations.apps])
 
-  if (cadence === 'Hourly') {
-    next.setUTCMinutes(0)
-    next.setUTCHours(next.getUTCHours() + 1)
-  } else {
-    next.setUTCMinutes(0)
-    next.setUTCHours(hour)
-    if (next.getTime() <= Date.now()) next.setUTCDate(next.getUTCDate() + 1)
-    if (cadence === 'Weekly') while (next.getUTCDay() !== 1) next.setUTCDate(next.getUTCDate() + 1)
-    if (cadence === 'Monthly') while (next.getUTCDate() !== 1) next.setUTCDate(next.getUTCDate() + 1)
-  }
-
-  return next.toLocaleString('en-GB', { timeZone: 'UTC', timeZoneName: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
-
-function NewAutomation({ onClose }: { onClose: () => void }) {
-  const { installed, addSchedule } = useWorkspace()
-  const apps = marketApps.filter((app) => installed.includes(app.code))
+  const browserZone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', [])
+  const zones = useMemo(() => zoneOptions(browserZone), [browserZone])
 
   const [appCode, setAppCode] = useState('')
   const [agent, setAgent] = useState('')
   const [name, setName] = useState('')
   const [cadence, setCadence] = useState<Cadence>('Daily')
   const [time, setTime] = useState('02:00')
+  const [timezone, setTimezone] = useState(browserZone)
 
   const app = apps.find((item) => item.code === appCode)
+  const expression = cron(cadence, time)
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal>
@@ -78,30 +86,44 @@ function NewAutomation({ onClose }: { onClose: () => void }) {
             Target app
             <select
               value={appCode}
+              disabled={installations.loading || Boolean(installations.error)}
               onChange={(event) => {
                 setAppCode(event.target.value)
                 setAgent('')
               }}
-              className="mt-1.5 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] font-normal text-fg focus:border-accent focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] font-normal text-fg focus:border-accent focus:outline-none disabled:text-fg-muted"
             >
-              <option value="">Select an app...</option>
+              <option value="">
+                {installations.loading
+                  ? 'Loading your applications...'
+                  : installations.error
+                    ? 'Your applications could not be loaded'
+                    : apps.length
+                      ? 'Select an app...'
+                      : 'No applications are installed'}
+              </option>
               {apps.map((item) => (
                 <option key={item.code} value={item.code}>
                   {item.name}
                 </option>
               ))}
             </select>
+            {installations.error && (
+              <span className="mt-1.5 block text-[12px] font-normal text-bad">{installations.error.message}</span>
+            )}
           </label>
 
           <label className="text-[13px] font-medium text-fg-2">
             What to run
             <select
               value={agent}
-              disabled={!app}
+              disabled={!app?.agents.length}
               onChange={(event) => setAgent(event.target.value)}
               className="mt-1.5 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] font-normal text-fg focus:border-accent focus:outline-none disabled:text-fg-muted"
             >
-              <option value="">{app ? 'Select an agent...' : 'Pick an app first'}</option>
+              <option value="">
+                {!app ? 'Pick an app first' : app.agents.length ? 'Select an agent...' : 'This app bundles no agents'}
+              </option>
               {app?.agents.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -144,12 +166,33 @@ function NewAutomation({ onClose }: { onClose: () => void }) {
                   <option key={item}>{item}</option>
                 ))}
               </select>
+              <select
+                aria-label="Timezone"
+                value={timezone}
+                onChange={(event) => setTimezone(event.target.value)}
+                className="rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] font-normal text-fg focus:border-accent focus:outline-none"
+              >
+                {zones.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
             </div>
             <p className="mt-2 text-[12px] font-normal text-fg-muted">
-              {describe(cadence, time)} · UTC · {cron(cadence, time)}
+              {describeCron(expression) ?? expression} · {timezone} · {expression}
             </p>
+            {(schedules.createFieldErrors.cron || schedules.createFieldErrors.timezone) && (
+              <p className="mt-1.5 text-[12px] font-normal text-bad">
+                {schedules.createFieldErrors.cron ?? schedules.createFieldErrors.timezone}
+              </p>
+            )}
           </div>
         </div>
+
+        {schedules.createError && (
+          <p role="alert" className="mt-4 text-[13px] text-bad">
+            {schedules.createError.message}
+          </p>
+        )}
 
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="secondary" onClick={onClose}>
@@ -157,17 +200,21 @@ function NewAutomation({ onClose }: { onClose: () => void }) {
           </Button>
           <Button
             variant="accent"
+            loading={schedules.creating}
             disabled={!app || !agent || !name.trim()}
-            onClick={() => {
-              addSchedule({
+            onClick={async () => {
+              const created = await schedules.createSchedule({
                 name: name.trim(),
-                kind: 'Agent',
-                target: `${app?.name} · ${agent}`,
-                cadence: cadence === 'Hourly' ? 'Hourly' : `${cadence} · ${time}`,
-                nextRun: nextRun(cadence, time),
-                active: true,
+                kind: HANDLER_KIND,
+                // The expression and zone the dialog has been showing all along
+                // — the prototype displayed a cron and then stored a sentence.
+                cron: expression,
+                timezone,
+                targetRef: `${app?.code}:${agent}`,
               })
-              onClose()
+              // Only on success: a dialog that closes on a failed save is how
+              // somebody loses what they typed.
+              if (created) onClose()
             }}
           >
             Create automation
@@ -181,14 +228,20 @@ function NewAutomation({ onClose }: { onClose: () => void }) {
 /** `/app/admin/scheduled-jobs` — the Administer view, which can create schedules. */
 export default function AdminScheduledJobs() {
   const [open, setOpen] = useState(false)
+  // One handle shared by the card and the dialog, so a schedule created here
+  // appears in the list behind it rather than waiting for a reload.
+  const schedules = useServerSchedules()
 
   return (
     <div className="mx-auto max-w-5xl pt-2">
       <header>
         <h1 className="text-[28px] font-bold tracking-tight">Scheduled Jobs</h1>
+        {/* "Re-time anything" was not true: this screen creates, pauses,
+            resumes and removes. Changing a stored cadence has no control here,
+            and the kinds listed were a taxonomy no row carried. */}
         <p className="mt-2 text-[15px] text-fg-muted">
-          Your organisation&apos;s scheduled jobs — agent runs, workflows, bots and app automations. Pause, resume or
-          re-time anything.
+          Your organisation&apos;s schedules. Create one, pause it, resume it or remove it — changing the cadence of a
+          schedule that already exists is not offered on this screen yet.
         </p>
       </header>
 
@@ -206,10 +259,10 @@ export default function AdminScheduledJobs() {
       </div>
 
       <div className="mt-4">
-        <SchedulesCard />
+        <SchedulesCard schedules={schedules} />
       </div>
 
-      {open && <NewAutomation onClose={() => setOpen(false)} />}
+      {open && <NewAutomation schedules={schedules} onClose={() => setOpen(false)} />}
     </div>
   )
 }

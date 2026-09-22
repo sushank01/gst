@@ -8,6 +8,7 @@ import { notFound } from '../../../../../../server/http/errors.ts'
 const Query = z
   .object({
     employeeId: uuid.optional(),
+    managerId: uuid.optional(),
     status: z.string().trim().max(40).optional(),
     from: isoDate.optional(),
     to: isoDate.optional(),

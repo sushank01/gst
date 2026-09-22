@@ -1,17 +1,19 @@
 import { tenantRoute, jsonBody, searchParams } from '../../../../../server/http/handler.ts'
-import { parseOrThrow, z, currency, trimmed, uuid } from '../../../../../server/http/validate.ts'
+import { parseOrThrow, z, currency, isoDate, trimmed, uuid } from '../../../../../server/http/validate.ts'
 import { listReports, openReport } from '../../../../../server/services/expenses.ts'
 
 const Query = z
   .object({
     employeeId: uuid.optional(),
     status: z.string().trim().max(40).optional(),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
     limit: z.coerce.number().int().min(1).max(200).optional(),
     offset: z.coerce.number().int().min(0).optional(),
   })
   .strict()
 
-/** Expense claims, filtered by person and state. */
+/** Expense claims, filtered by person, state and the date they were raised. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { rows, total } = await listReports(ctx, parseOrThrow(Query, searchParams(request)))
   return { body: { reports: rows, total } }

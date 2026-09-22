@@ -301,25 +301,234 @@ export async function readShift(ctx: TenantContext, shiftId: string): Promise<Sh
   }
 }
 
+export type ShiftListRow = ShiftRow & {
+  /** The cashier's name, joined here so a list does not need N member lookups. */
+  cashierName: string | null
+  totals: ShiftTotals
+}
+
+/**
+ * Tills, with the cashier's name and the tenders each one took.
+ *
+ * Both are joined and aggregated in this one call on purpose. A shift row on
+ * its own carries a user id and no takings, so a dashboard built from it
+ * either shows a uuid where a name belongs or fires a request per row — and
+ * resolving the name through the members endpoint would need a permission a
+ * cashier may not hold, so the manager's dashboard would simply be empty for
+ * the people it is about.
+ *
+ * `closedFrom` / `closedTo` select tills closed inside a window, which is what
+ * a "last 30 days" figure actually means; an open till has no close date and
+ * is excluded by them.
+ */
 export async function listShifts(
   ctx: TenantContext,
-  options: { open?: boolean; cashierUserId?: string; limit?: number } = {},
-): Promise<ShiftRow[]> {
+  options: {
+    open?: boolean
+    closed?: boolean
+    cashierUserId?: string
+    closedFrom?: string
+    closedTo?: string
+    limit?: number
+    offset?: number
+  } = {},
+): Promise<{ rows: ShiftListRow[]; total: number; cashiers: number }> {
   ctx.require('record.read')
-  const filters = ['tenant_id = $1']
+  const filters = ['s.tenant_id = $1']
   const params: unknown[] = [ctx.tenantId]
-  if (options.open) filters.push('closed_at is null')
-  if (options.cashierUserId) {
-    params.push(options.cashierUserId)
-    filters.push(`cashier_user_id = $${params.length}`)
+  const add = (clause: string, value: unknown) => {
+    params.push(value)
+    filters.push(clause.replace('$?', `$${params.length}`))
   }
-  params.push(Math.min(options.limit ?? 50, 200))
+  if (options.open) filters.push('s.closed_at is null')
+  if (options.closed) filters.push('s.closed_at is not null')
+  if (options.cashierUserId) add('s.cashier_user_id = $?', options.cashierUserId)
+  if (options.closedFrom) add('s.closed_at >= $?::date', options.closedFrom)
+  if (options.closedTo) add('s.closed_at < ($?::date + 1)', options.closedTo)
   const where = filters.join(' and ')
-  const { rows } = await ctx.db.query<Raw>(
-    `select * from pos_shifts where ${where} order by opened_at desc limit $${params.length}`,
+
+  // Counted separately so the figure beside the list is the number of matching
+  // tills, not the number this page happened to load.
+  const { rows: counted } = await ctx.db.query<{ n: string; cashiers: string }>(
+    `select count(*)::text as n, count(distinct s.cashier_user_id)::text as cashiers
+       from pos_shifts s where ${where}`,
     params as never[],
   )
-  return rows.map(mapShift)
+
+  params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  const { rows } = await ctx.db.query<Raw>(
+    `select s.*, u.full_name
+       from pos_shifts s
+       left join users u on u.id = s.cashier_user_id
+      where ${where}
+      order by s.opened_at desc
+      limit $${params.length - 1} offset $${params.length}`,
+    params as never[],
+  )
+
+  const ids = rows.map((row) => row.id as string)
+  const tenders = new Map<string, Record<string, string>>()
+  const sales = new Map<string, { sales: number; gross: string }>()
+  if (ids.length) {
+    const { rows: byMethod } = await ctx.db.query<{ shift_id: string; method: string; amount: string }>(
+      `select sale.shift_id, t.method, coalesce(sum(t.amount), 0)::text as amount
+         from pos_sale_tenders t
+         join pos_sales sale on sale.id = t.sale_id
+        where sale.tenant_id = $1 and sale.voided_at is null and sale.shift_id = any($2::uuid[])
+        group by sale.shift_id, t.method`,
+      [ctx.tenantId, ids],
+    )
+    for (const row of byMethod) {
+      const entry = tenders.get(row.shift_id) ?? {}
+      entry[row.method] = row.amount
+      tenders.set(row.shift_id, entry)
+    }
+    const { rows: counts } = await ctx.db.query<{ shift_id: string; n: string; total: string }>(
+      `select shift_id, count(*)::text as n, coalesce(sum(total), 0)::text as total
+         from pos_sales where tenant_id = $1 and voided_at is null and shift_id = any($2::uuid[])
+        group by shift_id`,
+      [ctx.tenantId, ids],
+    )
+    for (const row of counts) sales.set(row.shift_id, { sales: Number(row.n), gross: row.total })
+  }
+
+  return {
+    total: Number(counted[0].n),
+    cashiers: Number(counted[0].cashiers),
+    rows: rows.map((row) => {
+      const shift = mapShift(row)
+      const byMethod = tenders.get(shift.id) ?? {}
+      const counts = sales.get(shift.id) ?? { sales: 0, gross: '0.0000' }
+      return {
+        ...shift,
+        cashierName: (row.full_name as string) ?? null,
+        totals: {
+          ...counts,
+          byMethod,
+          expectedCash: toDecimal(toMinor(byMethod.cash ?? '0') + toMinor(shift.openingFloat)),
+        },
+      }
+    }),
+  }
+}
+
+/* ---------------------------- cash variance policy ------------------------ */
+
+export type VariancePolicy = {
+  reasonRequiredAbove: string
+  amberWorstShift: string
+  redWorstShift: string
+  amberAverage: string
+  redAverage: string
+  /**
+   * When the policy was last written, and the token a write must carry back.
+   * Null means no row exists and the figures above are the defaults `closeShift`
+   * falls back to. `cash_variance_policies` has no version column, so the
+   * timestamp is what turns a concurrent edit into a conflict.
+   */
+  updatedAt: string | null
+}
+
+const VARIANCE_DEFAULTS: Omit<VariancePolicy, 'updatedAt'> = {
+  reasonRequiredAbove: '1.0000',
+  amberWorstShift: '1.0000',
+  redWorstShift: '5.0000',
+  amberAverage: '0.5000',
+  redAverage: '2.0000',
+}
+
+type PolicyRow = {
+  reason_required_above: string
+  amber_worst_shift: string
+  red_worst_shift: string
+  amber_average: string
+  red_average: string
+  updated_at: Date
+}
+
+const POLICY_SELECT = `reason_required_above::text as reason_required_above,
+       amber_worst_shift::text as amber_worst_shift, red_worst_shift::text as red_worst_shift,
+       amber_average::text as amber_average, red_average::text as red_average, updated_at`
+
+const mapPolicy = (row: PolicyRow): VariancePolicy => ({
+  reasonRequiredAbove: row.reason_required_above,
+  amberWorstShift: row.amber_worst_shift,
+  redWorstShift: row.red_worst_shift,
+  amberAverage: row.amber_average,
+  redAverage: row.red_average,
+  updatedAt: new Date(row.updated_at).toISOString(),
+})
+
+/**
+ * The thresholds the till enforces.
+ *
+ * This is deliberately its own table and not an app-settings document:
+ * `closeShift` reads `reason_required_above` from here, so a threshold saved
+ * anywhere else would show on the settings screen and change nothing at the
+ * drawer.
+ */
+export async function readVariancePolicy(ctx: TenantContext): Promise<VariancePolicy> {
+  ctx.require('settings.read')
+  const { rows } = await ctx.db.query<PolicyRow>(
+    `select ${POLICY_SELECT} from cash_variance_policies where tenant_id = $1`,
+    [ctx.tenantId],
+  )
+  return rows[0] ? mapPolicy(rows[0]) : { ...VARIANCE_DEFAULTS, updatedAt: null }
+}
+
+export async function writeVariancePolicy(
+  ctx: TenantContext,
+  input: Omit<VariancePolicy, 'updatedAt'> & { updatedAt: string | null },
+): Promise<VariancePolicy> {
+  ctx.require('settings.manage')
+  // The table's own check constraint enforces red >= amber; saying it here
+  // first turns it into a message a form can show rather than a 500.
+  if (toMinor(input.redWorstShift) < toMinor(input.amberWorstShift)) {
+    throw unprocessable('red_below_amber', 'The red worst-shift figure must be at least the amber one.')
+  }
+  if (toMinor(input.redAverage) < toMinor(input.amberAverage)) {
+    throw unprocessable('red_below_amber', 'The red average must be at least the amber average.')
+  }
+
+  const values = [
+    input.reasonRequiredAbove,
+    input.amberWorstShift,
+    input.redWorstShift,
+    input.amberAverage,
+    input.redAverage,
+  ]
+
+  if (input.updatedAt === null) {
+    const { rows } = await ctx.db.query<PolicyRow>(
+      `insert into cash_variance_policies
+         (tenant_id, reason_required_above, amber_worst_shift, red_worst_shift, amber_average, red_average, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7) on conflict (tenant_id) do nothing returning ${POLICY_SELECT}`,
+      [ctx.tenantId, ...values, ctx.now],
+    )
+    if (!rows[0]) throw conflict('Someone else set a variance policy while you were editing.')
+    await recordAudit(ctx.db, ctx, {
+      action: 'pos.variance_policy_updated',
+      resource: 'cash_variance_policy',
+      resourceId: ctx.tenantId,
+    })
+    return mapPolicy(rows[0])
+  }
+
+  const { rows } = await ctx.db.query<PolicyRow>(
+    `update cash_variance_policies
+        set reason_required_above = $3, amber_worst_shift = $4, red_worst_shift = $5,
+            amber_average = $6, red_average = $7, updated_at = $8
+      where tenant_id = $1 and updated_at = $2::timestamptz
+      returning ${POLICY_SELECT}`,
+    [ctx.tenantId, input.updatedAt, ...values, ctx.now],
+  )
+  if (!rows[0]) throw conflict('Someone else changed the variance policy while you were editing.')
+  await recordAudit(ctx.db, ctx, {
+    action: 'pos.variance_policy_updated',
+    resource: 'cash_variance_policy',
+    resourceId: ctx.tenantId,
+  })
+  return mapPolicy(rows[0])
 }
 
 /**
@@ -327,33 +536,25 @@ export async function listShifts(
  *
  * Reports the worst single shift and the average, because a steady small
  * shortfall and one large one are different problems and a single average
- * hides the first inside the second.
+ * hides the first inside the second. The per-band counts are computed here
+ * too: the thresholds live beside the policy the till enforces, so a manager's
+ * scorecard and the drawer cannot disagree about what counts as red.
  */
 export async function varianceReport(
   ctx: TenantContext,
   options: { from?: string; to?: string } = {},
 ): Promise<{
   shifts: number
+  cashiers: number
   worst: string
   average: string
   total: string
   band: 'green' | 'amber' | 'red'
+  byBand: { green: number; amber: number; red: number }
+  bands: { amberWorstShift: string; redWorstShift: string; amberAverage: string; redAverage: string }
   unexplained: number
 }> {
   ctx.require('record.read')
-  const { rows } = await ctx.db.query<{ n: string; worst: string | null; total: string; unexplained: string }>(
-    `select count(*)::text as n,
-            max(abs(variance))::text as worst,
-            coalesce(sum(variance), 0)::text as total,
-            count(*) filter (where abs(variance) > 0 and coalesce(variance_reason, '') = '')::text as unexplained
-       from pos_shifts
-      where tenant_id = $1 and closed_at is not null
-        and ($2::date is null or closed_at >= $2::date)
-        and ($3::date is null or closed_at < ($3::date + 1))`,
-    [ctx.tenantId, options.from ?? null, options.to ?? null],
-  )
-  const shifts = Number(rows[0].n)
-  const worst = rows[0].worst ?? '0'
 
   const { rows: policy } = await ctx.db.query<{
     amber_worst_shift: string
@@ -366,7 +567,39 @@ export async function varianceReport(
        from cash_variance_policies where tenant_id = $1`,
     [ctx.tenantId],
   )
-  const bands = policy[0] ?? { amber_worst_shift: '1', red_worst_shift: '5', amber_average: '0.5', red_average: '2' }
+  const bands = policy[0] ?? {
+    amber_worst_shift: VARIANCE_DEFAULTS.amberWorstShift,
+    red_worst_shift: VARIANCE_DEFAULTS.redWorstShift,
+    amber_average: VARIANCE_DEFAULTS.amberAverage,
+    red_average: VARIANCE_DEFAULTS.redAverage,
+  }
+
+  const { rows } = await ctx.db.query<{
+    n: string
+    cashiers: string
+    worst: string | null
+    total: string
+    unexplained: string
+    red: string
+    amber: string
+    green: string
+  }>(
+    `select count(*)::text as n,
+            count(distinct cashier_user_id)::text as cashiers,
+            max(abs(variance))::text as worst,
+            coalesce(sum(variance), 0)::text as total,
+            count(*) filter (where abs(variance) > 0 and coalesce(variance_reason, '') = '')::text as unexplained,
+            count(*) filter (where abs(variance) >= $4)::text as red,
+            count(*) filter (where abs(variance) >= $5 and abs(variance) < $4)::text as amber,
+            count(*) filter (where abs(variance) < $5)::text as green
+       from pos_shifts
+      where tenant_id = $1 and closed_at is not null
+        and ($2::date is null or closed_at >= $2::date)
+        and ($3::date is null or closed_at < ($3::date + 1))`,
+    [ctx.tenantId, options.from ?? null, options.to ?? null, bands.red_worst_shift, bands.amber_worst_shift],
+  )
+  const shifts = Number(rows[0].n)
+  const worst = rows[0].worst ?? '0'
 
   // An average over no shifts is not zero; it is undefined, and reported as a
   // green band with zero shifts so nobody reads it as "no variance observed".
@@ -382,10 +615,18 @@ export async function varianceReport(
 
   return {
     shifts,
+    cashiers: Number(rows[0].cashiers),
     worst: toDecimal(worstMinor),
     average: toDecimal(average),
     total: rows[0].total,
     band,
+    byBand: { green: Number(rows[0].green), amber: Number(rows[0].amber), red: Number(rows[0].red) },
+    bands: {
+      amberWorstShift: bands.amber_worst_shift,
+      redWorstShift: bands.red_worst_shift,
+      amberAverage: bands.amber_average,
+      redAverage: bands.red_average,
+    },
     unexplained: Number(rows[0].unexplained),
   }
 }

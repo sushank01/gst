@@ -334,3 +334,98 @@ export async function decideOvertime(
     return mapOvertime(after[0])
   })
 }
+
+/* ------------------------------ list queries ------------------------------ */
+
+export type TimesheetListRow = TimesheetRow & { employeeName: string }
+
+/**
+ * Timesheets, filtered and counted.
+ *
+ * The total is the count of rows MATCHING the filter, not the length of the
+ * page returned: a list that reports its own page length as the total tells
+ * somebody they have 50 timesheets when they have 300.
+ */
+export async function listTimesheets(
+  ctx: TenantContext,
+  options: { employeeId?: string; managerId?: string; status?: string; limit?: number; offset?: number } = {},
+): Promise<{ rows: TimesheetListRow[]; total: number }> {
+  ctx.require('record.read')
+
+  const filters = ['t.tenant_id = $1']
+  const params: unknown[] = [ctx.tenantId]
+  const add = (clause: string, value: unknown) => {
+    params.push(value)
+    filters.push(clause.replace('$?', `$${params.length}`))
+  }
+  if (options.employeeId) add('t.employee_id = $?', options.employeeId)
+  if (options.managerId) add('e.manager_id = $?', options.managerId)
+  if (options.status) add('t.status = $?', options.status)
+  const where = filters.join(' and ')
+  const from = 'from hr_timesheets t join hr_employees e on e.id = t.employee_id'
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `select count(*)::text as n ${from} where ${where}`,
+    params as never[],
+  )
+  params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  const { rows } = await ctx.db.query<Raw>(
+    `select t.*, e.full_name as employee_name ${from}
+      where ${where}
+      order by t.period_start desc
+      limit $${params.length - 1} offset $${params.length}`,
+    params as never[],
+  )
+  return { total: Number(counted[0].n), rows: rows.map((row) => ({ ...mapSheet(row), employeeName: row.employee_name as string })) }
+}
+
+export type OvertimeListRow = OvertimeRow & { employeeName: string; reason: string | null; decidedAt: string | null }
+
+/**
+ * Overtime claims, filtered and counted.
+ *
+ * Claims could be made and decided long before this existed, so the queue was
+ * write-only: the approver had no way to see what was waiting on them.
+ */
+export async function listOvertime(
+  ctx: TenantContext,
+  options: { employeeId?: string; managerId?: string; status?: string; from?: string; to?: string; limit?: number; offset?: number } = {},
+): Promise<{ rows: OvertimeListRow[]; total: number }> {
+  ctx.require('record.read')
+
+  const filters = ['o.tenant_id = $1']
+  const params: unknown[] = [ctx.tenantId]
+  const add = (clause: string, value: unknown) => {
+    params.push(value)
+    filters.push(clause.replace('$?', `$${params.length}`))
+  }
+  if (options.employeeId) add('o.employee_id = $?', options.employeeId)
+  if (options.managerId) add('e.manager_id = $?', options.managerId)
+  if (options.status) add('o.status = $?', options.status)
+  if (options.from) add('o.worked_on >= $?', options.from)
+  if (options.to) add('o.worked_on <= $?', options.to)
+  const where = filters.join(' and ')
+  const from = 'from hr_overtime_requests o join hr_employees e on e.id = o.employee_id'
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `select count(*)::text as n ${from} where ${where}`,
+    params as never[],
+  )
+  params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  const { rows } = await ctx.db.query<Raw>(
+    `select o.*, e.full_name as employee_name ${from}
+      where ${where}
+      order by o.worked_on desc, o.created_at desc
+      limit $${params.length - 1} offset $${params.length}`,
+    params as never[],
+  )
+  return {
+    total: Number(counted[0].n),
+    rows: rows.map((row) => ({
+      ...mapOvertime(row),
+      employeeName: row.employee_name as string,
+      reason: (row.reason as string) ?? null,
+      decidedAt: row.decided_at ? new Date(row.decided_at as string).toISOString() : null,
+    })),
+  }
+}

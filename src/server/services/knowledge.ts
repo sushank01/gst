@@ -231,6 +231,32 @@ export async function unpublishArticle(ctx: TenantContext, articleId: string, ve
   })
 }
 
+/**
+ * Archives an article.
+ *
+ * Archived rather than deleted: an article a customer was reading yesterday
+ * still has to be explicable today, and `kb_article_versions` points at a row
+ * that has to stay. It leaves every audience's view immediately, which is what
+ * the Delete button on the list is actually for.
+ */
+export async function archiveArticle(ctx: TenantContext, articleId: string, version: number): Promise<ArticleRow> {
+  ctx.require('record.archive')
+
+  return ctx.db.transaction(async (tx) => {
+    const { rowCount } = await tx.query(
+      `update kb_articles set status = 'archived', published_at = null, version = version + 1, updated_at = $3
+        where id = $1 and tenant_id = $2 and version = $4`,
+      [articleId, ctx.tenantId, ctx.now, version],
+    )
+    if (!rowCount) {
+      const current = await readArticleOn(tx, ctx, articleId)
+      throw conflict('Someone else changed this article.', current.version)
+    }
+    await recordAudit(tx, ctx, { action: 'support.kb_archived', resource: 'kb_article', resourceId: articleId })
+    return readArticleOn(tx, ctx, articleId)
+  })
+}
+
 export type ArticleQuery = {
   q?: string
   categoryId?: string

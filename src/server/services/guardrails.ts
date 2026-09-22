@@ -1,4 +1,4 @@
-import { notFound, unprocessable } from '../http/errors.ts'
+import { conflict, notFound, unprocessable } from '../http/errors.ts'
 import { recordAudit } from '../events/audit.ts'
 import { balance } from './credits.ts'
 import type { Db } from '../db/client.ts'
@@ -23,6 +23,7 @@ import type { TenantContext } from '../tenancy/context.ts'
 
 export type Checkpoint = 'input' | 'output' | 'tool_call' | 'tool_result'
 export type GuardrailAction = 'block' | 'warn' | 'redact' | 'human_review'
+export type PolicyKind = 'keyword' | 'content' | 'pii' | 'spend' | 'rate' | 'schema'
 
 export type PolicyRow = {
   id: string
@@ -95,11 +96,39 @@ export async function listPolicies(ctx: TenantContext, checkpoint?: Checkpoint):
   return rows.map(mapPolicy)
 }
 
+/**
+ * Refuses a configuration that could never match.
+ *
+ * Checked on the way in rather than discovered later: a policy with no keywords
+ * sits in the list looking like protection while stopping nothing, and an
+ * operator has no way to tell the two apart from the table.
+ */
+function assertConfigured(kind: PolicyKind, config: Record<string, unknown>): void {
+  if (kind === 'keyword' && !(Array.isArray(config.keywords) && config.keywords.length)) {
+    throw unprocessable('empty_policy', 'A keyword policy needs at least one keyword.')
+  }
+  if (kind === 'pii' && !(Array.isArray(config.types) && config.types.length)) {
+    throw unprocessable('empty_policy', 'A PII policy needs at least one identifier type.')
+  }
+  if (kind === 'pii') {
+    const unknown = (config.types as string[]).filter((type) => !(type in PII_PATTERNS))
+    if (unknown.length) {
+      throw unprocessable('unknown_pii_type', `No detector exists for: ${unknown.join(', ')}.`)
+    }
+  }
+  if (kind === 'spend' && typeof config.maxCredits !== 'number') {
+    throw unprocessable('empty_policy', 'A spend policy needs a credit ceiling.')
+  }
+  if (kind === 'schema' && !(Array.isArray(config.requiredKeys) && config.requiredKeys.length)) {
+    throw unprocessable('empty_policy', 'A schema policy needs at least one required key.')
+  }
+}
+
 export async function createPolicy(
   ctx: TenantContext,
   input: {
     name: string
-    kind: 'keyword' | 'content' | 'pii' | 'spend' | 'rate' | 'schema'
+    kind: PolicyKind
     checkpoint: Checkpoint
     action: GuardrailAction
     config?: Record<string, unknown>
@@ -108,24 +137,8 @@ export async function createPolicy(
 ): Promise<PolicyRow> {
   ctx.require('settings.manage')
 
-  // A policy whose configuration cannot match anything would sit in the list
-  // looking like protection. Refused at creation rather than discovered later.
   const config = input.config ?? {}
-  if (input.kind === 'keyword' && !(Array.isArray(config.keywords) && config.keywords.length)) {
-    throw unprocessable('empty_policy', 'A keyword policy needs at least one keyword.')
-  }
-  if (input.kind === 'pii' && !(Array.isArray(config.types) && config.types.length)) {
-    throw unprocessable('empty_policy', 'A PII policy needs at least one identifier type.')
-  }
-  if (input.kind === 'pii') {
-    const unknown = (config.types as string[]).filter((type) => !(type in PII_PATTERNS))
-    if (unknown.length) {
-      throw unprocessable('unknown_pii_type', `No detector exists for: ${unknown.join(', ')}.`)
-    }
-  }
-  if (input.kind === 'spend' && typeof config.maxCredits !== 'number') {
-    throw unprocessable('empty_policy', 'A spend policy needs a credit ceiling.')
-  }
+  assertConfigured(input.kind, config)
 
   const { rows } = await ctx.db.query<Raw>(
     `insert into guardrail_policies (tenant_id, name, kind, checkpoint, action, config, failure_mode, created_by)
@@ -164,6 +177,72 @@ export async function setPolicyActive(ctx: TenantContext, policyId: string, acti
     resourceId: policyId,
   })
   return mapPolicy(rows[0])
+}
+
+/**
+ * Replaces a policy's definition.
+ *
+ * Separate from `setPolicyActive` because the two are different decisions: one
+ * pauses a rule everybody has agreed on, the other changes what the rule says.
+ * The version read by the editor is sent back, so two people editing the same
+ * policy get a conflict instead of the second one silently winning — and the
+ * version is bumped, because `guardrail_violations.policy_version` records
+ * which wording of the rule stopped a request.
+ */
+export async function updatePolicy(
+  ctx: TenantContext,
+  policyId: string,
+  input: {
+    version: number
+    name: string
+    kind: PolicyKind
+    checkpoint: Checkpoint
+    action: GuardrailAction
+    config?: Record<string, unknown>
+    failureMode?: 'open' | 'closed'
+  },
+): Promise<PolicyRow> {
+  ctx.require('settings.manage')
+
+  const config = input.config ?? {}
+  assertConfigured(input.kind, config)
+
+  return ctx.db.transaction(async (tx) => {
+    const { rows } = await tx.query<Raw>(
+      'select * from guardrail_policies where id = $1 and tenant_id = $2 for update',
+      [policyId, ctx.tenantId],
+    )
+    const current = rows[0]
+    if (!current) throw notFound('That policy')
+    if ((current.version as number) !== input.version) {
+      throw conflict('Someone else changed this policy.', current.version as number)
+    }
+
+    const { rows: updated } = await tx.query<Raw>(
+      `update guardrail_policies
+          set name = $3, kind = $4, checkpoint = $5, action = $6, config = $7, failure_mode = $8,
+              version = version + 1, updated_at = $9
+        where id = $1 and tenant_id = $2 returning *`,
+      [
+        policyId,
+        ctx.tenantId,
+        input.name,
+        input.kind,
+        input.checkpoint,
+        input.action,
+        JSON.stringify(config),
+        input.failureMode ?? (current.failure_mode as string),
+        ctx.now,
+      ],
+    )
+    await recordAudit(tx, ctx, {
+      action: 'guardrail.updated',
+      resource: 'guardrail_policy',
+      resourceId: policyId,
+      detail: { kind: input.kind, checkpoint: input.checkpoint, action: input.action },
+    })
+    return mapPolicy(updated[0])
+  })
 }
 
 type Match = { excerpt: string; reason: string; redacted: string }

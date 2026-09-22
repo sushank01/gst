@@ -4,7 +4,7 @@ import { Link, useSearchParams } from '../../../lib/router'
 import { Icon } from '../../../components/Icon'
 import { marketApps } from '../../../lib/appData'
 import { assetTabs, mastersTab } from '../../../lib/assetData'
-import { useWorkspace } from '../../../lib/workspace'
+import { useInstallations } from '../../../lib/useInstallations'
 import {
   AssetDashboard,
   AssetRegisterPane,
@@ -18,12 +18,32 @@ const app = marketApps.find((item) => item.code === 'ITAM')
 
 export default function AssetManagement() {
   const [params, setParams] = useSearchParams()
-  const { installed, trialDaysLeft } = useWorkspace()
+  const { apps, entitlement, loading, error } = useInstallations()
   const requested = params.get('tab')
   const onMasters = requested === mastersTab.id
   const tab = assetTabs.find((item) => item.id === requested)?.id ?? (onMasters ? 'settings' : 'dashboard')
+  const installation = apps.find((item) => item.code === 'ITAM')
 
-  if (!app || !installed.includes('ITAM')) {
+  // Until the server has answered, nothing is known about this workspace —
+  // and "not installed" is an answer, not a state to render while waiting.
+  if (loading) {
+    return (
+      <div role="status" className="mx-auto max-w-2xl pt-2 text-[14px] text-fg-muted">
+        Loading Asset Management…
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div role="alert" className="mx-auto max-w-2xl pt-2">
+        <h1 className="text-[22px] font-bold tracking-tight">We could not load your applications</h1>
+        <p className="mt-2 text-[14px] text-fg-muted">{error.message}</p>
+      </div>
+    )
+  }
+
+  if (!app || !installation?.status || installation.status === 'uninstalled') {
     return (
       <div className="mx-auto max-w-2xl pt-2">
         <h1 className="text-[22px] font-bold tracking-tight">Asset Management is not installed</h1>
@@ -40,6 +60,8 @@ export default function AssetManagement() {
   const select = (id: string) => setParams(id === 'dashboard' ? {} : { tab: id })
   // Master Taxonomies opens as its own top-level tab, beside Settings.
   const visibleTabs = onMasters ? [...assetTabs.slice(0, -1), mastersTab, assetTabs[assetTabs.length - 1]] : assetTabs
+  // Shown only while the plan really is a trial with days left to count.
+  const trialDaysLeft = entitlement?.status === 'trialing' ? entitlement.trialDaysLeft : null
 
   return (
     <div className="pt-2">
@@ -52,11 +74,12 @@ export default function AssetManagement() {
           <p className="mt-1 text-[13.5px] leading-relaxed text-fg-2">
             Track assets as individually tagged units through their full lifecycle.
           </p>
-          <p className="mt-1 text-[13px] text-fg-muted">v1.0.0</p>
         </div>
-        <span className="rounded-full bg-warn-muted px-3.5 py-1.5 text-[13px] font-medium text-warn">
-          Trial · {trialDaysLeft} days left
-        </span>
+        {trialDaysLeft !== null && (
+          <span className="rounded-full bg-warn-muted px-3.5 py-1.5 text-[13px] font-medium text-warn">
+            Trial · {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} left
+          </span>
+        )}
       </header>
 
       <nav aria-label="Asset Management" className="mt-5 flex flex-wrap gap-1 border-b border-line pb-3">

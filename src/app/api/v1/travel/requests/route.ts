@@ -6,6 +6,8 @@ const Query = z
   .object({
     employeeId: uuid.optional(),
     status: z.string().trim().max(40).optional(),
+    /** Several states at once, comma separated — "still live" spans five of them. */
+    statuses: z.string().trim().max(200).optional(),
     from: isoDate.optional(),
     to: isoDate.optional(),
     limit: z.coerce.number().int().min(1).max(200).optional(),
@@ -15,7 +17,11 @@ const Query = z
 
 /** Travel requests, filtered by person, state or dates. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
-  const { rows, total } = await listTrips(ctx, parseOrThrow(Query, searchParams(request)))
+  const query = parseOrThrow(Query, searchParams(request))
+  const { rows, total } = await listTrips(ctx, {
+    ...query,
+    statuses: query.statuses?.split(',').map((value) => value.trim()).filter(Boolean),
+  })
   return { body: { requests: rows, total } }
 })
 

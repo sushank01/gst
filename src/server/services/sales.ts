@@ -197,6 +197,8 @@ export type SalesDocument = {
   kind: string
   reference: string
   customerId: string | null
+  /** Joined from the party, so a list never has to print a uuid at somebody. */
+  customerName: string | null
   status: string
   currency: string
   subtotal: string
@@ -205,6 +207,7 @@ export type SalesDocument = {
   grandTotal: string
   paidTotal: string
   postedAt: string | null
+  cancelledAt: string | null
   version: number
   lines: ComputedLine[]
 }
@@ -255,11 +258,13 @@ export async function createDocument(ctx: TenantContext, input: CreateDocumentIn
       kind: input.kind,
       reference,
       customerId: input.customerId ?? null,
+      customerName: null,
       status: input.status ?? 'draft',
       currency: input.currency.toUpperCase(),
       ...totals,
       paidTotal: '0.0000',
       postedAt: null,
+      cancelledAt: null,
       version: rows[0].version,
       lines: totals.lines,
     }
@@ -273,6 +278,7 @@ type DocumentRow = {
   kind: string
   reference: string
   customer_id: string | null
+  customer_name: string | null
   status: string
   currency: string
   subtotal: string
@@ -281,6 +287,7 @@ type DocumentRow = {
   grand_total: string
   paid_total: string
   posted_at: Date | null
+  cancelled_at: Date | null
   version: number
 }
 
@@ -290,6 +297,7 @@ function mapDocument(row: DocumentRow, lines: ComputedLine[]): SalesDocument {
     kind: row.kind,
     reference: row.reference,
     customerId: row.customer_id,
+    customerName: row.customer_name,
     status: row.status,
     currency: row.currency,
     subtotal: row.subtotal,
@@ -298,6 +306,7 @@ function mapDocument(row: DocumentRow, lines: ComputedLine[]): SalesDocument {
     grandTotal: row.grand_total,
     paidTotal: row.paid_total ?? '0.0000',
     postedAt: row.posted_at ? new Date(row.posted_at).toISOString() : null,
+    cancelledAt: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : null,
     version: row.version,
     lines,
   }
@@ -340,9 +349,13 @@ async function linesOf(ctx: TenantContext, documentId: string): Promise<Computed
 export async function readDocument(ctx: TenantContext, documentId: string): Promise<SalesDocument> {
   ctx.require('record.read')
   const { rows } = await ctx.db.query<DocumentRow>(
-    `select id, kind, reference, customer_id, status, currency, subtotal, discount_total,
-            tax_total, grand_total, paid_total, posted_at, version
-       from sales_documents where id = $1 and tenant_id = $2`,
+    `select d.id, d.kind, d.reference, d.customer_id, p.name as customer_name, d.status, d.currency,
+            d.subtotal, d.discount_total, d.tax_total, d.grand_total, d.paid_total, d.posted_at,
+            d.cancelled_at, d.version
+       from sales_documents d
+       left join sales_customers c on c.id = d.customer_id
+       left join parties p on p.id = c.party_id
+      where d.id = $1 and d.tenant_id = $2`,
     [documentId, ctx.tenantId],
   )
   // Not found rather than forbidden: a document in another tenant must not be
@@ -360,11 +373,23 @@ export type ListDocumentOptions = {
   offset?: number
 }
 
-/** List view: totals only. Lines are read per document, which the list does not need. */
+/** One status's share of a filter: how many, worth how much, in which currencies. */
+export type StatusRollup = { status: string; count: number; total: string; currencies: string[] }
+
+/**
+ * List view: totals only. Lines are read per document, which the list does not need.
+ *
+ * `byStatus` answers the question every one of these screens asks beside its
+ * list — how many are open, what is the pipeline worth — for the WHOLE filter
+ * rather than the loaded page, and it ignores the status filter so selecting a
+ * chip does not change the figures above it. Currencies are listed, never
+ * summed together: a pipeline worth "USD 900" when half of it is in rupees is
+ * not a number anybody can act on.
+ */
 export async function listDocuments(
   ctx: TenantContext,
   options: ListDocumentOptions = {},
-): Promise<{ rows: SalesDocument[]; total: number }> {
+): Promise<{ rows: SalesDocument[]; total: number; byStatus: StatusRollup[] }> {
   ctx.require('record.read')
   const filters = ['d.tenant_id = $1']
   const params: unknown[] = [ctx.tenantId]
@@ -373,25 +398,49 @@ export async function listDocuments(
     filters.push(clause.replace('$?', `$${params.length}`))
   }
   if (options.kind) add('d.kind = $?', options.kind)
-  if (options.status) add('d.status = $?', options.status)
   if (options.customerId) add('d.customer_id = $?', options.customerId)
   if (options.q?.trim()) add('lower(d.reference) like $?', `%${options.q.trim().toLowerCase()}%`)
+  // Held back so the rollup below can be built from everything but the status.
+  const withoutStatus = filters.join(' and ')
+  const rollupParams = [...params]
+  if (options.status) add('d.status = $?', options.status)
   const where = filters.join(' and ')
 
   const { rows: counted } = await ctx.db.query<{ n: string }>(
     `select count(*)::text as n from sales_documents d where ${where}`,
     params as never[],
   )
+  const { rows: rollup } = await ctx.db.query<{ status: string; n: string; total: string; currencies: string[] }>(
+    `select d.status, count(*)::text as n, coalesce(sum(d.grand_total), 0)::text as total,
+            array_agg(distinct d.currency) as currencies
+       from sales_documents d where ${withoutStatus}
+      group by d.status order by d.status`,
+    rollupParams as never[],
+  )
+
   params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
   const { rows } = await ctx.db.query<DocumentRow>(
-    `select d.id, d.kind, d.reference, d.customer_id, d.status, d.currency, d.subtotal,
-            d.discount_total, d.tax_total, d.grand_total, d.paid_total, d.posted_at, d.version
-       from sales_documents d where ${where}
+    `select d.id, d.kind, d.reference, d.customer_id, p.name as customer_name, d.status, d.currency,
+            d.subtotal, d.discount_total, d.tax_total, d.grand_total, d.paid_total, d.posted_at,
+            d.cancelled_at, d.version
+       from sales_documents d
+       left join sales_customers c on c.id = d.customer_id
+       left join parties p on p.id = c.party_id
+      where ${where}
       order by d.created_at desc
       limit $${params.length - 1} offset $${params.length}`,
     params as never[],
   )
-  return { total: Number(counted[0].n), rows: rows.map((row) => mapDocument(row, [])) }
+  return {
+    total: Number(counted[0].n),
+    byStatus: rollup.map((row) => ({
+      status: row.status,
+      count: Number(row.n),
+      total: row.total,
+      currencies: row.currencies ?? [],
+    })),
+    rows: rows.map((row) => mapDocument(row, [])),
+  }
 }
 
 async function insertLines(tx: Db, ctx: TenantContext, documentId: string, lines: ComputedLine[]): Promise<void> {
@@ -431,8 +480,9 @@ export async function postDocument(ctx: TenantContext, documentId: string, versi
   ctx.require('record.update')
 
   return ctx.db.transaction(async (tx) => {
-    const { rows } = await tx.query<{ version: number; posted_at: Date | null; kind: string; grand_total: string }>(
-      'select version, posted_at, kind, grand_total::text as grand_total from sales_documents where id = $1 and tenant_id = $2 for update',
+    const { rows } = await tx.query<{ version: number; posted_at: Date | null; kind: string; reference: string; grand_total: string }>(
+      `select version, posted_at, kind, reference, grand_total::text as grand_total
+         from sales_documents where id = $1 and tenant_id = $2 for update`,
       [documentId, ctx.tenantId],
     )
     const document = rows[0]
@@ -446,6 +496,11 @@ export async function postDocument(ctx: TenantContext, documentId: string, versi
      */
     if (document.posted_at) return { postedAt: new Date(document.posted_at).toISOString() }
     if (document.version !== version) throw conflict('Someone else changed this document.', document.version)
+
+    // The match policy is checked here rather than at the boundary: posting is
+    // the moment the document becomes immutable, so it is the last point at
+    // which a refusal still leaves something editable to correct.
+    if (document.kind === 'invoice') await enforceMatchPolicy(tx, ctx, documentId, document.reference)
 
     await tx.query(
       `update sales_documents set posted_at = $2, posted_by = $3, status = 'posted', version = version + 1, updated_at = $2
@@ -505,11 +560,13 @@ export async function updateDocumentLines(
       kind: document.kind,
       reference: document.reference,
       customerId: document.customer_id,
+      customerName: null,
       status: document.status,
       currency: document.currency,
       ...totals,
       paidTotal: '0.0000',
       postedAt: null,
+      cancelledAt: null,
       version: document.version + 1,
       lines: totals.lines,
     }
@@ -739,6 +796,16 @@ export async function scheduleSubscriptionPeriods(
   count: number,
   cadenceDays = 30,
 ): Promise<number> {
+  ctx.require('record.create')
+  // Checked rather than left to the foreign key: an id from another tenant
+  // must read as "no such subscription", not as a database error.
+  const { rows } = await ctx.db.query<{ kind: string }>(
+    'select kind from sales_documents where id = $1 and tenant_id = $2',
+    [subscriptionId, ctx.tenantId],
+  )
+  if (!rows[0]) throw notFound('That subscription')
+  if (rows[0].kind !== 'subscription') throw unprocessable('not_a_subscription', 'Only a subscription can be given billing periods.')
+
   let created = 0
   for (let index = 0; index < count; index += 1) {
     const periodStart = new Date(starts.getTime() + index * cadenceDays * 86_400_000)
@@ -751,4 +818,370 @@ export async function scheduleSubscriptionPeriods(
     created += rowCount
   }
   return created
+}
+
+/* ----------------------------- cancellation ------------------------------ */
+
+/**
+ * Cancels a document.
+ *
+ * The row stays and is marked cancelled, because a numbered document that
+ * vanishes leaves a gap in a sequence somebody will have to account for. A
+ * posted document is refused outright: it is evidence, and the correction for
+ * it is a credit note.
+ */
+export async function cancelDocument(
+  ctx: TenantContext,
+  documentId: string,
+  version: number,
+): Promise<{ cancelledAt: string }> {
+  ctx.require('record.archive')
+
+  return ctx.db.transaction(async (tx) => {
+    const { rows } = await tx.query<{ version: number; posted_at: Date | null; cancelled_at: Date | null; kind: string; reference: string }>(
+      `select version, posted_at, cancelled_at, kind, reference
+         from sales_documents where id = $1 and tenant_id = $2 for update`,
+      [documentId, ctx.tenantId],
+    )
+    const document = rows[0]
+    if (!document) throw notFound('That document')
+    // Already cancelled is the state the caller asked for, not a failure.
+    if (document.cancelled_at) return { cancelledAt: new Date(document.cancelled_at).toISOString() }
+    if (document.posted_at) {
+      throw conflict(`${document.reference} is posted and cannot be cancelled. Raise a credit note instead.`)
+    }
+    if (document.version !== version) throw conflict('Someone else changed this document.', document.version)
+
+    await tx.query(
+      `update sales_documents set cancelled_at = $2, status = 'cancelled', version = version + 1, updated_at = $2
+        where id = $1`,
+      [documentId, ctx.now],
+    )
+    await recordAudit(tx, ctx, {
+      action: `sales.${document.kind}_cancelled`,
+      resource: 'sales_document',
+      resourceId: documentId,
+      detail: { reference: document.reference },
+    })
+    return { cancelledAt: ctx.now.toISOString() }
+  })
+}
+
+/* ----------------------------- tax categories ---------------------------- */
+
+/** One leg of a slab — "CGST 9%" — so a split is data rather than a sentence. */
+export type TaxComponent = { name: string; percent: string }
+
+export type TaxCategory = {
+  id: string
+  name: string
+  ratePercent: string
+  withinRegion: TaxComponent[]
+  crossRegion: TaxComponent[]
+}
+
+const mapTaxCategory = (row: {
+  id: string
+  name: string
+  rate_percent: string
+  within_region: TaxComponent[] | null
+  cross_region: TaxComponent[] | null
+}): TaxCategory => ({
+  id: row.id,
+  name: row.name,
+  ratePercent: row.rate_percent,
+  withinRegion: row.within_region ?? [],
+  crossRegion: row.cross_region ?? [],
+})
+
+export async function listTaxCategories(ctx: TenantContext): Promise<TaxCategory[]> {
+  ctx.require('record.read')
+  const { rows } = await ctx.db.query<{
+    id: string
+    name: string
+    rate_percent: string
+    within_region: TaxComponent[] | null
+    cross_region: TaxComponent[] | null
+  }>(
+    `select id, name, rate_percent::text as rate_percent, within_region, cross_region
+       from tax_categories where tenant_id = $1 and archived_at is null order by rate_percent, name`,
+    [ctx.tenantId],
+  )
+  return rows.map(mapTaxCategory)
+}
+
+export async function createTaxCategory(
+  ctx: TenantContext,
+  input: { name: string; ratePercent: string; withinRegion?: TaxComponent[]; crossRegion?: TaxComponent[] },
+): Promise<TaxCategory> {
+  ctx.require('settings.manage')
+  const { rows: clash } = await ctx.db.query(
+    'select 1 from tax_categories where tenant_id = $1 and lower(name) = lower($2) and archived_at is null',
+    [ctx.tenantId, input.name],
+  )
+  if (clash[0]) throw unprocessable('duplicate_name', `There is already a category called ${input.name}.`)
+
+  const { rows } = await ctx.db.query<{
+    id: string
+    name: string
+    rate_percent: string
+    within_region: TaxComponent[] | null
+    cross_region: TaxComponent[] | null
+  }>(
+    `insert into tax_categories (tenant_id, name, rate_percent, within_region, cross_region)
+     values ($1,$2,$3,$4,$5)
+     returning id, name, rate_percent::text as rate_percent, within_region, cross_region`,
+    [
+      ctx.tenantId,
+      input.name,
+      input.ratePercent,
+      JSON.stringify(input.withinRegion ?? []),
+      JSON.stringify(input.crossRegion ?? []),
+    ],
+  )
+  await recordAudit(ctx.db, ctx, {
+    action: 'sales.tax_category_created',
+    resource: 'tax_category',
+    resourceId: rows[0].id,
+    detail: { name: input.name, ratePercent: input.ratePercent },
+  })
+  return mapTaxCategory(rows[0])
+}
+
+/**
+ * Archives a slab. Never deletes: `sales_document_lines.tax_category_id`
+ * points here, and a posted invoice must keep saying which category it was
+ * taxed under.
+ */
+export async function archiveTaxCategory(ctx: TenantContext, categoryId: string): Promise<void> {
+  ctx.require('settings.manage')
+  const { rowCount } = await ctx.db.query(
+    'update tax_categories set archived_at = $3 where id = $1 and tenant_id = $2 and archived_at is null',
+    [categoryId, ctx.tenantId, ctx.now],
+  )
+  if (rowCount === 0) throw notFound('That tax category')
+  await recordAudit(ctx.db, ctx, { action: 'sales.tax_category_archived', resource: 'tax_category', resourceId: categoryId })
+}
+
+/* ------------------------------ match policy ----------------------------- */
+
+export type MatchAction = 'warn' | 'block' | 'ignore'
+
+export type MatchPolicy = {
+  priceTolerancePercent: string
+  priceAction: MatchAction
+  quantityTolerancePercent: string
+  quantityAction: MatchAction
+  requireOrder: boolean
+  requireDelivery: boolean
+  /**
+   * When the policy was last written, and the token a write must carry back.
+   * Null means no policy row exists and the values above are the defaults in
+   * force — `match_policies` has no version column, so the timestamp is what
+   * makes a concurrent edit a conflict rather than a silent overwrite.
+   */
+  updatedAt: string | null
+}
+
+const MATCH_DEFAULTS: Omit<MatchPolicy, 'updatedAt'> = {
+  priceTolerancePercent: '5.000',
+  priceAction: 'warn',
+  quantityTolerancePercent: '2.000',
+  quantityAction: 'warn',
+  requireOrder: false,
+  requireDelivery: false,
+}
+
+type MatchRow = {
+  price_tolerance_percent: string
+  price_action: MatchAction
+  quantity_tolerance_percent: string
+  quantity_action: MatchAction
+  require_order: boolean
+  require_delivery: boolean
+  updated_at: Date
+}
+
+const MATCH_SELECT = `price_tolerance_percent::text as price_tolerance_percent, price_action,
+       quantity_tolerance_percent::text as quantity_tolerance_percent, quantity_action,
+       require_order, require_delivery, updated_at`
+
+const mapMatchPolicy = (row: MatchRow): MatchPolicy => ({
+  priceTolerancePercent: row.price_tolerance_percent,
+  priceAction: row.price_action,
+  quantityTolerancePercent: row.quantity_tolerance_percent,
+  quantityAction: row.quantity_action,
+  requireOrder: row.require_order,
+  requireDelivery: row.require_delivery,
+  updatedAt: new Date(row.updated_at).toISOString(),
+})
+
+export async function readMatchPolicy(ctx: TenantContext): Promise<MatchPolicy> {
+  ctx.require('settings.read')
+  const { rows } = await ctx.db.query<MatchRow>(`select ${MATCH_SELECT} from match_policies where tenant_id = $1`, [
+    ctx.tenantId,
+  ])
+  return rows[0] ? mapMatchPolicy(rows[0]) : { ...MATCH_DEFAULTS, updatedAt: null }
+}
+
+export async function writeMatchPolicy(
+  ctx: TenantContext,
+  input: Omit<MatchPolicy, 'updatedAt'> & { updatedAt: string | null },
+): Promise<MatchPolicy> {
+  ctx.require('settings.manage')
+
+  if (input.updatedAt === null) {
+    const { rows } = await ctx.db.query<MatchRow>(
+      `insert into match_policies
+         (tenant_id, price_tolerance_percent, price_action, quantity_tolerance_percent, quantity_action,
+          require_order, require_delivery, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8)
+       on conflict (tenant_id) do nothing
+       returning ${MATCH_SELECT}`,
+      [
+        ctx.tenantId,
+        input.priceTolerancePercent,
+        input.priceAction,
+        input.quantityTolerancePercent,
+        input.quantityAction,
+        input.requireOrder,
+        input.requireDelivery,
+        ctx.now,
+      ],
+    )
+    if (!rows[0]) throw conflict('Someone else set a match policy while you were editing.')
+    await recordAudit(ctx.db, ctx, { action: 'sales.match_policy_updated', resource: 'match_policy', resourceId: ctx.tenantId })
+    return mapMatchPolicy(rows[0])
+  }
+
+  const { rows } = await ctx.db.query<MatchRow>(
+    `update match_policies
+        set price_tolerance_percent = $3, price_action = $4, quantity_tolerance_percent = $5,
+            quantity_action = $6, require_order = $7, require_delivery = $8, updated_at = $9
+      where tenant_id = $1 and updated_at = $2::timestamptz
+      returning ${MATCH_SELECT}`,
+    [
+      ctx.tenantId,
+      input.updatedAt,
+      input.priceTolerancePercent,
+      input.priceAction,
+      input.quantityTolerancePercent,
+      input.quantityAction,
+      input.requireOrder,
+      input.requireDelivery,
+      ctx.now,
+    ],
+  )
+  if (!rows[0]) throw conflict('Someone else changed the match policy while you were editing.')
+  await recordAudit(ctx.db, ctx, { action: 'sales.match_policy_updated', resource: 'match_policy', resourceId: ctx.tenantId })
+  return mapMatchPolicy(rows[0])
+}
+
+/** Drift as a percentage of the base, in minor units. Null when there is no base. */
+function driftPercent(base: bigint, actual: bigint): bigint | null {
+  if (base === 0n) return null
+  const difference = actual - base
+  const magnitude = difference < 0n ? -difference : difference
+  return (magnitude * 100n * pow10(SCALE)) / base
+}
+
+/**
+ * Applies the 3-way match policy to an invoice about to post.
+ *
+ * Only invoices are matched, and only against the documents they were actually
+ * raised from: the chain is followed through `source_document_id`, so an
+ * invoice billed from a delivery that came from an order is matched against
+ * both. Nothing is compared when there is no source — a tolerance against a
+ * document that does not exist is not a measurement.
+ *
+ * With no policy row the product ships with no checks at all rather than
+ * inventing thresholds nobody agreed: `readMatchPolicy` reports the defaults
+ * for display, but enforcement waits for an explicit save.
+ */
+async function enforceMatchPolicy(tx: Db, ctx: TenantContext, documentId: string, reference: string): Promise<void> {
+  const { rows: policyRows } = await tx.query<MatchRow>(`select ${MATCH_SELECT} from match_policies where tenant_id = $1`, [
+    ctx.tenantId,
+  ])
+  if (!policyRows[0]) return
+  const policy = mapMatchPolicy(policyRows[0])
+
+  // Walk the source chain. Four hops is already quotation → order → delivery →
+  // invoice; a longer one would mean a cycle, which the bound also stops.
+  type ChainRow = { source_document_id: string | null; kind: string; subtotal: string }
+  const chain: { id: string; kind: string; subtotal: string }[] = []
+  let cursor: string | null = documentId
+  for (let hop = 0; hop < 4 && cursor !== null; hop += 1) {
+    const here: string = cursor
+    const step = await tx.query<ChainRow>(
+      'select source_document_id, kind, subtotal::text as subtotal from sales_documents where id = $1 and tenant_id = $2',
+      [here, ctx.tenantId],
+    )
+    const row = step.rows[0]
+    if (!row) break
+    // The invoice itself is not one of its own sources.
+    if (hop > 0) chain.push({ id: here, kind: row.kind, subtotal: row.subtotal })
+    cursor = row.source_document_id
+  }
+
+  const order = chain.find((entry) => entry.kind === 'order')
+  const delivery = chain.find((entry) => entry.kind === 'delivery')
+
+  if (policy.requireOrder && !order) {
+    throw unprocessable('match_order_required', `${reference} is not linked to a sales order, and the match policy requires one.`)
+  }
+  if (policy.requireDelivery && !delivery) {
+    throw unprocessable('match_delivery_required', `${reference} is not linked to a delivery note, and the match policy requires one.`)
+  }
+
+  const { rows: mine } = await tx.query<{ subtotal: string; quantity: string }>(
+    `select d.subtotal::text as subtotal, coalesce(sum(l.quantity), 0)::text as quantity
+       from sales_documents d left join sales_document_lines l on l.document_id = d.id
+      where d.id = $1 group by d.subtotal`,
+    [documentId],
+  )
+  const invoiced = mine[0]
+  if (!invoiced) return
+
+  const checks: { label: string; base: string | null; actual: string; tolerance: string; action: MatchAction }[] = []
+  if (order) {
+    checks.push({
+      label: 'price',
+      base: order.subtotal,
+      actual: invoiced.subtotal,
+      tolerance: policy.priceTolerancePercent,
+      action: policy.priceAction,
+    })
+  }
+  if (delivery) {
+    const { rows: delivered } = await tx.query<{ quantity: string }>(
+      'select coalesce(sum(quantity), 0)::text as quantity from sales_document_lines where document_id = $1',
+      [delivery.id],
+    )
+    checks.push({
+      label: 'quantity',
+      base: delivered[0]?.quantity ?? null,
+      actual: invoiced.quantity,
+      tolerance: policy.quantityTolerancePercent,
+      action: policy.quantityAction,
+    })
+  }
+
+  for (const check of checks) {
+    if (check.action === 'ignore' || check.base === null) continue
+    const drift = driftPercent(toMinor(check.base), toMinor(check.actual))
+    if (drift === null || drift <= toMinor(check.tolerance)) continue
+    if (check.action === 'block') {
+      throw unprocessable(
+        `match_${check.label}_out_of_tolerance`,
+        `The invoiced ${check.label} differs from the ${check.label === 'price' ? 'order' : 'delivery note'} by more than the ${check.tolerance}% allowed.`,
+      )
+    }
+    await recordAudit(tx, ctx, {
+      action: 'sales.match_warning',
+      resource: 'sales_document',
+      resourceId: documentId,
+      outcome: 'failure',
+      detail: { check: check.label, tolerance: check.tolerance, base: check.base, actual: check.actual },
+    })
+  }
 }

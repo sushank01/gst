@@ -113,7 +113,7 @@ test('the unread count is per person, not per workspace', async () => {
   assert.equal(await unreadCount(ctx), 1)
   assert.equal(await unreadCount(theirs), 1)
 
-  await markRead(ctx, id!)
+  await markRead(ctx, id)
   assert.equal(await unreadCount(ctx), 0)
   assert.equal(await unreadCount(theirs), 1, 'one person reading it must not clear everybody s badge')
   await db.close()

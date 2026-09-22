@@ -1,9 +1,26 @@
-import { tenantRoute, jsonBody } from '../../../../../server/http/handler.ts'
+import { tenantRoute, jsonBody, searchParams } from '../../../../../server/http/handler.ts'
 import { parseOrThrow, z, currency, isoDate, money, optionalTrimmed, trimmed, uuid } from '../../../../../server/http/validate.ts'
-import { importCardTransactions, unmatchedTransactions } from '../../../../../server/services/expenses.ts'
+import { importCardTransactions, listCardTransactions } from '../../../../../server/services/expenses.ts'
 
-/** Card transactions that are not yet matched to an expense. */
-export const GET = tenantRoute(async ({ ctx }) => ({ body: { transactions: await unmatchedTransactions(ctx) } }))
+const Query = z
+  .object({
+    /** Omit for every line; `true`/`false` for the reconciled or the unreconciled ones. */
+    matched: z.enum(['true', 'false']).optional(),
+    limit: z.coerce.number().int().min(1).max(500).optional(),
+    offset: z.coerce.number().int().min(0).optional(),
+  })
+  .strict()
+
+/** Card transactions, with whether each is reconciled against an expense. */
+export const GET = tenantRoute(async ({ request, ctx }) => {
+  const query = parseOrThrow(Query, searchParams(request))
+  const { rows, total } = await listCardTransactions(ctx, {
+    matched: query.matched === undefined ? undefined : query.matched === 'true',
+    limit: query.limit,
+    offset: query.offset,
+  })
+  return { body: { transactions: rows, total } }
+})
 
 const Line = z
   .object({

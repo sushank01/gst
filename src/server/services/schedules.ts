@@ -37,6 +37,24 @@ export type ScheduleRow = {
 
 type Raw = Record<string, unknown>
 
+/**
+ * The next few occurrences, or none when the stored expression cannot be read.
+ *
+ * A stored row can hold an expression this engine refuses — written before the
+ * validation above existed, by a migration, or by any other writer — and the
+ * dispatcher already survives exactly that, one row at a time. Throwing here
+ * instead would answer the whole workspace's list with a 500, so a single
+ * unreadable row would hide every other schedule. It costs its own preview and
+ * nothing else; the screen then says the occurrence could not be computed.
+ */
+function upcomingFor(cron: string, timezone: string, now: Date): string[] {
+  try {
+    return describeUpcoming(cron, timezone, now, 3)
+  } catch {
+    return []
+  }
+}
+
 function mapSchedule(row: Raw, now: Date): ScheduleRow {
   const cron = row.cron as string
   const timezone = row.timezone as string
@@ -52,7 +70,7 @@ function mapSchedule(row: Raw, now: Date): ScheduleRow {
     lastRunAt: row.last_run_at ? new Date(row.last_run_at as string).toISOString() : null,
     lastStatus: (row.last_status as string) ?? null,
     nextRunAt: row.next_run_at ? new Date(row.next_run_at as string).toISOString() : null,
-    upcoming: row.active ? describeUpcoming(cron, timezone, now, 3) : [],
+    upcoming: row.active ? upcomingFor(cron, timezone, now) : [],
   }
 }
 
@@ -261,10 +279,16 @@ export async function listJobs(
     params as never[],
   )
   params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  /*
+   * The id breaks ties on created_at. Jobs enqueued in the same millisecond —
+   * a dispatcher sweeping several schedules, or two manual runs — otherwise
+   * have no defined order, and limit/offset over an unstable order can show one
+   * row on both pages while another is never reached at all.
+   */
   const { rows } = await ctx.db.query<Raw>(
     `select j.*, s.name as schedule_name
        from jobs j left join schedules s on s.id = j.schedule_id
-      where ${where} order by j.created_at desc limit $${params.length - 1} offset $${params.length}`,
+      where ${where} order by j.created_at desc, j.id desc limit $${params.length - 1} offset $${params.length}`,
     params as never[],
   )
   return { total: Number(counted[0].n), rows: rows.map(mapJob) }
@@ -305,12 +329,25 @@ export async function jobAttempts(ctx: TenantContext, jobId: string): Promise<Jo
 
 export async function cancelQueuedJob(ctx: TenantContext, jobId: string): Promise<void> {
   ctx.require('job.manage')
-  const { rows } = await ctx.db.query('select 1 from jobs where id = $1 and tenant_id = $2', [jobId, ctx.tenantId])
+  const { rows } = await ctx.db.query<{ status: string }>(
+    'select status from jobs where id = $1 and tenant_id = $2',
+    [jobId, ctx.tenantId],
+  )
   if (!rows[0]) throw notFound('That job')
 
+  /*
+   * Only a job still waiting may be cancelled here. The queue's own cancel
+   * accepts a running job as well — the dispatcher uses it to stop work it owns
+   * — but a running job holds a lease, and cancelling it from a screen would
+   * leave a worker writing results for something the screen calls cancelled.
+   * The status is therefore checked before the update rather than assumed from
+   * its return value. (A job that starts running between this check and the
+   * update would still be cancelled; closing that window means narrowing the
+   * queue's own update, which the dispatcher shares.)
+   */
+  if (rows[0].status !== 'queued') throw conflict('That job has already started or finished.')
+
   const cancelled = await cancelJob(ctx.db, jobId, ctx.now)
-  // A job already running holds a lease; cancelling it would leave a worker
-  // writing results for something the UI says is cancelled.
   if (!cancelled) throw conflict('That job has already started or finished.')
   await recordAudit(ctx.db, ctx, { action: 'job.cancelled', resource: 'job', resourceId: jobId })
 }

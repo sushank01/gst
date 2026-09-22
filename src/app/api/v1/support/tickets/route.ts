@@ -7,8 +7,18 @@ const Query = z
     q: z.string().trim().max(200).optional(),
     status: z.string().trim().max(60).optional(),
     priority: z.string().trim().max(60).optional(),
+    channel: z.string().trim().max(60).optional(),
+    /** Comma-separated; a ticket matches if it carries any of them. */
+    tags: z.string().trim().max(200).optional(),
     assigneeUserId: uuid.optional(),
+    /*
+     * Spelt out rather than coerced: `z.coerce.boolean()` reads the string
+     * "false" as true, which would silently turn the Unassigned queue on.
+     */
+    unassigned: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
     requesterPartyId: uuid.optional(),
+    /** Exact match. `q` also searches the subject, so it cannot stand in here. */
+    requesterEmail: z.string().trim().max(320).optional(),
     limit: z.coerce.number().int().min(1).max(200).optional(),
     offset: z.coerce.number().int().min(0).optional(),
   })
@@ -17,7 +27,15 @@ const Query = z
 /** Tickets, filtered and paged. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const query = parseOrThrow(Query, searchParams(request))
-  const { rows, total } = await listTickets(ctx, query)
+  const { rows, total } = await listTickets(ctx, {
+    ...query,
+    tags: query.tags
+      ? query.tags
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      : undefined,
+  })
   return { body: { tickets: rows, total } }
 })
 

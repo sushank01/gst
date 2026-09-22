@@ -132,27 +132,66 @@ export async function createLeaveType(
   }
 }
 
+/** The ledger kinds an administrator may write directly. */
+export type ManualEntryKind = 'grant' | 'adjustment' | 'encashment' | 'lapse'
+
+/** Kinds that take days away; the balance query treats these as debits. */
+const DEBIT_KINDS = new Set<ManualEntryKind>(['encashment', 'lapse'])
+
 /**
- * Grants an entitlement. Idempotent per (employee, type, year, reason).
+ * Writes one administrative ledger entry. Idempotent per (kind, employee, type,
+ * year, reason).
  *
  * The annual opening balance must not double if the grant job runs twice, so
- * the once-key carries the year and the reason rather than a timestamp.
+ * the once-key carries the year and the reason rather than a timestamp. The
+ * kind is part of the key too: encashing five days and granting five days for
+ * the same stated reason are different facts and must not collapse into one.
+ *
+ * A debit is refused when the balance cannot cover it unless the type allows
+ * going negative — encashing leave somebody has not accrued is paying for days
+ * that do not exist.
  */
-export async function grantLeave(
+export async function recordLeaveEntry(
   ctx: TenantContext,
-  input: { employeeId: string; leaveTypeId: string; year: number; days: string; reason: string },
-): Promise<{ granted: boolean }> {
+  input: { employeeId: string; leaveTypeId: string; year: number; days: string; reason: string; kind?: ManualEntryKind },
+): Promise<{ recorded: boolean }> {
   ctx.require('settings.manage')
-  const onceKey = `grant:${input.employeeId}:${input.leaveTypeId}:${input.year}:${input.reason}`
+  const kind: ManualEntryKind = input.kind ?? 'grant'
+  const onceKey = `${kind}:${input.employeeId}:${input.leaveTypeId}:${input.year}:${input.reason}`
+
+  if (Number(input.days) <= 0) throw unprocessable('bad_days', 'Enter a number of days greater than zero.')
+
+  if (DEBIT_KINDS.has(kind)) {
+    const type = await typeOf(ctx.db, ctx, input.leaveTypeId)
+    if (!type.allowNegative) {
+      const balances = await leaveBalances(ctx, input.employeeId, input.year)
+      const balance = balances.find((entry) => entry.leaveTypeId === input.leaveTypeId)
+      if (!balance || Number(balance.available) < Number(input.days)) {
+        throw unprocessable(
+          'insufficient_balance',
+          `Only ${balance?.available ?? '0.00'} day(s) of ${type.name} are available.`,
+        )
+      }
+    }
+  }
 
   const { rowCount } = await ctx.db.query(
     `insert into hr_leave_entries
        (tenant_id, employee_id, leave_type_id, period_year, kind, days, note, once_key, actor_user_id)
-     values ($1,$2,$3,$4,'grant',$5,$6,$7,$8)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      on conflict (tenant_id, once_key) do nothing`,
-    [ctx.tenantId, input.employeeId, input.leaveTypeId, input.year, input.days, input.reason, onceKey, ctx.userId],
+    [ctx.tenantId, input.employeeId, input.leaveTypeId, input.year, kind, input.days, input.reason, onceKey, ctx.userId],
   )
-  return { granted: rowCount > 0 }
+  return { recorded: rowCount > 0 }
+}
+
+/** Grants an entitlement — the opening balance path, kept by name. */
+export async function grantLeave(
+  ctx: TenantContext,
+  input: { employeeId: string; leaveTypeId: string; year: number; days: string; reason: string },
+): Promise<{ granted: boolean }> {
+  const { recorded } = await recordLeaveEntry(ctx, { ...input, kind: 'grant' })
+  return { granted: recorded }
 }
 
 /** The balance, computed from the ledger. Never read from a stored total. */
@@ -500,10 +539,21 @@ export async function cancelLeave(ctx: TenantContext, requestId: string, version
   })
 }
 
+export type LeaveRequestListRow = LeaveRequestRow & { employeeName: string; leaveTypeName: string }
+
 export async function listLeaveRequests(
   ctx: TenantContext,
-  options: { employeeId?: string; status?: string; from?: string; to?: string; limit?: number; offset?: number } = {},
-): Promise<{ rows: LeaveRequestRow[]; total: number }> {
+  options: {
+    employeeId?: string
+    /** Whose direct reports — a manager's approval queue. */
+    managerId?: string
+    status?: string
+    from?: string
+    to?: string
+    limit?: number
+    offset?: number
+  } = {},
+): Promise<{ rows: LeaveRequestListRow[]; total: number }> {
   ctx.require('record.read')
   const filters = ['r.tenant_id = $1']
   const params: unknown[] = [ctx.tenantId]
@@ -512,22 +562,34 @@ export async function listLeaveRequests(
     filters.push(clause.replace('$?', `$${params.length}`))
   }
   if (options.employeeId) add('r.employee_id = $?', options.employeeId)
+  if (options.managerId) add('e.manager_id = $?', options.managerId)
   if (options.status) add('r.status = $?', options.status)
   if (options.from) add('r.ends_on >= $?', options.from)
   if (options.to) add('r.starts_on <= $?', options.to)
   const where = filters.join(' and ')
+  const from = 'from hr_leave_requests r join hr_employees e on e.id = r.employee_id'
 
   const { rows: counted } = await ctx.db.query<{ n: string }>(
-    `select count(*)::text as n from hr_leave_requests r where ${where}`,
+    `select count(*)::text as n ${from} where ${where}`,
     params as never[],
   )
   params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
   const { rows } = await ctx.db.query<Raw>(
-    `select r.* from hr_leave_requests r where ${where}
+    `select r.*, e.full_name as employee_name, t.name as leave_type_name
+       ${from}
+       join hr_leave_types t on t.id = r.leave_type_id
+      where ${where}
       order by r.starts_on desc limit $${params.length - 1} offset $${params.length}`,
     params as never[],
   )
-  return { total: Number(counted[0].n), rows: rows.map(mapRequest) }
+  return {
+    total: Number(counted[0].n),
+    rows: rows.map((row) => ({
+      ...mapRequest(row),
+      employeeName: row.employee_name as string,
+      leaveTypeName: row.leave_type_name as string,
+    })),
+  }
 }
 
 export type LedgerEntry = { kind: string; days: string; note: string | null; createdAt: string }
@@ -552,4 +614,140 @@ export async function leaveLedger(
     note: row.note,
     createdAt: new Date(row.created_at).toISOString(),
   }))
+}
+
+/** The full leave-type library, including the rules each type applies. */
+export async function listLeaveTypes(ctx: TenantContext, includeArchived = false): Promise<LeaveTypeRow[]> {
+  ctx.require('record.read')
+  const { rows } = await ctx.db.query<Raw>(
+    `select id, name, code, accrual_days::text as accrual_days, accrual_period, allow_negative,
+            requires_approval, counts_weekends, counts_holidays
+       from hr_leave_types
+      where tenant_id = $1 ${includeArchived ? '' : 'and archived_at is null'}
+      order by name`,
+    [ctx.tenantId],
+  )
+  return rows.map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    code: row.code as string,
+    accrualDays: String(row.accrual_days),
+    accrualPeriod: row.accrual_period as string,
+    allowNegative: row.allow_negative as boolean,
+    requiresApproval: row.requires_approval as boolean,
+    countsWeekends: row.counts_weekends as boolean,
+    countsHolidays: row.counts_holidays as boolean,
+  }))
+}
+
+/**
+ * Retires a leave type.
+ *
+ * Archived rather than deleted: the ledger entries and requests that reference
+ * it are the evidence behind everyone's balance, and a delete would either be
+ * refused by the foreign key or take the history with it. An archived type can
+ * no longer be requested against — `typeOf` looks only at live rows.
+ */
+export async function archiveLeaveType(ctx: TenantContext, leaveTypeId: string): Promise<void> {
+  ctx.require('settings.manage')
+
+  return ctx.db.transaction(async (tx) => {
+    /*
+     * "Live" is an undecided request whatever its dates, plus an approved one
+     * that has not finished. A past, decided request is history: its ledger
+     * entries stay and the balance still reconciles, so keeping the type
+     * choosable for ever because somebody once used it would mean the library
+     * could never be tidied.
+     */
+    const { rows: live } = await tx.query<{ n: string }>(
+      `select count(*)::text as n from hr_leave_requests
+        where leave_type_id = $1 and tenant_id = $2
+          and (status = 'submitted' or (status = 'approved' and ends_on >= $3))`,
+      [leaveTypeId, ctx.tenantId, ctx.now.toISOString().slice(0, 10)],
+    )
+    if (Number(live[0].n) > 0) {
+      throw unprocessable(
+        'type_in_use',
+        `${live[0].n} undecided or future request(s) still use that leave type. Decide or cancel them first.`,
+      )
+    }
+    const { rowCount } = await tx.query(
+      'update hr_leave_types set archived_at = $3 where id = $1 and tenant_id = $2 and archived_at is null',
+      [leaveTypeId, ctx.tenantId, ctx.now],
+    )
+    if (!rowCount) throw notFound('That leave type')
+    await recordAudit(tx, ctx, { action: 'hr.leave_type_archived', resource: 'leave_type', resourceId: leaveTypeId })
+  })
+}
+
+export type LeaveEntryRow = {
+  id: string
+  employeeId: string
+  employeeName: string
+  leaveTypeId: string
+  leaveTypeName: string
+  year: number
+  kind: string
+  days: string
+  note: string | null
+  createdAt: string
+}
+
+/**
+ * The ledger across employees — what Allocations and Encashments show.
+ *
+ * `leaveLedger` explains one (employee, type, year) triple; this is the same
+ * rows read the other way round, so the two can never disagree about what was
+ * granted.
+ */
+export async function listLeaveEntries(
+  ctx: TenantContext,
+  options: { employeeId?: string; leaveTypeId?: string; year?: number; kind?: string; limit?: number; offset?: number } = {},
+): Promise<{ rows: LeaveEntryRow[]; total: number }> {
+  ctx.require('record.read')
+
+  const filters = ['l.tenant_id = $1']
+  const params: unknown[] = [ctx.tenantId]
+  const add = (clause: string, value: unknown) => {
+    params.push(value)
+    filters.push(clause.replace('$?', `$${params.length}`))
+  }
+  if (options.employeeId) add('l.employee_id = $?', options.employeeId)
+  if (options.leaveTypeId) add('l.leave_type_id = $?', options.leaveTypeId)
+  if (options.year !== undefined) add('l.period_year = $?', options.year)
+  if (options.kind) add('l.kind = $?', options.kind)
+  const where = filters.join(' and ')
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `select count(*)::text as n from hr_leave_entries l where ${where}`,
+    params as never[],
+  )
+  params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  const { rows } = await ctx.db.query<Raw>(
+    `select l.id, l.employee_id, e.full_name as employee_name, l.leave_type_id, t.name as leave_type_name,
+            l.period_year, l.kind, l.days::text as days, l.note, l.created_at
+       from hr_leave_entries l
+       join hr_employees e on e.id = l.employee_id
+       join hr_leave_types t on t.id = l.leave_type_id
+      where ${where}
+      order by l.created_at desc, l.id desc
+      limit $${params.length - 1} offset $${params.length}`,
+    params as never[],
+  )
+
+  return {
+    total: Number(counted[0].n),
+    rows: rows.map((row) => ({
+      id: row.id as string,
+      employeeId: row.employee_id as string,
+      employeeName: row.employee_name as string,
+      leaveTypeId: row.leave_type_id as string,
+      leaveTypeName: row.leave_type_name as string,
+      year: row.period_year as number,
+      kind: row.kind as string,
+      days: String(row.days),
+      note: (row.note as string) ?? null,
+      createdAt: new Date(row.created_at as string).toISOString(),
+    })),
+  }
 }

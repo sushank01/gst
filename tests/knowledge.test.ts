@@ -5,7 +5,7 @@ import { createSession } from '../src/server/auth/session.ts'
 import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
 import {
-  archiveCanned, articleHistory, createArticle, createCanned, createCategory, listArticles,
+  archiveArticle, archiveCanned, articleHistory, createArticle, createCanned, createCategory, listArticles,
   listCanned, listCategories, publishArticle, readArticle, recordArticleView, slugify,
   unpublishArticle, updateArticle, useCanned,
 } from '../src/server/services/knowledge.ts'
@@ -196,5 +196,30 @@ test('ISOLATION: articles and responses never cross workspaces', async () => {
   await assert.rejects(() => readArticle(rivalCtx, article.id), /That article/)
   assert.equal((await listArticles(rivalCtx, { audience: 'public' })).total, 0, 'published does not mean everyone s')
   assert.deepEqual(await listCanned(rivalCtx), [])
+  await db.close()
+})
+
+test('archiving an article takes it out of every view but keeps its versions', async () => {
+  const { db, ctx } = await helpdesk()
+  const article = await createArticle(ctx, { title: 'Refund policy', body: 'Ask billing.', visibility: 'public' })
+  const published = await publishArticle(ctx, article.id, article.version)
+  const edited = await updateArticle(ctx, published.id, { version: published.version, body: 'Ask billing first.' })
+
+  const archived = await archiveArticle(ctx, edited.id, edited.version)
+  assert.equal(archived.status, 'archived')
+  assert.equal(archived.publishedAt, null)
+  // A reader outside the team must stop seeing it immediately.
+  assert.equal((await listArticles(ctx, { audience: 'public' })).total, 0)
+  // But the text a customer read yesterday still has to be explicable, which
+  // is why this archives rather than deletes.
+  assert.equal((await articleHistory(ctx, edited.id)).length, 1)
+  await db.close()
+})
+
+test('archiving with a stale version is refused rather than clobbering an edit', async () => {
+  const { db, ctx } = await helpdesk()
+  const article = await createArticle(ctx, { title: 'How to', body: 'Steps.' })
+  await updateArticle(ctx, article.id, { version: article.version, title: 'How to, revised' })
+  await assert.rejects(() => archiveArticle(ctx, article.id, article.version), (e: any) => e.status === 409)
   await db.close()
 })

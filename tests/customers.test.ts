@@ -5,7 +5,9 @@ import { createSession } from '../src/server/auth/session.ts'
 import { authenticate, withTenant } from '../src/server/tenancy/context.ts'
 import { createTenantWithOwner } from '../src/server/services/tenancy.ts'
 import {
-  agingReport, createCustomer, listCustomers, orderToCash, readCustomer, topDebtors, updateCustomer,
+  agingReport, archiveCustomerGroup, createCustomer, createCustomerGroup, createLoyaltyProgramme,
+  deactivateLoyaltyProgramme, listCustomerGroups, listCustomers, listLoyaltyProgrammes, orderToCash,
+  readCustomer, revenueSeries, topDebtors, updateCustomer,
 } from '../src/server/services/customers.ts'
 import { createDocument, postDocument, recordPayment } from '../src/server/services/sales.ts'
 import { createLead } from '../src/server/services/crm.ts'
@@ -219,5 +221,119 @@ test('ISOLATION: customers and receivables never cross workspaces', async () => 
   assert.equal((await listCustomers(rivalCtx, {})).total, 0)
   assert.equal((await agingReport(rivalCtx, rivalCtx.now)).total, '0.0000')
   assert.deepEqual(await topDebtors(rivalCtx), [])
+  await db.close()
+})
+
+/* --------------------------------- email ---------------------------------- */
+
+test('the email a form collects is the email the API returns', async () => {
+  const { db, ctx } = await shop()
+  const customer = await createCustomer(ctx, { name: 'Nimbus', currency: 'INR', email: 'billing@nimbus.test' })
+  // A form field that is accepted and then dropped is worse than no field: the
+  // person believes they recorded something.
+  assert.equal(customer.email, 'billing@nimbus.test')
+  assert.equal((await readCustomer(ctx, customer.id)).email, 'billing@nimbus.test')
+
+  const found = await listCustomers(ctx, { q: 'nimbus.test' })
+  assert.equal(found.total, 1, 'the directory promises a search by email, so the server has to match on it')
+  await db.close()
+})
+
+test('a second customer at the same address is refused with a message, not a 500', async () => {
+  const { db, ctx } = await shop()
+  await createCustomer(ctx, { name: 'Nimbus', currency: 'INR', email: 'billing@nimbus.test' })
+  await assert.rejects(
+    () => createCustomer(ctx, { name: 'Nimbus Two', currency: 'INR', email: 'BILLING@nimbus.test' }),
+    /already belongs to another account/,
+    'the unique index would reject this anyway, but as an error nobody can act on',
+  )
+  await db.close()
+})
+
+/* ----------------------------- customer groups ---------------------------- */
+
+test('a group is archived, not deleted, so its customers stay segmented', async () => {
+  const { db, ctx } = await shop()
+  const group = await createCustomerGroup(ctx, { name: 'Wholesale' })
+  const customer = await createCustomer(ctx, { name: 'Nimbus', currency: 'INR', groupId: group.id })
+  assert.equal(customer.groupName, 'Wholesale')
+
+  assert.equal((await listCustomerGroups(ctx))[0].customers, 1)
+  await assert.rejects(() => createCustomerGroup(ctx, { name: 'wholesale' }), /already a group/)
+
+  await archiveCustomerGroup(ctx, group.id)
+  assert.deepEqual(await listCustomerGroups(ctx), [])
+  const { rows } = await db.query<{ group_id: string | null }>('select group_id from sales_customers where id = $1', [
+    customer.id,
+  ])
+  assert.equal(rows[0].group_id, group.id, 'erasing the row would silently unsegment every customer in it')
+  await db.close()
+})
+
+test('ISOLATION: groups and programmes belong to one workspace', async () => {
+  const { db, ctx, rivalCtx } = await shop()
+  await createCustomerGroup(ctx, { name: 'Wholesale' })
+  await createLoyaltyProgramme(ctx, { name: 'Points', currency: 'INR' })
+  assert.deepEqual(await listCustomerGroups(rivalCtx), [])
+  assert.deepEqual(await listLoyaltyProgrammes(rivalCtx), [])
+  await db.close()
+})
+
+/* --------------------------- loyalty programmes --------------------------- */
+
+test('a programme is deactivated, because accrued points point back at it', async () => {
+  const { db, ctx } = await shop()
+  const programme = await createLoyaltyProgramme(ctx, { name: 'Points', currency: 'inr', pointsPerUnit: '2' })
+  assert.equal(programme.currency, 'INR')
+  assert.equal(programme.pointsPerUnit, '2.0000')
+
+  await deactivateLoyaltyProgramme(ctx, programme.id)
+  assert.deepEqual(await listLoyaltyProgrammes(ctx), [])
+  assert.equal((await listLoyaltyProgrammes(ctx, true)).length, 1, 'a balance whose scheme vanished cannot be explained')
+  await assert.rejects(() => deactivateLoyaltyProgramme(ctx, programme.id), /That programme/)
+  await db.close()
+})
+
+/* ------------------------------ revenue series ---------------------------- */
+
+test('revenue is bucketed over time, and two currencies are never added up', async () => {
+  const { db, ctx } = await shop()
+  const usd = await createCustomer(ctx, { name: 'Globex', currency: 'USD' })
+  const inr = await createCustomer(ctx, { name: 'Nimbus', currency: 'INR' })
+
+  for (const [customerId, currency, price] of [
+    [usd.id, 'USD', '100'],
+    [usd.id, 'USD', '250'],
+    [inr.id, 'INR', '9000'],
+  ] as const) {
+    const invoice = await createDocument(ctx, {
+      kind: 'invoice',
+      customerId,
+      currency,
+      lines: [{ description: 'Widget', quantity: '1', unitPrice: price }],
+    })
+    await postDocument(ctx, invoice.id, invoice.version)
+  }
+
+  const series = await revenueSeries(ctx, { from: day(ctx, -1), to: day(ctx, 1), bucket: 'day' })
+  // Two USD invoices outnumber the one INR invoice, so USD is what is
+  // reported — and the rupees are named rather than folded into the dollars.
+  assert.equal(series.currency, 'USD')
+  assert.deepEqual(series.otherCurrencies, ['INR'])
+  assert.equal(series.total, '350.0000')
+  assert.equal(series.invoices, 2)
+  assert.equal(series.buckets.length, 1)
+
+  const rupees = await revenueSeries(ctx, { from: day(ctx, -1), to: day(ctx, 1), currency: 'INR' })
+  assert.equal(rupees.total, '9000.0000')
+  await db.close()
+})
+
+test('a range with nothing invoiced reports no currency, not a zero in one', async () => {
+  const { db, ctx } = await shop()
+  const series = await revenueSeries(ctx, { from: day(ctx, -30), to: day(ctx, -20) })
+  // "USD 0" would assert a currency this workspace may not even trade in.
+  assert.equal(series.currency, null)
+  assert.deepEqual(series.buckets, [])
   await db.close()
 })
