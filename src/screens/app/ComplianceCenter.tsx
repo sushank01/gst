@@ -7,8 +7,14 @@ import { Icon } from '../../components/Icon'
 import { useSearchParams } from '../../lib/router'
 import { Button } from '../../components/ui'
 import { connectors } from '../../lib/connectorData'
-import { flowTone, inventoryCategories, legalBases, type InventoryCategory } from '../../lib/complianceData'
-import { useWorkspace } from '../../lib/workspace'
+import { flowTone, inventoryCategories, legalBases, type FlowType, type InventoryCategory } from '../../lib/complianceData'
+import {
+  useAutomatedDecisions,
+  useDpias,
+  useFlows,
+  useInventory,
+  useRetentionPolicies,
+} from './useCompliance'
 import { toneFor } from '../../lib/tones'
 
 const tabs = [
@@ -85,13 +91,56 @@ function EmptyTable({ columns, message }: { columns: string[]; message: string }
   )
 }
 
+/**
+ * What a register pane shows before its rows arrive.
+ *
+ * Returns null once there is something to render. The distinction it protects
+ * is the one that matters most in this screen: an empty register and an
+ * unreachable one look identical on a table, and mean opposite things to
+ * anybody auditing.
+ */
+function RegisterState({ loading, error }: { loading: boolean; error: { message: string } | null }) {
+  if (loading) return <p className="mt-6 text-[13px] text-fg-muted">Loading…</p>
+  if (error) {
+    return (
+      <p className="mt-6 rounded-2xl border border-bad/30 bg-bad-muted/30 px-5 py-4 text-[13px] text-fg-2">
+        {error.message} Nothing is listed rather than an empty table, because an empty register and an unreachable
+        one are opposite answers.
+      </p>
+    )
+  }
+  return null
+}
+
 function Dashboard() {
-  const { dataInventory, dataFlows, dpias, automatedDecisions } = useWorkspace()
+  const inventory = useInventory()
+  const flows = useFlows()
+  const assessments = useDpias()
+  const decisions = useAutomatedDecisions()
+
+  const dataInventory = inventory.fields
+  const dataFlows = flows.flows
+  const dpias = assessments.dpias
+  const automatedDecisions = decisions.decisions
+
+  // A failed fetch must not render as an empty register: "we hold no personal
+  // data" and "we could not ask" are opposite answers to an auditor.
+  const failed = [inventory, flows, assessments, decisions].some((resource) => resource.error)
+  const loading = [inventory, flows, assessments, decisions].some((resource) => resource.loading)
+  if (loading) return <p className="mt-6 text-[13px] text-fg-muted">Loading your registers…</p>
+  if (failed) {
+    return (
+      <p className="mt-6 rounded-2xl border border-bad/30 bg-bad-muted/30 px-5 py-4 text-[13px] text-fg-2">
+        These registers could not be loaded. Nothing is shown rather than an empty one, because an empty register
+        and an unreachable one look identical and mean opposite things.
+      </p>
+    )
+  }
 
   const sensitive = dataInventory.filter((field) => field.sensitive).length
   const crossBorder = dataFlows.filter((flow) => flow.crossBorder).length
-  const needsReview = dpias.filter((dpia) => dpia.status !== 'Approved').length
-  const highRisk = dpias.filter((dpia) => dpia.risk === 'High').length
+  const needsReview = dpias.filter((dpia) => dpia.status !== 'approved').length
+  const highRisk = dpias.filter((dpia) => dpia.riskLevel === 'high').length
   const unreviewed = automatedDecisions.filter((entry) => entry.profiling && !entry.humanReview).length
 
   return (
@@ -139,11 +188,15 @@ const inputClass =
 
 
 function DpiaPane() {
-  const { dpias, addDpia } = useWorkspace()
+  const { dpias, add: addDpia, loading, error } = useDpias()
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [activity, setActivity] = useState('')
   const [risk, setRisk] = useState<'Low' | 'Medium' | 'High'>('Medium')
+
+
+  const state = <RegisterState loading={loading} error={error} />
+  if (loading || error) return state
 
   return (
     <>
@@ -173,14 +226,14 @@ function DpiaPane() {
                 {dpias.map((dpia) => (
                   <tr key={dpia.id}>
                     <td className="px-5 py-3.5 font-medium">{dpia.title}</td>
-                    <td className="px-5 py-3.5 text-fg-2">{dpia.activity}</td>
+                    <td className="px-5 py-3.5 text-fg-2">{dpia.processing}</td>
                     <td className="px-5 py-3.5">
                       <span
                         className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${
-                          dpia.risk === 'High' ? 'bg-bad-muted text-bad' : 'bg-surface-2 text-fg-2'
+                          dpia.riskLevel === 'high' ? 'bg-bad-muted text-bad' : 'bg-surface-2 text-fg-2'
                         }`}
                       >
-                        {dpia.risk}
+                        {dpia.riskLevel}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-fg-2">{dpia.status}</td>
@@ -224,7 +277,11 @@ function DpiaPane() {
               variant="accent"
               disabled={!title.trim()}
               onClick={() => {
-                addDpia({ title: title.trim(), activity: activity.trim(), risk, status: 'Draft' })
+                void addDpia({
+                  title: title.trim(),
+                  processing: activity.trim(),
+                  riskLevel: risk.toLowerCase(),
+                })
                 setTitle('')
                 setActivity('')
                 setOpen(false)
@@ -240,11 +297,15 @@ function DpiaPane() {
 }
 
 function DecisionsPane() {
-  const { automatedDecisions, addAutomatedDecision } = useWorkspace()
+  const { decisions: automatedDecisions, add: addAutomatedDecision, loading, error } = useAutomatedDecisions()
   const [open, setOpen] = useState(false)
   const [name, setName] = useState('')
   const [profiling, setProfiling] = useState(true)
   const [humanReview, setHumanReview] = useState(true)
+
+
+  const state = <RegisterState loading={loading} error={error} />
+  if (loading || error) return state
 
   return (
     <>
@@ -277,12 +338,14 @@ function DecisionsPane() {
                     <td className="px-5 py-3.5 text-fg-2">{entry.profiling ? 'Yes' : 'No'}</td>
                     <td className="px-5 py-3.5 text-fg-2">{entry.humanReview ? 'Yes' : 'No'}</td>
                     <td className="px-5 py-3.5">
+                      {/* Derived where it is shown rather than frozen at write
+                          time: editing the two facts must move the flag. */}
                       <span
                         className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${
-                          entry.status === 'Needs review' ? 'bg-warn-muted text-warn' : 'bg-ok-muted text-ok'
+                          entry.profiling && !entry.humanReview ? 'bg-warn-muted text-warn' : 'bg-ok-muted text-ok'
                         }`}
                       >
-                        {entry.status}
+                        {entry.profiling && !entry.humanReview ? 'Needs review' : 'Registered'}
                       </span>
                     </td>
                   </tr>
@@ -332,13 +395,9 @@ function DecisionsPane() {
               variant="accent"
               disabled={!name.trim()}
               onClick={() => {
-                addAutomatedDecision({
-                  name: name.trim(),
-                  profiling,
-                  humanReview,
-                  // Profiling with nobody in the loop is exactly what Art. 22 flags.
-                  status: profiling && !humanReview ? 'Needs review' : 'Registered',
-                })
+                // Profiling with nobody in the loop is exactly what Art. 22
+                // flags; the table derives that from these two facts.
+                void addAutomatedDecision({ name: name.trim(), description: null, profiling, humanReview, logicSummary: null })
                 setName('')
                 setOpen(false)
               }}
@@ -353,7 +412,7 @@ function DecisionsPane() {
 }
 
 function InventoryPane() {
-  const { dataInventory, addInventoryField, removeInventoryField, updateInventoryField } = useWorkspace()
+  const { fields: dataInventory, add: addInventoryField, remove: removeInventoryField, loading, error } = useInventory()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState({
@@ -372,16 +431,20 @@ function InventoryPane() {
         ? {
             entity: existing.entity,
             field: existing.field,
-            category: existing.category,
+            category: existing.category as InventoryCategory,
             sensitive: existing.sensitive,
             legalBasis: existing.legalBasis,
-            retention: existing.retention,
+            retention: existing.retention ?? '',
           }
         : { entity: '', field: '', category: 'basic', sensitive: false, legalBasis: 'Consent', retention: '' },
     )
     setEditing(id)
     setOpen(true)
   }
+
+
+  const state = <RegisterState loading={loading} error={error} />
+  if (loading || error) return state
 
   return (
     <>
@@ -527,8 +590,13 @@ function InventoryPane() {
               variant="accent"
               disabled={!draft.entity.trim() || !draft.field.trim()}
               onClick={() => {
-                if (editing) updateInventoryField(editing, draft)
-                else addInventoryField(draft)
+                /*
+                 * Editing a catalogued field is a remove and re-add: the
+                 * server keys a field on (entity, field), so changing either
+                 * is a different field, and changing the rest is one write.
+                 */
+                if (editing) void removeInventoryField(editing)
+                void addInventoryField({ ...draft, retention: draft.retention || null, notes: null })
                 setOpen(false)
               }}
             >
@@ -542,7 +610,7 @@ function InventoryPane() {
 }
 
 function FlowsPane() {
-  const { dataFlows, addDataFlow } = useWorkspace()
+  const { flows: dataFlows, add: addDataFlow, loading, error } = useFlows()
   const [view, setView] = useState<'List' | 'Map'>('List')
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState({
@@ -552,6 +620,10 @@ function FlowsPane() {
     destination: '',
     crossBorder: '',
   })
+
+
+  const state = <RegisterState loading={loading} error={error} />
+  if (loading || error) return state
 
   return (
     <>
@@ -598,8 +670,8 @@ function FlowsPane() {
                   <tr key={flow.id}>
                     <td className="px-5 py-3.5 font-medium">{flow.name}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${flowTone[flow.type]}`}>
-                        {flow.type}
+                      <span className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${flowTone[flow.direction as FlowType]}`}>
+                        {flow.direction}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-fg-2">{flow.source}</td>
@@ -644,7 +716,7 @@ function FlowsPane() {
               </h3>
               <ul className="mt-4 space-y-3">
                 {dataFlows
-                  .filter((flow) => flow.type === type)
+                  .filter((flow) => flow.direction === type)
                   .map((flow) => (
                     <li key={flow.id} className="rounded-xl border border-line px-4 py-3">
                       <p className="text-[13px] font-medium">{flow.name}</p>
@@ -718,7 +790,13 @@ function FlowsPane() {
               variant="accent"
               disabled={!draft.name.trim()}
               onClick={() => {
-                addDataFlow(draft)
+                void addDataFlow({
+                  name: draft.name,
+                  direction: draft.type,
+                  source: draft.source,
+                  destination: draft.destination,
+                  crossBorder: draft.crossBorder || null,
+                })
                 setDraft({ name: '', type: 'egress', source: '', destination: '', crossBorder: '' })
                 setOpen(false)
               }}
@@ -733,12 +811,15 @@ function FlowsPane() {
 }
 
 function RetentionPane() {
-  const { retentionPolicies, addRetentionPolicy, removeRetentionPolicy, connections } = useWorkspace()
+  const { policies: retentionPolicies, add: addRetentionPolicy, remove: removeRetentionPolicy, loading, error } =
+    useRetentionPolicies()
   const [open, setOpen] = useState(false)
   const [connectorId, setConnectorId] = useState(connectors[0].id)
   const [days, setDays] = useState(90)
 
-  const nameOf = (id: string) => connectors.find((item) => item.id === id)?.name ?? id
+
+  const state = <RegisterState loading={loading} error={error} />
+  if (loading || error) return state
 
   return (
     <>
@@ -768,7 +849,7 @@ function RetentionPane() {
               <tbody className="divide-y divide-line">
                 {retentionPolicies.map((policy) => (
                   <tr key={policy.id}>
-                    <td className="px-5 py-3.5 font-medium">{nameOf(policy.connectorId)}</td>
+                    <td className="px-5 py-3.5 font-medium">{policy.subject}</td>
                     <td className="px-5 py-3.5 text-fg-2">{policy.keepForDays} days</td>
                     <td className="px-5 py-3.5">
                       <span
@@ -807,9 +888,9 @@ function RetentionPane() {
       {open && (
         <Dialog size="lg" title="Set retention policy" onClose={() => setOpen(false)}>
           <p className="mt-1.5 text-[13px] text-fg-muted">
-            {connections.length
-              ? 'Applies to data this tenant has pulled through the connector.'
-              : 'No connections exist yet — a policy set now applies as soon as one is created.'}
+            {/* This is a record of intent. Nothing purges anything, and the
+                table says so in its own column. */}
+            Records how long you intend to keep this. Nothing deletes it — no purge job runs on this deployment.
           </p>
           <div className="mt-5 grid gap-4">
             <Field label="Connector">
@@ -843,7 +924,7 @@ function RetentionPane() {
               variant="accent"
               disabled={days < 1}
               onClick={() => {
-                addRetentionPolicy({ connectorId, keepForDays: days, enabled: true, lastRun: '' })
+                void addRetentionPolicy({ subject: connectorId, keepForDays: days })
                 setOpen(false)
               }}
             >
