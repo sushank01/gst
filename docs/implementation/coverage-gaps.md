@@ -9,7 +9,7 @@ one — the asset metrics rows, for example, are served by
 `/api/v1/reports/apps/{code}`. Closing a line means reading the rows behind
 it and deciding what the operation actually needs, not renaming a path.
 
-At this pass: **725 ledger rows**, 170 documented operations,
+At this pass: **725 ledger rows**, 172 documented operations,
 65 SERVED, 28 VERIFIED, 2 BLOCKED,
 630 still DISCOVERED.
 

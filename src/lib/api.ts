@@ -16,13 +16,20 @@ export class ApiClientError extends Error {
   readonly code: string
   readonly fields?: FieldErrors
   readonly currentVersion?: number
+  /** Per-row problems from a bulk operation, so a form can point at the row. */
+  readonly problems?: { line: number; message: string }[]
   readonly requestId?: string
 
   constructor(
     status: number,
     code: string,
     message: string,
-    extra: { fields?: FieldErrors; currentVersion?: number; requestId?: string } = {},
+    extra: {
+      fields?: FieldErrors
+      currentVersion?: number
+      problems?: { line: number; message: string }[]
+      requestId?: string
+    } = {},
   ) {
     super(message)
     this.name = 'ApiClientError'
@@ -30,6 +37,7 @@ export class ApiClientError extends Error {
     this.code = code
     this.fields = extra.fields
     this.currentVersion = extra.currentVersion
+    this.problems = extra.problems
     this.requestId = extra.requestId
   }
 
@@ -101,7 +109,18 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   if (!response.ok) {
-    const envelope = (payload as { error?: { code?: string; message?: string; fields?: FieldErrors; currentVersion?: number; requestId?: string } })?.error
+    const envelope = (
+      payload as {
+        error?: {
+          code?: string
+          message?: string
+          fields?: FieldErrors
+          currentVersion?: number
+          problems?: { line: number; message: string }[]
+          requestId?: string
+        }
+      }
+    )?.error
     throw new ApiClientError(
       response.status,
       envelope?.code ?? 'error',
@@ -109,6 +128,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
       {
         fields: envelope?.fields,
         currentVersion: envelope?.currentVersion,
+        problems: envelope?.problems,
         requestId: envelope?.requestId ?? response.headers.get('x-request-id') ?? undefined,
       },
     )

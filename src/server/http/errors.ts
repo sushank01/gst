@@ -20,6 +20,13 @@ export type ErrorBody = {
     requestId?: string
     /** Present on 409 conflicts so the client can refetch and merge. */
     currentVersion?: number
+    /*
+     * Per-item problems, for an operation over many rows. A bulk import has to
+     * say WHICH row is wrong and why — "12 rows failed" sends somebody back to
+     * a spreadsheet with no idea where to look — and `fields` cannot express a
+     * list. Unlike `detail`, this IS serialised, so nothing sensitive goes in it.
+     */
+    problems?: { line: number; message: string }[]
   }
 }
 
@@ -28,6 +35,7 @@ export class ApiError extends Error {
   readonly code: string
   readonly fields?: FieldErrors
   readonly currentVersion?: number
+  readonly problems?: { line: number; message: string }[]
   /** Extra context for the server log only. Never serialised to the client. */
   readonly detail?: Record<string, unknown>
 
@@ -35,7 +43,12 @@ export class ApiError extends Error {
     status: number,
     code: string,
     message: string,
-    options: { fields?: FieldErrors; currentVersion?: number; detail?: Record<string, unknown> } = {},
+    options: {
+      fields?: FieldErrors
+      currentVersion?: number
+      problems?: { line: number; message: string }[]
+      detail?: Record<string, unknown>
+    } = {},
   ) {
     super(message)
     this.name = 'ApiError'
@@ -43,6 +56,7 @@ export class ApiError extends Error {
     this.code = code
     this.fields = options.fields
     this.currentVersion = options.currentVersion
+    this.problems = options.problems
     this.detail = options.detail
   }
 
@@ -53,6 +67,7 @@ export class ApiError extends Error {
         message: this.message,
         ...(this.fields ? { fields: this.fields } : {}),
         ...(this.currentVersion !== undefined ? { currentVersion: this.currentVersion } : {}),
+        ...(this.problems?.length ? { problems: this.problems } : {}),
         ...(requestId ? { requestId } : {}),
       },
     }
@@ -86,7 +101,11 @@ export const conflict = (message: string, currentVersion?: number) =>
 export const tooManyRequests = (message = 'Too many attempts. Try again shortly.', retryAfterSeconds?: number) =>
   new ApiError(429, 'too_many_requests', message, { detail: { retryAfterSeconds } })
 
-export const unprocessable = (code: string, message: string) => new ApiError(422, code, message)
+export const unprocessable = (
+  code: string,
+  message: string,
+  options: { problems?: { line: number; message: string }[] } = {},
+) => new ApiError(422, code, message, options)
 
 export const notImplemented = (code: string, message: string) => new ApiError(501, code, message)
 
