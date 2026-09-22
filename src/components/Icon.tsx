@@ -141,7 +141,9 @@ export function Icon({
   className = '',
   size = 18,
 }: {
-  name: IconName | string
+  // Callers pass names from data files, so an unknown string must be accepted
+  // and fall back — but keep IconName visible for editor completion.
+  name: IconName | (string & {})
   className?: string
   size?: number
 }) {

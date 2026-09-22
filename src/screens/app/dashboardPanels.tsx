@@ -1,5 +1,7 @@
 'use client'
 
+import { StatCard } from '../../components/StatCard'
+
 import { Link } from '../../lib/router'
 import { builderTiles, jumpCards, marketApps, pendingApprovals, quickTools } from '../../lib/appData'
 import { useWorkspace } from '../../lib/workspace'
@@ -7,14 +9,8 @@ import { CountUp } from '../../components/CountUp'
 
 /** Cards below the context tabs on the Overview dashboard. */
 
-function Stat({ label, value, sub }: { label: string; value: string; sub: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-5">
-      <p className="text-[11px] font-semibold tracking-[0.08em] text-fg-muted uppercase">{label}</p>
-      <p className="mt-2.5 text-3xl font-bold">{value}</p>
-      <p className="mt-1.5 text-[12px] text-fg-muted">{sub}</p>
-    </div>
-  )
+function Stat(props: Omit<React.ComponentProps<typeof StatCard>, 'variant'>) {
+  return <StatCard {...props} variant="dashboard" />
 }
 
 function MeterCard({

@@ -3,16 +3,18 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { NavLink, useLocation } from '../lib/router'
+import { Dialog } from './Dialog'
 import { AppSidebar } from './AppSidebar'
 import { CopilotDock } from './CopilotDock'
 import { ThemeSwitch } from './ThemeSwitch'
 import { useWorkspace } from '../lib/workspace'
 
-function TopBar() {
+function TopBar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
   const { unreadCount } = useWorkspace()
 
   return (
-    <div className="pointer-events-none sticky top-0 z-20 flex justify-end px-6 py-4">
+    <div className="pointer-events-none sticky top-0 z-20 flex justify-between px-6 py-4 lg:justify-end">
+      <button type="button" onClick={onOpenNavigation} className="pointer-events-auto rounded-xl border border-line bg-surface px-3 text-sm lg:hidden" aria-label="Open workspace navigation">☰ Menu</button>
       <div className="pointer-events-auto flex items-center gap-1 rounded-full border border-line bg-surface px-1.5 py-1.5 shadow-sm">
         <ThemeSwitch compact />
         <NavLink
@@ -37,6 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // The rail is permanent: an app no longer collapses it on entry. Collapsing
   // is the user's own choice, made with the chevron under the logo.
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileNavigation, setMobileNavigation] = useState(false)
 
   return (
     <div className="app-surface flex min-h-dvh bg-bg">
@@ -45,13 +48,18 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
+        <TopBar onOpenNavigation={() => setMobileNavigation(true)} />
         {/* Keying on the path restarts the entrance animation on every navigation. */}
         <main key={pathname} className="app-enter min-w-0 flex-1 px-6 pb-14">
           {children}
         </main>
       </div>
 
+      {mobileNavigation && <Dialog title="Workspace navigation" onClose={() => setMobileNavigation(false)}>
+        <div onClick={(event) => { if ((event.target as Element).closest('a')) setMobileNavigation(false) }}>
+          <AppSidebar embedded collapsed={false} onToggleCollapsed={() => setMobileNavigation(false)} />
+        </div>
+      </Dialog>}
       <CopilotDock />
     </div>
   )

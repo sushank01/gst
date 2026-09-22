@@ -6,6 +6,7 @@ import { Link, useNavigate, useSearchParams } from '../lib/router'
 import { AuthLayout } from '../components/AuthLayout'
 import { Button, Divider, Field, SsoButtons } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { ApiClientError } from '../lib/api'
 import { trustPoints } from '../lib/content'
 import {
   passwordRules,
@@ -64,21 +65,26 @@ export default function Register() {
       await signUp({
         fullName: values.fullName,
         email: values.email,
+        password: values.password,
         organization: values.organization,
       })
       navigate(intent ? `/onboarding?intent=${encodeURIComponent(intent)}` : '/onboarding', { replace: true })
-    } catch {
-      setErrors({ form: 'We could not create your workspace. Please try again.' })
+    } catch (error) {
+      if (error instanceof ApiClientError && error.fields) {
+        // The server validates independently; show its per-field messages
+        // rather than only the client's.
+        setErrors((current) => ({ ...current, ...error.fields, form: error.fields?.form }))
+      } else {
+        setErrors({ form: error instanceof ApiClientError ? error.message : 'We could not create your account. Please try again.' })
+      }
     } finally {
       setSubmitting(false)
     }
   }
 
-  async function onSso(provider: 'google' | 'microsoft') {
-    setSubmitting(true)
-    await signUp({ fullName: 'New User', email: `you@${provider}.com`, provider })
-    setSubmitting(false)
-    navigate('/onboarding', { replace: true })
+  /* See Login: SSO waits on real OAuth credentials (decision D3). */
+  function onSso() {
+    setErrors({ form: 'Single sign-on is not configured on this deployment yet. Sign up with your email address.' })
   }
 
   return (

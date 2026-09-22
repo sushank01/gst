@@ -1,0 +1,4772 @@
+{
+ "domain": "Business Suite, Prompt Lab, Agent Studios (both), Vibe Studio, Copilot + public Vippy",
+ "entities": [
+  {
+   "name": "SuiteToolCategory",
+   "sourceType": "SuiteCategory",
+   "sourceFile": "src/lib/businessData.ts:17",
+   "purpose": "The 10 groups the Business Suite home and /app/business?category=<id> browse by. Platform catalogue, identical for every tenant today.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "text primary key",
+     "nullable": false,
+     "notes": "slug, exactly: writing, social, marketing, business, creative, development, productivity, data, education, image"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Writing, Social media, Marketing, Business, Creative, Development, Productivity, Data & Analysis, Education, Image"
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "key into src/components/Icon.tsx registry: pen, link, megaphone, briefcase, palette, code, zap, chart, graduation, image"
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "NEW. Today ordering is only the literal array position"
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. CategoryView already renders 'That category no longer exists.' for an unknown id, implying retirement"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SuiteTool",
+     "via": "nested array SuiteCategory.tools",
+     "gap": "Tools are nested literals with no id; the child carries no parent key. LocatedTool re-attaches the whole category object by value."
+    }
+   ]
+  },
+  {
+   "name": "SuiteTool",
+   "sourceType": "SuiteTool",
+   "sourceFile": "src/lib/businessData.ts:10",
+   "purpose": "One of the 102 catalogue tools rendered as a card and opened at /app/business/tool/:slug.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "No id exists today; name is the de facto key"
+    },
+    {
+     "name": "slug",
+     "tsType": "string (derived)",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "computed at render by toolSlug() (businessData.ts:205): lowercase, [^a-z0-9]+ -> '-', trim '-'. Verified 102 slugs, zero collisions. Must become a stored unique column: unique(slug)"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "creditCost",
+     "tsType": "number",
+     "sqlType": "numeric(12,4) not null",
+     "nullable": false,
+     "notes": "Observed values only 0,1,2,3,4. Displayed as '~N AI Credits'. 7 tools cost 0 (hashtag-generator, invoice-description-writer, git-commit-message-writer, task-breakdown, checklist-generator, citation-formatter, alt-text-generator) and spend(0) can never fail, so they run on an empty pool. Never float."
+    },
+    {
+     "name": "categoryId",
+     "tsType": "string",
+     "sqlType": "text not null references suite_tool_categories(id)",
+     "nullable": false
+    },
+    {
+     "name": "isFeatured",
+     "tsType": "derived",
+     "sqlType": "boolean not null default false",
+     "nullable": false,
+     "notes": "businessData.ts:229 featuredToolNames matches by display NAME string, not id — 6 entries: AI Agent Prompt Engineer, AI Chat Assistant, AI Image Prompt Generator, Blog Post Generator, Business Plan Generator, Code Generator"
+    },
+    {
+     "name": "quickAccessSlot",
+     "tsType": "derived",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "businessData.ts:222 quickAccess hardcodes destination URLs (/app/business/tool/image-generator, /app/business/tool/code-generator) rather than tool ids"
+    },
+    {
+     "name": "inputSchema",
+     "tsType": "NEW",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false,
+     "notes": "Tool.tsx:11 states the per-tool forms were never transcribed; every tool shares one free-text textarea"
+    },
+    {
+     "name": "defaultModelId",
+     "tsType": "NEW",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SuiteToolCategory",
+     "via": "nesting only",
+     "gap": "no categoryId column exists; the category is reattached by object identity in allSuiteTools"
+    },
+    {
+     "kind": "hasMany",
+     "target": "SuiteToolRun",
+     "via": "none",
+     "gap": "runs are not recorded at all"
+    }
+   ]
+  },
+  {
+   "name": "SuiteToolRun",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/business/Tool.tsx:25",
+   "purpose": "One execution of a Business Suite tool. Nothing about a run survives the component today: input, output, cost and outcome are React state.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "insufficient_credits",
+    "cancelled"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true,
+     "notes": "UI claims 'soft-tagged to your active company' but no active-company concept exists anywhere in the codebase"
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references users(id)",
+     "nullable": false
+    },
+    {
+     "name": "toolId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references suite_tools(id)",
+     "nullable": false
+    },
+    {
+     "name": "toolSlugSnapshot",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "catalogue may be re-slugged; the run must stay readable"
+    },
+    {
+     "name": "modelId",
+     "tsType": "NEW",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true,
+     "notes": "Tool.tsx offers no model choice at all"
+    },
+    {
+     "name": "inputText",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Tool.tsx:19 useState('') — discarded on unmount"
+    },
+    {
+     "name": "inputPayload",
+     "tsType": "NEW",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "outputText",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "currently a template literal containing the user's own echoed input"
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null check (status in ('queued','running','succeeded','failed','insufficient_credits','cancelled'))",
+     "nullable": false,
+     "notes": "today only two branches render: funded string vs 'Not enough AI Credits…'. No error or timeout state exists."
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "promptTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "completionTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "latencyMs",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "currently a fixed 700ms setTimeout"
+    },
+    {
+     "name": "providerRequestId",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "error",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "startedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "completedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SuiteTool",
+     "via": "none",
+     "gap": "no run record exists"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "CreditLedgerEntry",
+     "via": "spend() mutating a scalar",
+     "gap": "no ledger row, no reversal if the call fails after spend()"
+    }
+   ]
+  },
+  {
+   "name": "ChatSession",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/business/Chat.tsx:17",
+   "purpose": "An AI-chat conversation at /app/business/chat. '+ New Chat' destroys the previous one with no save and no confirm.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "active",
+    "archived"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references users(id)",
+     "nullable": false
+    },
+    {
+     "name": "title",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "no titling exists; header shows only a message count"
+    },
+    {
+     "name": "modelId",
+     "tsType": "string",
+     "sqlType": "uuid not null references ai_models(id)",
+     "nullable": false,
+     "notes": "Chat.tsx:19 holds the display STRING from chatModels; default chatModels[0] = 'Claude Sonnet 4.6'"
+    },
+    {
+     "name": "systemPrompt",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Chat.tsx:21, collapsed panel; its only current effect is appending ', following your system prompt' to the canned reply"
+    },
+    {
+     "name": "messageCount",
+     "tsType": "derived",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "ChatMessage",
+     "via": "in-memory array",
+     "gap": "nothing persisted; refresh loses the conversation"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AiModel",
+     "via": "display-name string",
+     "gap": "'Claude Sonnet 4.6' etc. is a label, not a provider model id"
+    }
+   ]
+  },
+  {
+   "name": "ChatMessage",
+   "sourceType": "Message",
+   "sourceFile": "src/screens/app/business/Chat.tsx:10",
+   "purpose": "One turn in a Business Suite chat.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "user",
+    "assistant"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "today `u-${Date.now()}` / `a-${Date.now()}` — two sends inside one millisecond collide on the React key"
+    },
+    {
+     "name": "sessionId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references chat_sessions(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "seq",
+     "tsType": "NEW",
+     "sqlType": "integer not null",
+     "nullable": false,
+     "notes": "unique(session_id, seq); array order is the only ordering today"
+    },
+    {
+     "name": "role",
+     "tsType": "'user' | 'assistant'",
+     "sqlType": "text not null check (role in ('user','assistant','system','tool'))",
+     "nullable": false,
+     "notes": "source vocabulary is exactly 'user' | 'assistant'; 'system' is held separately on the session"
+    },
+    {
+     "name": "text",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "modelId",
+     "tsType": "NEW",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false,
+     "notes": "Chat.tsx:13 costPerTurn = 1, charged on the USER turn before any output exists"
+    },
+    {
+     "name": "promptTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "completionTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "latencyMs",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false,
+     "notes": "no timestamp is stored on a message today"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "ChatSession",
+     "via": "none",
+     "gap": "messages live in one useState array"
+    }
+   ]
+  },
+  {
+   "name": "ChatStarterPrompt",
+   "sourceType": "chatSuggestions",
+   "sourceFile": "src/lib/businessData.ts:243",
+   "purpose": "The six starter prompts on an empty AI chat; clicking one sends it immediately.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "text",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "6 literals, e.g. 'Write a professional email to follow up on a client meeting', 'Help me debug a React component that has infinite re-renders'"
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid references tenants(id) on delete cascade",
+     "nullable": true,
+     "notes": "null = platform default; a tenant override is plausible but not evidenced"
+    },
+    {
+     "name": "active",
+     "tsType": "NEW",
+     "sqlType": "boolean not null default true",
+     "nullable": false
+    }
+   ],
+   "relations": []
+  },
+  {
+   "name": "AiModel",
+   "sourceType": "NEW",
+   "sourceFile": "src/lib/businessData.ts:252, src/screens/app/PromptLab.tsx:6, src/lib/vibeData.ts:17-20, src/lib/agentStudioData.ts:127",
+   "purpose": "A single registry to replace FOUR mutually inconsistent hardcoded model lists across this domain.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "active",
+    "preview",
+    "deprecated",
+    "retired"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "slug",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "unique(slug). The four existing lists disagree in both membership and naming convention: businessData.chatModels = ['Claude Sonnet 4.6','Claude Opus 4.6','GPT-4.1','Gemini 2.5 Pro','Llama 3.3 70B']; PromptLab.models (module-local, unexported) = ['Claude Sonnet 4','Claude Opus 4','GPT-4o','Gemini Pro']; vibeModels = ['Default · claude-sonnet-4-6','claude-opus-5','claude-sonnet-5','claude-haiku-4-5']; studioModel = 'claude-sonnet-4-6'. VibeStudio.tsx:167 additionally hardcodes a bare 'Claude' chip next to that select."
+    },
+    {
+     "name": "displayName",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "vibeModels[0] is the LABEL 'Default · claude-sonnet-4-6' used as a value — a label and an id conflated in one string"
+    },
+    {
+     "name": "provider",
+     "tsType": "NEW",
+     "sqlType": "text not null check (provider in ('anthropic','openai','google','meta','other'))",
+     "nullable": false
+    },
+    {
+     "name": "providerModelId",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "contextWindow",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "maxOutputTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "PromptLab lets maxTokens be any number including 0 and negatives; nothing validates against a model ceiling"
+    },
+    {
+     "name": "supportsTemperature",
+     "tsType": "NEW",
+     "sqlType": "boolean not null default true",
+     "nullable": false
+    },
+    {
+     "name": "creditsPerCall",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "no per-model pricing exists anywhere; every surface hardcodes a flat cost"
+    },
+    {
+     "name": "enabledSurfaces",
+     "tsType": "NEW",
+     "sqlType": "text[] not null default '{}'",
+     "nullable": false,
+     "notes": "suite_chat | suite_tool | prompt_lab | vibe_studio | agent_studio | copilot | vippy"
+    },
+    {
+     "name": "isDefault",
+     "tsType": "NEW",
+     "sqlType": "boolean not null default false",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'active' check (status in ('active','preview','deprecated','retired'))",
+     "nullable": false
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "ChatSession",
+     "via": "display-name string",
+     "gap": "every consumer stores a free display string; a rename silently orphans history"
+    }
+   ]
+  },
+  {
+   "name": "PromptTemplate",
+   "sourceType": "templates (module const)",
+   "sourceFile": "src/screens/app/PromptLab.tsx:9",
+   "purpose": "A saved system+user prompt pair the Templates dropdown applies. Three read-only literals today; there is no create, edit, delete or save control anywhere in Prompt Lab.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "draft",
+    "published",
+    "archived"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "exactly: 'Invoice reviewer', 'Lead qualifier', 'Clause summariser'"
+    },
+    {
+     "name": "systemPrompt",
+     "tsType": "string",
+     "sqlType": "text not null default ''",
+     "nullable": false
+    },
+    {
+     "name": "userPrompt",
+     "tsType": "string",
+     "sqlType": "text not null default ''",
+     "nullable": false,
+     "notes": "contains {{invoice_number}}, {{supplier}}, {{po_number}}, {{threshold}}, {{lead}}, {{contract_text}}"
+    },
+    {
+     "name": "variables",
+     "tsType": "derived",
+     "sqlType": "jsonb not null default '[]'::jsonb",
+     "nullable": false,
+     "notes": "PromptLab.tsx:52 derives these at render with /\\{\\{\\s*[\\w.]+\\s*\\}\\}/g over `[...system, ...user].join('')` — the two strings are concatenated with no separator, so a '{{' ending the system prompt can false-match a '}}' opening the user prompt"
+    },
+    {
+     "name": "defaultModelId",
+     "tsType": "NEW",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true
+    },
+    {
+     "name": "defaultTemperature",
+     "tsType": "NEW",
+     "sqlType": "numeric(3,2)",
+     "nullable": true
+    },
+    {
+     "name": "defaultMaxTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "visibility",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'private' check (visibility in ('private','team','tenant'))",
+     "nullable": false,
+     "notes": "the doc comment says 'Saved prompts the team can reach for' — sharing scope is asserted but unimplemented"
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'draft' check (status in ('draft','published','archived'))",
+     "nullable": false
+    },
+    {
+     "name": "createdBy",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id)",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "PromptRun",
+     "via": "none",
+     "gap": "applying a template copies two strings into textareas; the run keeps no link back"
+    }
+   ]
+  },
+  {
+   "name": "PromptRun",
+   "sourceType": "Result",
+   "sourceFile": "src/screens/app/PromptLab.tsx:27",
+   "purpose": "One Prompt Lab execution with its settings, output and metering. Entirely ephemeral; only the latest result is held.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "insufficient_credits"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references users(id)",
+     "nullable": false
+    },
+    {
+     "name": "templateId",
+     "tsType": "NEW",
+     "sqlType": "uuid references prompt_templates(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "modelId",
+     "tsType": "string",
+     "sqlType": "uuid not null references ai_models(id)",
+     "nullable": false,
+     "notes": "Result.model holds the display string"
+    },
+    {
+     "name": "systemPrompt",
+     "tsType": "string",
+     "sqlType": "text not null default ''",
+     "nullable": false
+    },
+    {
+     "name": "userPrompt",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "temperature",
+     "tsType": "number",
+     "sqlType": "numeric(3,2) not null default 0.70 check (temperature >= 0 and temperature <= 2)",
+     "nullable": false,
+     "notes": "PromptLab.tsx:33 useState(2) with a range of min 0 / max 2 step 0.1 — the lab ships at MAXIMUM temperature by default, which looks like a bug rather than a product choice"
+    },
+    {
+     "name": "maxTokens",
+     "tsType": "number",
+     "sqlType": "integer not null default 2048 check (max_tokens > 0)",
+     "nullable": false,
+     "notes": "PromptLab.tsx:109 is a bare number input: Number('') yields NaN and negatives are accepted; nothing validates it"
+    },
+    {
+     "name": "variables",
+     "tsType": "string[] (derived)",
+     "sqlType": "jsonb not null default '[]'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "outputText",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "latencyMs",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "FABRICATED: 1200 + round(random()*900); rendered as '{ms/1000}s'"
+    },
+    {
+     "name": "totalTokens",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "FABRICATED: round(userPrompt.length / 3) + 180"
+    },
+    {
+     "name": "promptTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "completionTokens",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false,
+     "notes": "hardcoded 3 per run at PromptLab.tsx:60, independent of model, tokens or temperature; set to 0 in the result when unfunded"
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null check (status in ('queued','running','succeeded','failed','insufficient_credits'))",
+     "nullable": false
+    },
+    {
+     "name": "providerRequestId",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "error",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "startedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "completedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "PromptTemplate",
+     "via": "none",
+     "gap": "no provenance is recorded when a template is applied"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AiModel",
+     "via": "display-name string"
+    }
+   ]
+  },
+  {
+   "name": "VibeCapability",
+   "sourceType": "Capability",
+   "sourceFile": "src/lib/vibeData.ts:3",
+   "purpose": "The six 'Start from a capability' cards in Vibe Studio; picking one also starts a build.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "text primary key",
+     "nullable": false,
+     "notes": "exactly: agent, business-solution-agents, web-app, erp-custom-agents, mobile-app, web-rpa-bot"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Agent, Business Solution Agents, Web app, ERP Custom Agents, Mobile App, Web RPA Bot"
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "raw glyphs ⚙ ⚛ </> ✦ ▯ 🤖 — not Icon-registry keys, unlike the Business Suite"
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "producesArtifactKind",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "needed because addArtifact currently writes the capability NAME into both skill and kind"
+    },
+    {
+     "name": "entitlementKey",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "no plan gating exists on any capability"
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "active",
+     "tsType": "NEW",
+     "sqlType": "boolean not null default true",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Artifact",
+     "via": "Artifact.skill / Artifact.kind display-name string",
+     "gap": "a capability rename orphans every artifact built from it; the stable id is available and unused"
+    }
+   ]
+  },
+  {
+   "name": "VibeBuild",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/VibeStudio.tsx:114",
+   "purpose": "One Vibe Studio build job. The prompt that produced the artifact is discarded after naming it.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "idle",
+    "building",
+    "done"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references users(id)",
+     "nullable": false
+    },
+    {
+     "name": "prompt",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "LOST today — only toArtifactName(prompt, 48) survives, word-boundary trimmed with a trailing ellipsis"
+    },
+    {
+     "name": "capabilityId",
+     "tsType": "string",
+     "sqlType": "text not null references vibe_capabilities(id)",
+     "nullable": false
+    },
+    {
+     "name": "modelId",
+     "tsType": "NEW",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true,
+     "notes": "the TopBar model select (VibeStudio.tsx:30/66) is local to TopBar and is NEVER passed to build(); choosing a model has no effect whatsoever"
+    },
+    {
+     "name": "status",
+     "tsType": "'idle' | 'building' | 'done'",
+     "sqlType": "text not null check (status in ('queued','running','succeeded','failed','cancelled'))",
+     "nullable": false,
+     "notes": "source vocabulary is idle|building|done — there is no failure state at all"
+    },
+    {
+     "name": "currentStep",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "steps",
+     "tsType": "string[]",
+     "sqlType": "jsonb not null default '[]'::jsonb",
+     "nullable": false,
+     "notes": "fixed four labels at VibeStudio.tsx:17: 'Reading the prompt','Proposing the shape','Wiring tools + guardrails','Snapshotting version 1' — each a 450ms setTimeout"
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false,
+     "notes": "hardcoded spend(15) at VibeStudio.tsx:124 with its BOOLEAN RETURN IGNORED — the artifact is created even when the pool is empty"
+    },
+    {
+     "name": "artifactId",
+     "tsType": "NEW",
+     "sqlType": "uuid references artifacts(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "error",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "startedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "completedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Artifact",
+     "via": "in-memory builtId",
+     "gap": "the build/artifact link exists only for the current render"
+    }
+   ]
+  },
+  {
+   "name": "Artifact",
+   "sourceType": "Artifact",
+   "sourceFile": "src/lib/workspace.tsx:36",
+   "purpose": "What Vibe Studio produces, listed under 'Your artifacts' and counted by the onboarding checklist. The only record in this domain that is persisted at all — to one browser localStorage key shared by every tenant on the device.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "draft",
+    "published"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "crypto.randomUUID() client-side; must be server-generated"
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false,
+     "notes": "artifacts are stored under the global key 'apragya.workspace' — switching accounts in one browser shows the other tenant's artifacts"
+    },
+    {
+     "name": "companyId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "createdBy",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references users(id)",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "lossy: toArtifactName truncates at 48 chars on a word boundary and appends '…'"
+    },
+    {
+     "name": "skill",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "set to capability.name (display string). Must become capability_id uuid."
+    },
+    {
+     "name": "kind",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "set to the SAME capability.name as skill — two columns holding one value; addArtifact({ name, skill: from.name, kind: from.name })"
+    },
+    {
+     "name": "version",
+     "tsType": "number",
+     "sqlType": "integer not null default 1",
+     "nullable": false,
+     "notes": "publishArtifact increments it on the same row rather than snapshotting; a 'Build complete' panel shows v1 and after publish v2"
+    },
+    {
+     "name": "status",
+     "tsType": "'draft' | 'published'",
+     "sqlType": "text not null default 'draft' check (status in ('draft','published','archived'))",
+     "nullable": false
+    },
+    {
+     "name": "sourcePrompt",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "buildId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references vibe_builds(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "definition",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false,
+     "notes": "no artifact CONTENT is ever produced or stored — only a name and two labels"
+    },
+    {
+     "name": "publishedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "publishedBy",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id)",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false,
+     "notes": "ISO string from new Date().toISOString()"
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "there is no delete or archive control for an artifact anywhere"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "VibeCapability",
+     "via": "skill/kind display-name string",
+     "gap": "should be capability_id"
+    },
+    {
+     "kind": "hasMany",
+     "target": "ArtifactVersion",
+     "via": "an integer counter on the row",
+     "gap": "no version rows exist, so the advertised 'immutable snapshot' and 'roll back in one click' have nothing to roll back to"
+    }
+   ]
+  },
+  {
+   "name": "ArtifactVersion",
+   "sourceType": "NEW",
+   "sourceFile": "src/lib/workspace.tsx:1046",
+   "purpose": "The immutable snapshot the product copy promises. publishArtifact currently mutates status and bumps a counter in place.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "draft",
+    "published",
+    "superseded",
+    "rolled_back"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "artifactId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references artifacts(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "versionNumber",
+     "tsType": "NEW",
+     "sqlType": "integer not null",
+     "nullable": false,
+     "notes": "unique(artifact_id, version_number)"
+    },
+    {
+     "name": "definition",
+     "tsType": "NEW",
+     "sqlType": "jsonb not null",
+     "nullable": false
+    },
+    {
+     "name": "checksum",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null check (status in ('draft','published','superseded','rolled_back'))",
+     "nullable": false
+    },
+    {
+     "name": "publishedBy",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id)",
+     "nullable": true
+    },
+    {
+     "name": "publishedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Artifact",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "AgentBundle",
+   "sourceType": "AgentGroup",
+   "sourceFile": "src/lib/agentCatalog.ts:8",
+   "purpose": "The app that bundles a set of Enterprise Agents. 14 bundles covering 60 agents.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "code",
+     "tsType": "string",
+     "sqlType": "text primary key",
+     "nullable": false,
+     "notes": "exactly: SUP, IDP, PM, TE, CRM, HR, FIN, INV, P2P, PAY, MFG, CTR, ITAM, POS"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "tone",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "agentCatalog.ts:162 groupTones — Tailwind class strings (bg-pink-500 …) stored as data"
+    },
+    {
+     "name": "appCode",
+     "tsType": "derived",
+     "sqlType": "text references marketplace_apps(code)",
+     "nullable": true,
+     "notes": "VERIFIED MISMATCH: bundle FIN ('Finance & Accounting', 3 agents) has no installable app, so its 3 agents can never be enabled; apps PP, PPTX, EVT, RQA, POD ship zero agents despite the marketing claim that 'Every app ships with bound agents'"
+    },
+    {
+     "name": "agentCount",
+     "tsType": "derived",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "SUP 9, IDP 9, PM 7, TE 5, CRM 4, HR 4, FIN 3, INV 3, P2P 3, PAY 3, MFG 3, CTR 3, ITAM 3, POS 1 = 60 (totalEnterpriseAgents)"
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "CatalogAgent",
+     "via": "nested array + agentsByAppCode Map keyed by code"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "MarketplaceApp",
+     "via": "shared code string",
+     "gap": "no FK; the two tables silently disagree on 6 codes"
+    }
+   ]
+  },
+  {
+   "name": "CatalogAgent",
+   "sourceType": "CatalogAgent",
+   "sourceFile": "src/lib/agentCatalog.ts:7",
+   "purpose": "One of the 60 Enterprise Agents. Its display NAME is the identity used by every run, schedule and disable list in the app.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "ENTERPRISE",
+    "CUSTOM"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "no id exists; name is the key everywhere"
+    },
+    {
+     "name": "bundleCode",
+     "tsType": "derived",
+     "sqlType": "text not null references agent_bundles(code)",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "unique(name) is effectively required today because Run.agent, Schedule.target and PosSettings.agents.disabled[] all store this string"
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "isCustom",
+     "tsType": "custom?: boolean",
+     "sqlType": "boolean not null default false",
+     "nullable": false,
+     "notes": "exactly 2 of 60 are flagged: 'Lead Qualify & Route' (CRM) and 'Resume Screening' (HR). AgentPortal renders the badge CUSTOM vs ENTERPRISE from it. A tenant-authored agent sitting inside a platform catalogue is a tenancy leak."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references tenants(id) on delete cascade",
+     "nullable": true,
+     "notes": "required for the isCustom rows; null for platform agents"
+    },
+    {
+     "name": "defaultModelId",
+     "tsType": "NEW",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true
+    },
+    {
+     "name": "definition",
+     "tsType": "NEW",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false,
+     "notes": "no agent has any prompt, tool list or graph — only a name and a blurb"
+    },
+    {
+     "name": "creditCost",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "every agent run costs exactly 6 credits because sampleTrace is shared"
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "active",
+     "tsType": "NEW",
+     "sqlType": "boolean not null default true",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AgentBundle",
+     "via": "array nesting"
+    },
+    {
+     "kind": "hasMany",
+     "target": "Run",
+     "via": "Run.agent display-name string",
+     "gap": "the single most load-bearing display-name relation in the domain: run history, per-agent run counts (AgentPortal runsByAgent Map), schedules and the POS disabled list all key on a mutable label"
+    }
+   ]
+  },
+  {
+   "name": "AgentDefinition",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx:300, src/screens/app/AgentStudio.tsx:10",
+   "purpose": "A tenant-authored agent. Neither Agent Studio creates one: the workspace studio turns a prompt straight into a fake completed Run, and the canvas studio has no create control at all.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "draft",
+    "testing",
+    "published",
+    "paused",
+    "archived"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "workspaceId",
+     "tsType": "NEW",
+     "sqlType": "uuid references studio_workspaces(id) on delete cascade",
+     "nullable": true
+    },
+    {
+     "name": "name",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "today the studio passes prompt.slice(0,60) as an agent NAME into recordRun"
+    },
+    {
+     "name": "description",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "sourcePrompt",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "discarded after setSent(); setPrompt('') clears it"
+    },
+    {
+     "name": "templateId",
+     "tsType": "NEW",
+     "sqlType": "uuid references studio_workflow_templates(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "modelId",
+     "tsType": "NEW",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true,
+     "notes": "studioModel 'claude-sonnet-4-6' is rendered as inert text, not a control"
+    },
+    {
+     "name": "systemPrompt",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "graph",
+     "tsType": "NEW",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'draft' check (status in ('draft','testing','published','paused','archived'))",
+     "nullable": false
+    },
+    {
+     "name": "version",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 1",
+     "nullable": false,
+     "notes": "the canvas Inspector claims 'Deploy publishes an immutable snapshot. In-flight runs finish on the previous version' — there is no Deploy control on the page"
+    },
+    {
+     "name": "createdBy",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id)",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "AgentNode",
+     "via": "none",
+     "gap": "canvasNodes is a 6-element module constant shared by all users"
+    },
+    {
+     "kind": "hasMany",
+     "target": "AgentTest",
+     "via": "none"
+    },
+    {
+     "kind": "hasMany",
+     "target": "Run",
+     "via": "free-text Run.agent"
+    }
+   ]
+  },
+  {
+   "name": "AgentNode",
+   "sourceType": "canvasNodes",
+   "sourceFile": "src/screens/app/AgentStudio.tsx:10",
+   "purpose": "One step of the visual agent graph on the orphaned /app/build/agent-studio canvas.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "trigger",
+    "rag",
+    "llm",
+    "guard",
+    "hitl",
+    "out"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "literal ids today: trigger, rag, llm, guard, hitl, out"
+    },
+    {
+     "name": "agentId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references agent_definitions(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Trigger, Knowledge, Reason, Guardrail, Approval, Output"
+    },
+    {
+     "name": "nodeType",
+     "tsType": "string (as `kind`)",
+     "sqlType": "text not null check (node_type in ('trigger','knowledge','llm','guardrail','hitl','output'))",
+     "nullable": false,
+     "notes": "the source `kind` is a DISPLAY sentence, not a type: 'Record created', 'RAG · playbooks', 'LLM node', 'Max 12 tool calls', 'HITL if > ₹50,000', 'Write to app'. The type must be extracted from it."
+    },
+    {
+     "name": "config",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false,
+     "notes": "would hold: max tool calls (12), the HITL money threshold, the RAG source (playbooks)"
+    },
+    {
+     "name": "thresholdAmount",
+     "tsType": "MISSING",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "the literal '₹50,000' is baked into a label string; money must be numeric(18,4) with an explicit currency"
+    },
+    {
+     "name": "thresholdCurrency",
+     "tsType": "MISSING",
+     "sqlType": "char(3)",
+     "nullable": true,
+     "notes": "INR is implied only by the ₹ glyph; the tenant currency default is USD (migration 0001)"
+    },
+    {
+     "name": "position",
+     "tsType": "MISSING",
+     "sqlType": "jsonb",
+     "nullable": true,
+     "notes": "rendered as a vertical <ol>, not a canvas; there is no drag, no connect, no add, no delete"
+    },
+    {
+     "name": "seq",
+     "tsType": "derived",
+     "sqlType": "integer not null",
+     "nullable": false
+    },
+    {
+     "name": "tone",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Tailwind class string used as data"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AgentDefinition",
+     "via": "none",
+     "gap": "the six nodes are a module constant, identical for every tenant and every agent"
+    }
+   ]
+  },
+  {
+   "name": "AgentTest",
+   "sourceType": "inline array",
+   "sourceFile": "src/screens/app/AgentStudio.tsx:132",
+   "purpose": "The 'Golden tests' list on the canvas Tests tab.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "pass",
+    "fail"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "agentId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references agent_definitions(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "4 hardcoded: 'Scores a high-fit inbound lead above 0.8', 'Routes enterprise leads to the named rep', 'Pauses when the deal value exceeds the cap', 'Rejects a lead with no contactable email'"
+    },
+    {
+     "name": "input",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "expectation",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "lastStatus",
+     "tsType": "'pass' | 'fail'",
+     "sqlType": "text check (last_status in ('pass','fail','error','skipped'))",
+     "nullable": true,
+     "notes": "source vocabulary is exactly pass|fail; three are hardcoded pass and one hardcoded fail, and nothing ever executes them"
+    },
+    {
+     "name": "lastRunAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "blocksPublish",
+     "tsType": "MISSING",
+     "sqlType": "boolean not null default true",
+     "nullable": false,
+     "notes": "copy says 'Tests run as part of the build gate' — no gate exists; a permanently failing test blocks nothing"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AgentDefinition",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "StudioWorkspace",
+   "sourceType": "NEW",
+   "sourceFile": "src/app/studio/workspace/[workspaceId]/home/page.tsx",
+   "purpose": "The workspace the Agent Studio route is scoped to. The dynamic segment is accepted and then completely ignored.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "active",
+    "archived"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "the route takes [workspaceId] but the rendered component never calls useParams — /studio and /studio/workspace/anything/home render byte-identical output"
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "slug",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "unique(tenant_id, lower(slug))"
+    },
+    {
+     "name": "ownerUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id)",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "AgentDefinition",
+     "via": "none",
+     "gap": "no scoping of any kind is applied"
+    }
+   ]
+  },
+  {
+   "name": "StudioTemplateCategory",
+   "sourceType": "TemplateCategory",
+   "sourceFile": "src/lib/agentStudioData.ts:40",
+   "purpose": "The seven 'Start from a template' categories in the workspace Agent Studio.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "text primary key",
+     "nullable": false,
+     "notes": "popular, sales, support, engineering, marketing, productivity, operations"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Popular, Sales & CRM, Support, Engineering, Marketing & Content, Productivity, Operations"
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "raw glyphs ✦ 👥 💬 </> ✎ ☑ ⚙"
+    },
+    {
+     "name": "advertisedCount",
+     "tsType": "number (as `count`)",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "VERIFIED MISMATCH — the card prints '{count} templates' and the panel prints '{count} workflows', but the arrays are shorter: popular 6/6, sales 12/4, support 8/3, engineering 11/3, marketing 10/3, productivity 19/3, operations 16/3. 82 advertised, 25 present. Either drop the column and count rows, or treat the difference as an unbuilt backlog."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "StudioWorkflowTemplate",
+     "via": "nested array"
+    }
+   ]
+  },
+  {
+   "name": "StudioWorkflowTemplate",
+   "sourceType": "Workflow",
+   "sourceFile": "src/lib/agentStudioData.ts:39",
+   "purpose": "A starting point in Agent Studio. Clicking one only writes its NAME into the prompt box.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "no id; name is the React key"
+    },
+    {
+     "name": "categoryId",
+     "tsType": "derived",
+     "sqlType": "text not null references studio_template_categories(id)",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "25 total, e.g. Self-populating CRM, Meeting prep agent, Resolve todo list, Research assistant, Auto-reply agent, Expense tracker, Lead qualifier, Deal scorer, Follow-up drafter, Pipeline digest, Ticket triager, Reply suggester, Escalation predictor, PR reviewer, Incident summariser, Release notes drafter, Campaign brief writer, SEO auditor, Social scheduler, Inbox summariser, Note taker, Weekly digest, Invoice auditor, Vendor risk analyzer, Stock reorder advisor"
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "tone",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Tailwind classes as data (bg-sky-500/20 text-sky-300 …)"
+    },
+    {
+     "name": "promptText",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "setPrompt(workflow.name) — the panel promises 'click one to prefill your prompt' but prefills only the 2-3 word title"
+    },
+    {
+     "name": "definition",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "StudioTemplateCategory",
+     "via": "array nesting"
+    }
+   ]
+  },
+  {
+   "name": "StudioNavItem",
+   "sourceType": "StudioNavItem / StudioNavGroup",
+   "sourceFile": "src/lib/agentStudioData.ts:3",
+   "purpose": "The Agent Studio left rail. Nine destinations, none of which change the rendered page.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "text primary key",
+     "nullable": false
+    },
+    {
+     "name": "groupId",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "null for studioPrimary (Build, Search); otherwise library | data | operations"
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Build, Search | Agents, Activity | Knowledge, Tables, Files | Schedules, Logs"
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "badge",
+     "tsType": "string | undefined",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "only 'Agents' carries one, hardcoded '1' — it is not derived from any artifact, agent or run count"
+    },
+    {
+     "name": "route",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "there is no route; onSelect only sets a local `active` string"
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": []
+  },
+  {
+   "name": "BuildAttachment",
+   "sourceType": "attachments: string[]",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx:236",
+   "purpose": "A file added as context to an Agent Studio build. Only the filename is captured; no bytes are ever read.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "pending",
+    "scanning",
+    "clean",
+    "quarantined",
+    "rejected"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "ownerType",
+     "tsType": "NEW",
+     "sqlType": "text not null check (owner_type in ('agent_build','vibe_build','chat_session','prompt_run'))",
+     "nullable": false
+    },
+    {
+     "name": "ownerId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null",
+     "nullable": false
+    },
+    {
+     "name": "fileName",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "the ONLY field captured: Array.from(event.target.files).map(f => f.name), then event.target.value = ''. The File objects are dropped and the names are cleared again on submit."
+    },
+    {
+     "name": "mimeType",
+     "tsType": "MISSING",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "byteSize",
+     "tsType": "MISSING",
+     "sqlType": "bigint not null",
+     "nullable": false
+    },
+    {
+     "name": "storageKey",
+     "tsType": "MISSING",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "checksum",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "scanStatus",
+     "tsType": "MISSING",
+     "sqlType": "text not null default 'pending' check (scan_status in ('pending','scanning','clean','quarantined','rejected'))",
+     "nullable": false
+    },
+    {
+     "name": "uploadedBy",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id)",
+     "nullable": true
+    },
+    {
+     "name": "uploadedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AgentDefinition",
+     "via": "none",
+     "gap": "attachments are dropped at submit; help text claims 'Attachments become context the builder reads'"
+    }
+   ]
+  },
+  {
+   "name": "Run",
+   "sourceType": "Run",
+   "sourceFile": "src/lib/workspace.tsx:54",
+   "purpose": "An agent execution. Written by BOTH Agent Studios, the Agent Portal and Scheduled Jobs, and read by /app/runs, the Agent Health panel and the Overview dashboard. Every run is fabricated from one shared constant trace.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "success",
+    "needs-review",
+    "failed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "today `run_${Math.random().toString(36).slice(2,8)}` — 6 base-36 chars, client-side, collision-prone, and displayed to the user as the run reference"
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "userId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id)",
+     "nullable": true,
+     "notes": "the audit row claims user 'owner' / role 'Org_admin' unconditionally"
+    },
+    {
+     "name": "agent",
+     "tsType": "string",
+     "sqlType": "uuid not null references catalog_agents(id)",
+     "nullable": false,
+     "notes": "DISPLAY-NAME RELATION. Values seen: a CatalogAgent.name (Agent Portal), prompt.slice(0,60) (studio), marketApps agent name or the literal 'Untitled agent' (canvas), Schedule.name (Scheduled Jobs). Needs agent_id plus an agent_name_snapshot."
+    },
+    {
+     "name": "source",
+     "tsType": "string",
+     "sqlType": "text not null check (source in ('agent_studio','agent_studio_test','agent_portal','scheduled_job','vibe_studio','api'))",
+     "nullable": false,
+     "notes": "free text today: 'Agent Studio', 'Agent Studio test', 'Scheduled Jobs', and the bundle display name from AgentPortal (e.g. 'Support & Ticketing')"
+    },
+    {
+     "name": "status",
+     "tsType": "'success' | 'needs-review' | 'failed'",
+     "sqlType": "text not null check (status in ('queued','running','success','needs-review','failed','cancelled'))",
+     "nullable": false,
+     "notes": "the type declares three values; recordRun hardcodes 'success' and nothing ever writes the other two, so the Agent Health 'Runs passing' figure is always 100%"
+    },
+    {
+     "name": "startedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "finishedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "credits",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false,
+     "notes": "always exactly 6 — the sum of sampleTrace step credits (0+1+4+0+0+1)"
+    },
+    {
+     "name": "ms",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "always exactly 3260 — the sum of sampleTrace step ms (180+640+2100+20+10+310)"
+    },
+    {
+     "name": "input",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "output",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "error",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "trace",
+     "tsType": "RunStep[]",
+     "sqlType": "— child table run_steps",
+     "nullable": false,
+     "notes": "every Run holds a reference to the SAME module-level sampleTrace array object (appData.ts), not a copy"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CatalogAgent",
+     "via": "agent: string display name",
+     "gap": "the core FK of the whole run/observability surface is a label"
+    },
+    {
+     "kind": "hasMany",
+     "target": "RunStep",
+     "via": "embedded array",
+     "gap": "shared mutable array instance across all runs"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AuditEvent",
+     "via": "auditEvent({action:'agent.run', resourceId: run.id})",
+     "gap": "actor is hardcoded 'owner'/'Org_admin', ip is ''"
+    }
+   ]
+  },
+  {
+   "name": "RunStep",
+   "sourceType": "RunStep",
+   "sourceFile": "src/lib/appData.ts:105 (sampleTrace at :112)",
+   "purpose": "One node execution inside a run trace, expanded on /app/runs.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "llm",
+    "tool",
+    "guardrail",
+    "hitl",
+    "output"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "bigserial primary key",
+     "nullable": false
+    },
+    {
+     "name": "runId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references runs(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "seq",
+     "tsType": "NEW",
+     "sqlType": "integer not null",
+     "nullable": false,
+     "notes": "unique(run_id, seq); array index today"
+    },
+    {
+     "name": "node",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "fixed six: Intake, Enrich, Score, Policy check, Approval, Route"
+    },
+    {
+     "name": "kind",
+     "tsType": "'llm'|'tool'|'guardrail'|'hitl'|'output'",
+     "sqlType": "text not null check (kind in ('llm','tool','guardrail','hitl','output'))",
+     "nullable": false,
+     "notes": "complete vocabulary; Runs.tsx kindStyles keys on exactly these five"
+    },
+    {
+     "name": "detail",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "prose that hides structured data: 'Fetched record from CRM · lead #4821', 'claude · 1,204 prompt / 318 completion tokens', 'Max tool calls 8/12 · content filter passed', 'Auto-approved — score 0.91 below review threshold', 'Assigned to Priya S. · CRM updated'"
+    },
+    {
+     "name": "ms",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "credits",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "promptTokens",
+     "tsType": "MISSING",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "1204 is buried in the detail string"
+    },
+    {
+     "name": "completionTokens",
+     "tsType": "MISSING",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "318 is buried in the detail string"
+    },
+    {
+     "name": "modelId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references ai_models(id)",
+     "nullable": true,
+     "notes": "'claude' with no version"
+    },
+    {
+     "name": "toolName",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "payload",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "startedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Run",
+     "via": "array position"
+    }
+   ]
+  },
+  {
+   "name": "CopilotThread",
+   "sourceType": "NEW",
+   "sourceFile": "src/components/CopilotDock.tsx:11",
+   "purpose": "The in-app AI Copilot conversation pinned to every /app/* page. Held in one useState array; lost on reload.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "open",
+    "closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references users(id)",
+     "nullable": false
+    },
+    {
+     "name": "openedFromPath",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "the dock can be raised from elsewhere by a window CustomEvent 'apragya:copilot' (only dispatcher: src/screens/app/pos/settings.tsx:879) — the event carries no payload and no context"
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "lastMessageAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "CopilotMessage",
+     "via": "in-memory array"
+    }
+   ]
+  },
+  {
+   "name": "CopilotMessage",
+   "sourceType": "{ role: 'you' | 'copilot'; text: string }",
+   "sourceFile": "src/components/CopilotDock.tsx:11",
+   "purpose": "One Copilot turn. The greeting advertises actions ('install the Contracts app', 'who approved invoice 4821?') that the dock cannot perform.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "you",
+    "copilot"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "MISSING",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "no id at all — the list renders with the array index as its React key"
+    },
+    {
+     "name": "threadId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references copilot_threads(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "seq",
+     "tsType": "NEW",
+     "sqlType": "integer not null",
+     "nullable": false
+    },
+    {
+     "name": "role",
+     "tsType": "'you' | 'copilot'",
+     "sqlType": "text not null check (role in ('user','assistant','tool'))",
+     "nullable": false,
+     "notes": "source vocabulary is literally 'you' | 'copilot' — UI labels used as a data enum"
+    },
+    {
+     "name": "text",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false,
+     "notes": "spend(2) per ask, charged before the canned reply is appended"
+    },
+    {
+     "name": "toolCalls",
+     "tsType": "MISSING",
+     "sqlType": "jsonb not null default '[]'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "requiresApproval",
+     "tsType": "MISSING",
+     "sqlType": "boolean not null default false",
+     "nullable": false,
+     "notes": "the reply claims 'consequential actions pause for your approval first' — no approval path is wired to the dock"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CopilotThread",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "VippyConversation",
+   "sourceType": "{ role: 'you' | 'vippy'; text: string }",
+   "sourceFile": "src/components/VippyWidget.tsx:9",
+   "purpose": "The public, unauthenticated 'Ask Vippy anything' widget rendered by SiteLayout on every marketing page. No credits, no auth, no network, no persistence.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "you",
+    "vippy"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "visitorId",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "anonymous; no identity of any kind exists on the public site"
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid references tenants(id) on delete set null",
+     "nullable": true,
+     "notes": "null until the visitor signs up; the reply copy promises the same assistant answers from tenant data after sign-in"
+    },
+    {
+     "name": "pagePath",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "messages",
+     "tsType": "array",
+     "sqlType": "— child table vippy_messages (id, conversation_id, seq, role check in ('user','assistant'), text, created_at)",
+     "nullable": false,
+     "notes": "role vocabulary in source is 'you' | 'vippy'; seeded with one greeting"
+    },
+    {
+     "name": "ipHash",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "needed for abuse limiting on an unauthenticated endpoint"
+    },
+    {
+     "name": "retentionExpiresAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none",
+     "gap": "the widget promises continuity from anonymous visitor to signed-in tenant with no identifier to carry it"
+    }
+   ]
+  },
+  {
+   "name": "CreditLedgerEntry",
+   "sourceType": "creditsUsed: number",
+   "sourceFile": "src/lib/workspace.tsx:65 (MONTHLY_CREDITS), :1018 (creditsLeft), :1020 (spend)",
+   "purpose": "The single shared AI Credits pool every surface in this domain draws on. Today it is ONE integer plus a constant.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "reserved",
+    "settled",
+    "refunded",
+    "void"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "bigserial primary key",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true,
+     "notes": "copy promises per-user allocations and admin alerts; only a boolean creditsAllocated flag exists"
+    },
+    {
+     "name": "surface",
+     "tsType": "NEW",
+     "sqlType": "text not null check (surface in ('suite_tool','suite_chat','prompt_lab','vibe_build','agent_run','copilot'))",
+     "nullable": false,
+     "notes": "observed charges: suite tool = tool.cost (0-4); suite chat = 1/turn; prompt lab = 3/run; vibe build = 15; copilot = 2/ask; agent run = 6 (sampleTrace)"
+    },
+    {
+     "name": "refType",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "refId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true
+    },
+    {
+     "name": "delta",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4) not null",
+     "nullable": false,
+     "notes": "negative for spend, positive for grant/refund. Never float — the UI already formats with toLocaleString()."
+    },
+    {
+     "name": "balanceAfter",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4) not null",
+     "nullable": false
+    },
+    {
+     "name": "state",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'settled' check (state in ('reserved','settled','refunded','void'))",
+     "nullable": false,
+     "notes": "needed because every surface debits BEFORE the provider call and never refunds on failure"
+    },
+    {
+     "name": "idempotencyKey",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "unique(tenant_id, idempotency_key); spend() is a read-then-write over React state with no atomicity, so two concurrent tabs can both pass the creditsLeft check"
+    },
+    {
+     "name": "periodStart",
+     "tsType": "NEW",
+     "sqlType": "date not null",
+     "nullable": false,
+     "notes": "calendar-day fact -> date, not timestamptz. There is no period at all today: MONTHLY_CREDITS is a constant and creditsUsed never resets."
+    },
+    {
+     "name": "occurredAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "a browser-global localStorage key",
+     "gap": "'apragya.workspace' is shared by every account using the browser"
+    }
+   ]
+  },
+  {
+   "name": "CreditPoolPeriod",
+   "sourceType": "MONTHLY_CREDITS / APP_QUOTA / TRIAL_DAYS",
+   "sourceFile": "src/lib/workspace.tsx:65-68",
+   "purpose": "The allowance the ledger is checked against. Three module constants stand in for a plan.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "open",
+    "closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "planId",
+     "tsType": "NEW",
+     "sqlType": "uuid references plans(id)",
+     "nullable": true
+    },
+    {
+     "name": "grantedCredits",
+     "tsType": "const 1000",
+     "sqlType": "numeric(18,4) not null",
+     "nullable": false,
+     "notes": "MONTHLY_CREDITS = 1000, identical for every tenant and plan"
+    },
+    {
+     "name": "usedCredits",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) not null default 0",
+     "nullable": false,
+     "notes": "the persisted scalar; creditsLeft = 1000 - usedCredits, and vibeControls renders the same number as 'N AIU'"
+    },
+    {
+     "name": "appQuota",
+     "tsType": "const 5",
+     "sqlType": "integer not null",
+     "nullable": false,
+     "notes": "APP_QUOTA = 5"
+    },
+    {
+     "name": "trialDaysLeft",
+     "tsType": "const 13",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "TRIAL_DAYS = 13, a frozen constant rather than a computed expiry"
+    },
+    {
+     "name": "periodStart",
+     "tsType": "NEW",
+     "sqlType": "date not null",
+     "nullable": false
+    },
+    {
+     "name": "periodEnd",
+     "tsType": "NEW",
+     "sqlType": "date not null",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'open' check (status in ('open','closed'))",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "CreditLedgerEntry",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "OnboardingIntent",
+   "sourceType": "?intent query string",
+   "sourceFile": "src/screens/Landing.tsx:64, src/screens/Register.tsx:69, src/screens/Onboarding.tsx:16",
+   "purpose": "The landing-hero prompt carried through signup. Onboarding renders 'Queued for your first run' for it and then drops it.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "captured",
+    "queued",
+    "consumed",
+    "expired"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid references tenants(id) on delete cascade",
+     "nullable": true
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id) on delete cascade",
+     "nullable": true
+    },
+    {
+     "name": "text",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "free text from the hero input or one of the suggestionChips"
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'captured' check (status in ('captured','queued','consumed','expired'))",
+     "nullable": false,
+     "notes": "nothing is ever queued; VibeStudio.tsx:103 reads a ?prompt= parameter that NOTHING in the codebase ever sets (verified by grep) — the intent funnel and the Vibe Studio intake were never connected"
+    },
+    {
+     "name": "targetSurface",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "would be vibe_studio per the VibeStudio comment 'The prompt arrives from Home or the landing hero'"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "consumedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "VibeBuild",
+     "via": "none",
+     "gap": "dead path: /register?intent -> /onboarding?intent -> displayed -> discarded"
+    }
+   ]
+  }
+ ],
+ "operations": [
+  {
+   "id": "OP-SUITE-HOME-READ",
+   "entity": "SuiteToolCategory",
+   "action": "list",
+   "surface": "/app/business (no ?category)",
+   "sourceFile": "src/screens/app/business/Suite.tsx",
+   "sourceLine": 53,
+   "currentBehaviour": "Module import of a static array; no network, no tenant scoping. Greets with session.user.fullName.split(' ')[0] or 'there'.",
+   "requiredBehaviour": "GET tenant-visible categories with tool counts and per-tenant enablement.",
+   "apiMethodPath": "GET /api/v1/suite/categories",
+   "authorization": "member of tenant",
+   "validation": "none needed",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-CATEGORY-READ",
+   "entity": "SuiteToolCategory",
+   "action": "read",
+   "surface": "/app/business?category={writing|social|marketing|business|creative|development|productivity|data|education|image}",
+   "tab": "category",
+   "sourceFile": "src/screens/app/business/Suite.tsx",
+   "sourceLine": 11,
+   "currentBehaviour": "categoryById[id] object lookup; unknown id renders 'That category no longer exists.' with a back link. No 404 status, no logging.",
+   "requiredBehaviour": "GET one category with its tools; 404 for unknown/archived.",
+   "apiMethodPath": "GET /api/v1/suite/categories/{categoryId}",
+   "authorization": "member of tenant",
+   "validation": "categoryId in catalogue",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-TOOL-LIST",
+   "entity": "SuiteTool",
+   "action": "list",
+   "surface": "/app/business?category=…",
+   "sourceFile": "src/screens/app/business/Suite.tsx",
+   "sourceLine": 42,
+   "currentBehaviour": "Renders category.tools inline. No paging, no sort, no search. 102 tools across 10 categories.",
+   "requiredBehaviour": "Paged, sortable, searchable tool list scoped to tenant entitlements.",
+   "apiMethodPath": "GET /api/v1/suite/tools?categoryId=&q=&page=",
+   "authorization": "member of tenant",
+   "validation": "page bounds",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-FEATURED-LIST",
+   "entity": "SuiteTool",
+   "action": "list",
+   "surface": "/app/business — 'Featured tools'",
+   "sourceFile": "src/lib/businessData.ts",
+   "sourceLine": 238,
+   "currentBehaviour": "featuredToolNames.map(name => allSuiteTools.find(t => t.name === name)).filter(Boolean) — matched by display NAME; a rename silently drops the card with no error.",
+   "requiredBehaviour": "GET featured tools by id with an explicit is_featured flag and sort order.",
+   "apiMethodPath": "GET /api/v1/suite/tools?featured=true",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-QUICKACCESS-NAV",
+   "entity": "SuiteTool",
+   "action": "read",
+   "surface": "/app/business — 'Quick access' x3",
+   "sourceFile": "src/screens/app/business/Suite.tsx",
+   "sourceLine": 76,
+   "currentBehaviour": "Three <Link> navigations to hardcoded paths: /app/business/chat, /app/business/tool/image-generator, /app/business/tool/code-generator. Navigates only.",
+   "requiredBehaviour": "Same navigation, but the targets resolved from tool ids so a slug change cannot 404 the tile.",
+   "apiMethodPath": "n/a (client navigation)",
+   "authorization": "member of tenant",
+   "validation": "target must resolve",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-VIEWALL-NAV",
+   "entity": "SuiteToolCategory",
+   "action": "read",
+   "surface": "/app/business — 'View all →' beside Featured tools",
+   "sourceFile": "src/screens/app/business/Suite.tsx",
+   "sourceLine": 97,
+   "currentBehaviour": "Navigates to /app/business?category=writing. The label says 'View all' but it opens one category of 12 tools out of 102. Mislabelled control.",
+   "requiredBehaviour": "Open an all-tools listing, or relabel to 'Browse Writing'.",
+   "apiMethodPath": "n/a (client navigation)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-CATEGORY-NAV",
+   "entity": "SuiteToolCategory",
+   "action": "read",
+   "surface": "/app/business — 'Browse by category' x10",
+   "sourceFile": "src/screens/app/business/Suite.tsx",
+   "sourceLine": 113,
+   "currentBehaviour": "Link to /app/business?category={id}; the count badge is category.tools.length (12,10,12,12,8,11,11,9,9,8).",
+   "requiredBehaviour": "Same, with server-supplied counts.",
+   "apiMethodPath": "n/a (client navigation)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-TOOLCARD-NAV",
+   "entity": "SuiteTool",
+   "action": "read",
+   "surface": "every tool card",
+   "sourceFile": "src/screens/app/business/shared.tsx",
+   "sourceLine": 25,
+   "currentBehaviour": "Whole card is a Link to /app/business/tool/${toolSlug(tool.name)} — the slug is recomputed at render from the display name on every click.",
+   "requiredBehaviour": "Link by stored slug/id.",
+   "apiMethodPath": "n/a (client navigation)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-TOOL-RESOLVE",
+   "entity": "SuiteTool",
+   "action": "read",
+   "surface": "/app/business/tool/[slug]",
+   "sourceFile": "src/screens/app/business/Tool.tsx",
+   "sourceLine": 23,
+   "currentBehaviour": "toolBySlug[slug]; a miss renders <Navigate to='/app/business' replace/> — a silent client redirect, never a 404.",
+   "requiredBehaviour": "GET tool by slug; 404 page for unknown, 403 when the tenant is not entitled.",
+   "apiMethodPath": "GET /api/v1/suite/tools/{slug}",
+   "authorization": "member of tenant",
+   "validation": "slug exists and is not archived",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-TOOL-INPUT",
+   "entity": "SuiteToolRun",
+   "action": "update",
+   "surface": "/app/business/tool/[slug] — 'What do you need?' textarea",
+   "sourceFile": "src/screens/app/business/Tool.tsx",
+   "sourceLine": 61,
+   "currentBehaviour": "setState only. No length cap, no draft persistence; navigating away loses the input.",
+   "requiredBehaviour": "Local draft with autosave; server-side length and content validation on submit.",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "member of tenant",
+   "validation": "1..N chars, max length enforced server-side",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-TOOL-RUN",
+   "entity": "SuiteToolRun",
+   "action": "execute",
+   "surface": "/app/business/tool/[slug] — 'Run · N credits'",
+   "sourceFile": "src/screens/app/business/Tool.tsx",
+   "sourceLine": 25,
+   "currentBehaviour": "spend(tool.cost) mutates the localStorage credit counter, THEN awaits setTimeout(700), then sets a canned string that echoes the user's own input. No provider call, no output stored. For the 7 zero-cost tools spend(0) can never fail so they always report success.",
+   "requiredBehaviour": "Create a SuiteToolRun, reserve credits idempotently, call the provider, persist input/output/tokens/latency, settle or refund the reservation, return the run.",
+   "apiMethodPath": "POST /api/v1/suite/tools/{slug}/runs",
+   "authorization": "member of tenant with ai.tool.run; credits must be available",
+   "validation": "non-empty input; model+tool entitlement; idempotency key required",
+   "sideEffect": "LLM provider call (none exists today)"
+  },
+  {
+   "id": "OP-SUITE-TOOL-RUN-DENIED",
+   "entity": "SuiteToolRun",
+   "action": "execute",
+   "surface": "/app/business/tool/[slug] — insufficient credits branch",
+   "sourceFile": "src/screens/app/business/Tool.tsx",
+   "sourceLine": 36,
+   "currentBehaviour": "spend() returns false and the same <p> renders 'Not enough AI Credits left in this cycle…'. Styled identically to a success — no error colour, no role=alert.",
+   "requiredBehaviour": "402/403 envelope surfaced as a distinct error state with a route to top-up.",
+   "apiMethodPath": "POST /api/v1/suite/tools/{slug}/runs",
+   "authorization": "denied when pool exhausted",
+   "validation": "balance check must be atomic",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-TOOL-BACK-NAV",
+   "entity": "SuiteToolCategory",
+   "action": "read",
+   "surface": "/app/business/tool/[slug] — 'Back to {category}'",
+   "sourceFile": "src/screens/app/business/Tool.tsx",
+   "sourceLine": 43,
+   "currentBehaviour": "Navigates to /app/business?category={tool.category.id}.",
+   "requiredBehaviour": "unchanged",
+   "apiMethodPath": "n/a (client navigation)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUITE-TOOL-HISTORY",
+   "entity": "SuiteToolRun",
+   "action": "list",
+   "surface": "MISSING on /app/business/tool/[slug]",
+   "sourceFile": "src/screens/app/business/Tool.tsx",
+   "sourceLine": 73,
+   "currentBehaviour": "No history control exists. Only the single latest output is held in state and it is cleared on the next run.",
+   "requiredBehaviour": "List past runs for this tool scoped to the user/tenant, with re-run and copy.",
+   "apiMethodPath": "GET /api/v1/suite/tools/{slug}/runs?page=",
+   "authorization": "own runs; tenant admin sees all",
+   "validation": "paging",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CHAT-SESSION-OPEN",
+   "entity": "ChatSession",
+   "action": "read",
+   "surface": "/app/business/chat",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 17,
+   "currentBehaviour": "Mounts with messages=[] every time. There is no session list, no resume, no history. Header shows '{n} messages'.",
+   "requiredBehaviour": "Create or resume a persisted session; list prior sessions.",
+   "apiMethodPath": "POST /api/v1/suite/chat/sessions",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CHAT-SEND",
+   "entity": "ChatMessage",
+   "action": "create",
+   "surface": "/app/business/chat — send button and Enter",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 25,
+   "currentBehaviour": "Appends a user message with id `u-${Date.now()}`, sets thinking=true, spend(1), awaits setTimeout(650), then appends an assistant message whose text is a template literal naming the selected model and echoing the prompt. No provider call.",
+   "requiredBehaviour": "Persist the user turn, stream the assistant turn from the provider, persist it with tokens/latency, settle credits.",
+   "apiMethodPath": "POST /api/v1/suite/chat/sessions/{id}/messages",
+   "authorization": "session owner",
+   "validation": "non-empty; max length; model entitlement",
+   "sideEffect": "LLM provider call (none today)"
+  },
+  {
+   "id": "OP-CHAT-SEND-KEYBOARD",
+   "entity": "ChatMessage",
+   "action": "create",
+   "surface": "/app/business/chat composer",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 49,
+   "currentBehaviour": "Enter without Shift preventDefaults and calls send(draft); Shift+Enter inserts a newline. Same fake path.",
+   "requiredBehaviour": "identical to OP-CHAT-SEND",
+   "apiMethodPath": "POST /api/v1/suite/chat/sessions/{id}/messages",
+   "authorization": "session owner",
+   "validation": "same",
+   "sideEffect": "LLM provider call"
+  },
+  {
+   "id": "OP-CHAT-SUGGESTION-SEND",
+   "entity": "ChatMessage",
+   "action": "create",
+   "surface": "/app/business/chat empty state — 6 starter cards",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 165,
+   "currentBehaviour": "Immediately calls send(suggestion) — one click both fills and submits, and charges a credit, with no chance to edit first.",
+   "requiredBehaviour": "Prefill the composer (or send with explicit confirmation), then the normal send path.",
+   "apiMethodPath": "POST /api/v1/suite/chat/sessions/{id}/messages",
+   "authorization": "session owner",
+   "validation": "suggestion id must exist",
+   "sideEffect": "LLM provider call + credit spend"
+  },
+  {
+   "id": "OP-CHAT-MODEL-SELECT",
+   "entity": "ChatSession",
+   "action": "update",
+   "surface": "/app/business/chat — Model select",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 74,
+   "currentBehaviour": "setState of a display string from chatModels. Its only observable effect is being interpolated into the canned reply text. Never persisted, never sent anywhere.",
+   "requiredBehaviour": "PATCH the session's model; validate against the tenant's enabled models; reprice subsequent turns.",
+   "apiMethodPath": "PATCH /api/v1/suite/chat/sessions/{id}",
+   "authorization": "session owner",
+   "validation": "modelId active and enabled for surface suite_chat",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CHAT-SYSTEM-TOGGLE",
+   "entity": "ChatSession",
+   "action": "read",
+   "surface": "/app/business/chat — 'System' button",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 84,
+   "currentBehaviour": "Toggles a local boolean that reveals the system-prompt panel. aria-expanded is set correctly.",
+   "requiredBehaviour": "unchanged (pure UI)",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "session owner",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CHAT-SYSTEM-EDIT",
+   "entity": "ChatSession",
+   "action": "update",
+   "surface": "/app/business/chat — system prompt textarea",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 116,
+   "currentBehaviour": "setState only. The only effect on output is that a non-empty value appends ', following your system prompt' to the canned reply. Lost on reload.",
+   "requiredBehaviour": "Persist on the session and send as the system role on every turn.",
+   "apiMethodPath": "PATCH /api/v1/suite/chat/sessions/{id}",
+   "authorization": "session owner",
+   "validation": "max length",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CHAT-NEW",
+   "entity": "ChatSession",
+   "action": "create",
+   "surface": "/app/business/chat — '+ New Chat'",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 97,
+   "currentBehaviour": "setMessages([]) and setDraft('') then focuses the composer. DESTRUCTIVE: the previous conversation is unrecoverable, with no save and no confirmation. Note it does NOT clear the system prompt or the model.",
+   "requiredBehaviour": "Close/persist the current session and open a new one; the old session stays retrievable.",
+   "apiMethodPath": "POST /api/v1/suite/chat/sessions",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CHAT-BACK-NAV",
+   "entity": "SuiteToolCategory",
+   "action": "read",
+   "surface": "/app/business/chat — 'Back'",
+   "sourceFile": "src/screens/app/business/Chat.tsx",
+   "sourceLine": 59,
+   "currentBehaviour": "Link to /app/business; loses the conversation with no warning.",
+   "requiredBehaviour": "Same navigation, but the session survives because it is persisted.",
+   "apiMethodPath": "n/a (client navigation)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-MODEL-SELECT",
+   "entity": "PromptRun",
+   "action": "update",
+   "surface": "/app/prompt-lab toolbar",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 81,
+   "currentBehaviour": "setState from a module-local models array of 4 display strings that exists nowhere else in the app. Only interpolated into the canned output and the result header.",
+   "requiredBehaviour": "Select from the shared AiModel registry filtered to surface prompt_lab.",
+   "apiMethodPath": "GET /api/v1/ai/models?surface=prompt_lab",
+   "authorization": "member of tenant",
+   "validation": "model active + entitled",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-TEMPERATURE-SET",
+   "entity": "PromptRun",
+   "action": "update",
+   "surface": "/app/prompt-lab — 'Temp' range 0..2 step 0.1",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 98,
+   "currentBehaviour": "setTemperature(Number(value)); initial state is 2, i.e. the maximum of the range. Never sent anywhere.",
+   "requiredBehaviour": "Send to the provider; default to a sane value and reject models that do not support it.",
+   "apiMethodPath": "POST /api/v1/prompt-lab/runs",
+   "authorization": "member of tenant",
+   "validation": "0 <= t <= 2; reject when model.supportsTemperature is false",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-MAXTOKENS-SET",
+   "entity": "PromptRun",
+   "action": "update",
+   "surface": "/app/prompt-lab — 'Tokens' number input",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 109,
+   "currentBehaviour": "setMaxTokens(Number(value)) with no min/max/step. Clearing the field yields NaN, which then renders in the canned output as 'capped at NaN tokens'. Negative values accepted.",
+   "requiredBehaviour": "Validate 1..model.maxOutputTokens both client- and server-side.",
+   "apiMethodPath": "POST /api/v1/prompt-lab/runs",
+   "authorization": "member of tenant",
+   "validation": "integer, 1..model ceiling",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-TEMPLATES-OPEN",
+   "entity": "PromptTemplate",
+   "action": "list",
+   "surface": "/app/prompt-lab — 'Templates' dropdown",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 116,
+   "currentBehaviour": "Toggles a local boolean; a mousedown listener closes it on outside click. Lists 3 module constants.",
+   "requiredBehaviour": "GET tenant prompt templates, paged and searchable.",
+   "apiMethodPath": "GET /api/v1/prompt-lab/templates",
+   "authorization": "member of tenant; visibility filter",
+   "validation": "paging",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-TEMPLATE-APPLY",
+   "entity": "PromptTemplate",
+   "action": "read",
+   "surface": "/app/prompt-lab — a template row",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 129,
+   "currentBehaviour": "setSystem(template.system) and setUser(template.user), OVERWRITING unsaved work with no confirmation, then closes the menu. No link back to the template is retained.",
+   "requiredBehaviour": "Warn on unsaved changes; record templateId on the resulting run.",
+   "apiMethodPath": "GET /api/v1/prompt-lab/templates/{id}",
+   "authorization": "template visible to caller",
+   "validation": "template exists",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-SYSTEM-EDIT",
+   "entity": "PromptRun",
+   "action": "update",
+   "surface": "/app/prompt-lab — System prompt textarea",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 166,
+   "currentBehaviour": "setState only; never persisted, lost on navigation.",
+   "requiredBehaviour": "Draft autosave; submitted with the run.",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "member of tenant",
+   "validation": "max length",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-USER-EDIT",
+   "entity": "PromptRun",
+   "action": "update",
+   "surface": "/app/prompt-lab — User prompt textarea",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 180,
+   "currentBehaviour": "setState only; also the sole gate on the Run button (!user.trim()).",
+   "requiredBehaviour": "Draft autosave; submitted with the run.",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "member of tenant",
+   "validation": "non-empty, max length",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-VARIABLES-DETECT",
+   "entity": "PromptRun",
+   "action": "read",
+   "surface": "/app/prompt-lab — 'Detected:' chips",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 52,
+   "currentBehaviour": "Derived each render: new Set(match of /\\{\\{\\s*[\\w.]+\\s*\\}\\}/g over [...system, ...user].join('')). The two prompts are concatenated with no separator, so a '{{' at the end of the system prompt can pair with a '}}' at the start of the user prompt and report a variable that exists in neither.",
+   "requiredBehaviour": "Parse each prompt independently; expose variables for binding and require values before a run.",
+   "apiMethodPath": "n/a (derived) — persisted on PromptRun.variables",
+   "authorization": "member of tenant",
+   "validation": "join the two strings with a separator; dedupe per field",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-VARIABLE-BIND",
+   "entity": "PromptRun",
+   "action": "update",
+   "surface": "MISSING on /app/prompt-lab",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 194,
+   "currentBehaviour": "Variables are displayed as read-only chips. There is no input to give {{invoice_number}} a value, so a template can never actually be executed with data.",
+   "requiredBehaviour": "Render an input per detected variable; substitute server-side before the provider call.",
+   "apiMethodPath": "POST /api/v1/prompt-lab/runs (body.variables)",
+   "authorization": "member of tenant",
+   "validation": "every declared variable bound or explicitly blank",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-RUN",
+   "entity": "PromptRun",
+   "action": "execute",
+   "surface": "/app/prompt-lab — 'Run'",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 54,
+   "currentBehaviour": "setTimeout(900), THEN spend(3) (hardcoded), then setResult with a fabricated latency (1200 + random*900), fabricated token count (userPrompt.length/3 + 180) and a stock paragraph beginning 'On the live platform this runs against…'. Only the single latest result is kept.",
+   "requiredBehaviour": "Persist a PromptRun, call the provider, record real latency/tokens/cost, price credits from the model, and keep run history.",
+   "apiMethodPath": "POST /api/v1/prompt-lab/runs",
+   "authorization": "member of tenant with ai.promptlab.run",
+   "validation": "non-empty user prompt; temperature and maxTokens in range; idempotency key",
+   "sideEffect": "LLM provider call (none today)"
+  },
+  {
+   "id": "OP-LAB-RUN-DENIED",
+   "entity": "PromptRun",
+   "action": "execute",
+   "surface": "/app/prompt-lab response pane",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 70,
+   "currentBehaviour": "Unfunded runs still create a Result with credits: 0 and the text 'Your AI Credits pool is empty for this cycle…' — rendered in the same body style as a success, and the header still prints a fabricated latency and token count for a call that never happened.",
+   "requiredBehaviour": "402 envelope; no run row marked succeeded; no metering shown.",
+   "apiMethodPath": "POST /api/v1/prompt-lab/runs",
+   "authorization": "denied on exhausted pool",
+   "validation": "atomic balance check",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-CREDITS-READ",
+   "entity": "CreditPoolPeriod",
+   "action": "read",
+   "surface": "/app/prompt-lab — '{n} credits left this cycle.'",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 222,
+   "currentBehaviour": "Reads creditsLeft (1000 - creditsUsed) from localStorage. Only rendered after a result exists.",
+   "requiredBehaviour": "Server balance for the current period, always visible.",
+   "apiMethodPath": "GET /api/v1/billing/credits",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-SAVE-TEMPLATE",
+   "entity": "PromptTemplate",
+   "action": "create",
+   "surface": "MISSING on /app/prompt-lab",
+   "sourceFile": "src/screens/app/PromptLab.tsx",
+   "sourceLine": 69,
+   "currentBehaviour": "No save control exists anywhere on the page, yet the stock output says 'When a prompt works, save it to the library' and the public /prompt-lab page advertises a 'Save to library' capability.",
+   "requiredBehaviour": "Save the current system+user+settings as a named template with a visibility scope.",
+   "apiMethodPath": "POST /api/v1/prompt-lab/templates",
+   "authorization": "member of tenant; team/tenant visibility needs admin",
+   "validation": "unique name per scope; non-empty user prompt",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-LAB-COMPARE-MODELS",
+   "entity": "PromptRun",
+   "action": "execute",
+   "surface": "MISSING on /app/prompt-lab",
+   "sourceFile": "src/lib/pages/product.ts",
+   "sourceLine": 221,
+   "currentBehaviour": "The empty-state copy says 'Test prompts against multiple models, compare responses' and the marketing page promises side-by-side comparison. The Lab holds exactly one model and one Result at a time.",
+   "requiredBehaviour": "Fan a single prompt out to N models and render results side by side with per-model cost and latency.",
+   "apiMethodPath": "POST /api/v1/prompt-lab/runs:compare",
+   "authorization": "member of tenant",
+   "validation": "1..N model ids, all entitled",
+   "sideEffect": "N LLM provider calls"
+  },
+  {
+   "id": "OP-VIBE-TOPNAV-SELECT",
+   "entity": "VibeCapability",
+   "action": "read",
+   "surface": "/app/build/vibe-studio — Progress | My Playbooks | Settings",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 38,
+   "currentBehaviour": "NO-OP. setActive(item.id) only restyles the button; the page body below is identical for all three. Three advertised sub-surfaces with zero implementation.",
+   "requiredBehaviour": "Real routes: build progress, saved playbooks, studio settings.",
+   "apiMethodPath": "n/a (should become routed tabs)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-MODEL-SELECT",
+   "entity": "VibeBuild",
+   "action": "update",
+   "surface": "/app/build/vibe-studio — model select",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 66,
+   "currentBehaviour": "setState local to the TopBar component. build() lives in the parent and never reads it, so choosing claude-opus-5 changes nothing at all. Options: 'Default · claude-sonnet-4-6', claude-opus-5, claude-sonnet-5, claude-haiku-4-5.",
+   "requiredBehaviour": "Lift to the build request and persist on VibeBuild.modelId.",
+   "apiMethodPath": "POST /api/v1/vibe/builds (body.modelId)",
+   "authorization": "member of tenant",
+   "validation": "model active and enabled for surface vibe_studio",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-CONTROLS-READ",
+   "entity": "CreditPoolPeriod",
+   "action": "read",
+   "surface": "/app/build/vibe-studio — '{n} AIU' and 'Claude · SaaS Key' chips",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 55,
+   "currentBehaviour": "Read-only chips. The first prints creditsUsed with the unit 'AIU' — every other surface calls the same number AI Credits. The second is the literal constant 'Claude · SaaS Key'; no BYO-key store exists.",
+   "requiredBehaviour": "One credit unit across the product; the key chip must reflect a real tenant provider-credential record.",
+   "apiMethodPath": "GET /api/v1/billing/credits, GET /api/v1/ai/provider-keys",
+   "authorization": "member of tenant; key detail admin-only",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-PROMPT-EDIT",
+   "entity": "VibeBuild",
+   "action": "update",
+   "surface": "/app/build/vibe-studio — build textarea",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 156,
+   "currentBehaviour": "setState; placeholder 'Design an investor pitch deck for a fintech'. Cleared implicitly by the build flow's artifact naming.",
+   "requiredBehaviour": "Draft persistence; submitted and stored verbatim on the build.",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "member of tenant",
+   "validation": "non-empty, max length",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-PROMPT-INGEST",
+   "entity": "OnboardingIntent",
+   "action": "read",
+   "surface": "/app/build/vibe-studio?prompt=…",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 110,
+   "currentBehaviour": "DEAD PATH. Reads params.get('prompt') to seed the textarea and then clears the query string. Verified by grep: nothing in the repository ever links to /app/build/vibe-studio?prompt= . The landing hero instead routes to /register?intent= and onboarding merely prints it.",
+   "requiredBehaviour": "Carry the captured intent through signup into the first build, or delete the dead parameter.",
+   "apiMethodPath": "GET /api/v1/onboarding/intent",
+   "authorization": "member of tenant",
+   "validation": "length cap; treat as untrusted text",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-BUILD-SUBMIT",
+   "entity": "VibeBuild",
+   "action": "execute",
+   "surface": "/app/build/vibe-studio — '→' submit",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 114,
+   "currentBehaviour": "Loops 4 fixed labels with setTimeout(450) each (1.8s total), calls spend(15) AND DISCARDS ITS RETURN VALUE, then addArtifact({name: toArtifactName(prompt), skill: capability.name, kind: capability.name}) writing to localStorage. The prompt itself is never stored. No build is performed and no artifact content is produced.",
+   "requiredBehaviour": "Create a VibeBuild, reserve credits (fail closed), run real build steps, persist the artifact and its first version, settle credits.",
+   "apiMethodPath": "POST /api/v1/vibe/builds",
+   "authorization": "member of tenant with vibe.build; credits available",
+   "validation": "non-empty prompt; capabilityId valid; idempotency key",
+   "sideEffect": "LLM/codegen pipeline (none today)"
+  },
+  {
+   "id": "OP-VIBE-CAPABILITY-BUILD",
+   "entity": "VibeBuild",
+   "action": "execute",
+   "surface": "/app/build/vibe-studio — 6 'Start from a capability' cards",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 227,
+   "currentBehaviour": "onPick calls build(item), whose first line is `if (!prompt.trim()) return`. With an empty prompt the card click does ABSOLUTELY NOTHING — no focus move, no message, no error. The section header says 'each opens its own workspace'; none of them opens anything.",
+   "requiredBehaviour": "Select the capability, focus the prompt, and only then build; or open the capability's own workspace as the copy claims.",
+   "apiMethodPath": "POST /api/v1/vibe/builds",
+   "authorization": "member of tenant; capability entitlement",
+   "validation": "prompt required — surface the requirement instead of silently returning",
+   "sideEffect": "LLM/codegen pipeline"
+  },
+  {
+   "id": "OP-VIBE-BUILD-PROGRESS",
+   "entity": "VibeBuild",
+   "action": "read",
+   "surface": "/app/build/vibe-studio — build step list",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 181,
+   "currentBehaviour": "Renders 4 constant labels with ○/◐/✓ markers driven by a setTimeout counter. 'Wiring tools + guardrails' and 'Snapshotting version 1' describe work that does not occur.",
+   "requiredBehaviour": "Stream real step status from the build job; allow cancel and show failures.",
+   "apiMethodPath": "GET /api/v1/vibe/builds/{id}",
+   "authorization": "build owner",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-ARTIFACT-CREATE",
+   "entity": "Artifact",
+   "action": "create",
+   "surface": "/app/build/vibe-studio — 'Build complete' panel",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1029,
+   "currentBehaviour": "Client crypto.randomUUID(); writes {name, skill, kind, version:1, status:'draft', createdAt} to the shared localStorage blob. No tenantId, no userId, no audit event, no content. Also flips the onboarding checklist 'Create your first agent' to done.",
+   "requiredBehaviour": "Server-created, tenant-scoped, audited artifact with its definition and version 1 snapshot.",
+   "apiMethodPath": "POST /api/v1/artifacts",
+   "authorization": "member of tenant with artifact.create",
+   "validation": "name 1..200; capabilityId valid",
+   "sideEffect": "audit event artifact.created"
+  },
+  {
+   "id": "OP-VIBE-ARTIFACT-PUBLISH",
+   "entity": "Artifact",
+   "action": "transition",
+   "surface": "/app/build/vibe-studio — 'Publish to tenant'",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1046,
+   "currentBehaviour": "Maps the array, sets status:'published' and version+1 IN PLACE. No snapshot row, no publishedAt, no publishedBy, NO PERMISSION CHECK, no audit event, no notification. Re-publish is prevented only by a disabled attribute on the button.",
+   "requiredBehaviour": "Check the app-publish permission server-side, write an immutable ArtifactVersion, stamp publisher and time, emit audit + notification, and support rollback.",
+   "apiMethodPath": "POST /api/v1/artifacts/{id}/publish",
+   "authorization": "tenant admin with app.publish — currently enforced nowhere",
+   "validation": "artifact must be draft; optimistic concurrency on version",
+   "sideEffect": "audit event artifact.published"
+  },
+  {
+   "id": "OP-VIBE-BUILD-ANOTHER",
+   "entity": "VibeBuild",
+   "action": "update",
+   "surface": "/app/build/vibe-studio — 'Build another'",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "setPhase('idle') only. It does NOT clear the prompt or reset builtId, so the previous prompt stays in the box.",
+   "requiredBehaviour": "Reset the composer to a clean state.",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-ARTIFACT-LIST",
+   "entity": "Artifact",
+   "action": "list",
+   "surface": "/app/build/vibe-studio — 'Your artifacts'",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 236,
+   "currentBehaviour": "Renders every artifact in localStorage, newest first, showing name, skill, version and status. No paging, no filter, no search, no open, no delete, no rename.",
+   "requiredBehaviour": "Paged tenant-scoped list with open/rename/archive and a version history view.",
+   "apiMethodPath": "GET /api/v1/artifacts?page=",
+   "authorization": "member of tenant; scoped to tenant",
+   "validation": "paging",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-ARTIFACT-OPEN",
+   "entity": "Artifact",
+   "action": "read",
+   "surface": "MISSING — artifact rows are not interactive",
+   "sourceFile": "src/screens/app/VibeStudio.tsx",
+   "sourceLine": 237,
+   "currentBehaviour": "Each <li> is plain text. Copy promises 'Refine it in conversation, edit the graph by hand' — neither control exists.",
+   "requiredBehaviour": "Open an artifact detail/editor surface.",
+   "apiMethodPath": "GET /api/v1/artifacts/{id}",
+   "authorization": "member of tenant",
+   "validation": "artifact in tenant",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIBE-ARTIFACT-ROLLBACK",
+   "entity": "ArtifactVersion",
+   "action": "transition",
+   "surface": "MISSING",
+   "sourceFile": "src/lib/pages/product.ts",
+   "sourceLine": 34,
+   "currentBehaviour": "Marketing promises 'roll back to any earlier version in one click'. publishArtifact only increments a counter, so there is no earlier version to return to.",
+   "requiredBehaviour": "Roll back to a chosen published version, creating a new version row.",
+   "apiMethodPath": "POST /api/v1/artifacts/{id}/rollback",
+   "authorization": "tenant admin with app.publish",
+   "validation": "target version exists and was published",
+   "sideEffect": "audit event artifact.rolled_back"
+  },
+  {
+   "id": "OP-STUDIO-WS-OPEN",
+   "entity": "StudioWorkspace",
+   "action": "read",
+   "surface": "/studio AND /studio/workspace/[workspaceId]/home",
+   "sourceFile": "src/app/studio/workspace/[workspaceId]/home/page.tsx",
+   "sourceLine": 1,
+   "currentBehaviour": "Two routes render the identical component. The [workspaceId] segment is never read (no useParams in src/screens/studio/AgentStudio.tsx), so any string in that position yields the same page. Both are wrapped in Protected requireOnboarding; unlike /app/*, this route is OUTSIDE AppShell, so it has no sidebar, no top bar and no Copilot dock.",
+   "requiredBehaviour": "Resolve the workspace, authorize membership, 404 on unknown, and scope every child query to it. Collapse the duplicate route or make /studio redirect to the default workspace.",
+   "apiMethodPath": "GET /api/v1/studio/workspaces/{workspaceId}",
+   "authorization": "member of the workspace's tenant",
+   "validation": "uuid, exists, not archived",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-NAV-PRIMARY",
+   "entity": "StudioNavItem",
+   "action": "read",
+   "surface": "/studio sidebar — Build, Search",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 41,
+   "currentBehaviour": "onSelect(label) sets a local `active` string used only for highlighting. The main region always renders the Build home. 'Search' is a dead destination.",
+   "requiredBehaviour": "Route to real Build and Search surfaces.",
+   "apiMethodPath": "n/a (should be routes)",
+   "authorization": "workspace member",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-NAV-GROUP-TOGGLE",
+   "entity": "StudioNavItem",
+   "action": "update",
+   "surface": "/studio sidebar — Library / Data / Operations headers",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 66,
+   "currentBehaviour": "Adds/removes the group id in a local collapsed[] array. Not persisted; resets on reload.",
+   "requiredBehaviour": "Persist the collapse preference per user (local storage is acceptable for this one).",
+   "apiMethodPath": "n/a (client preference)",
+   "authorization": "workspace member",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-NAV-ITEM-SELECT",
+   "entity": "StudioNavItem",
+   "action": "read",
+   "surface": "/studio sidebar — Agents, Activity, Knowledge, Tables, Files, Schedules, Logs",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 91,
+   "currentBehaviour": "Seven destinations, all setState-only. None changes the page. 'Agents' carries a hardcoded badge of '1' that is derived from nothing.",
+   "requiredBehaviour": "Seven real surfaces (agent library, run activity, knowledge bases, data tables, files, schedules, logs) with live counts.",
+   "apiMethodPath": "GET /api/v1/studio/workspaces/{id}/{agents|activity|knowledge|tables|files|schedules|logs}",
+   "authorization": "workspace member; per-surface scopes",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-SEARCH",
+   "entity": "AgentDefinition",
+   "action": "list",
+   "surface": "/studio header — 'Search agents, tables, logs...'",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 267,
+   "currentBehaviour": "An <input> with a placeholder and an aria-label and NO value, NO onChange and NO form. Typing in it does nothing; it is a decorative control.",
+   "requiredBehaviour": "Federated search across agents, tables and logs in the workspace.",
+   "apiMethodPath": "GET /api/v1/studio/workspaces/{id}/search?q=",
+   "authorization": "workspace member",
+   "validation": "q length; debounce",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-THEME-TOGGLE",
+   "entity": "StudioWorkspace",
+   "action": "update",
+   "surface": "/studio header — ☀/☾",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 276,
+   "currentBehaviour": "Calls useTheme().toggle — this one genuinely works and persists via the theme provider.",
+   "requiredBehaviour": "unchanged",
+   "apiMethodPath": "n/a (client preference)",
+   "authorization": "any authenticated user",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-HELP",
+   "entity": "StudioWorkspace",
+   "action": "read",
+   "surface": "/studio header — '?'",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 283,
+   "currentBehaviour": "Opens an inline role=dialog panel with static prose. Not a modal, no focus trap, no Escape handler.",
+   "requiredBehaviour": "Accessible dialog with focus management, or a docs link.",
+   "apiMethodPath": "n/a (static content)",
+   "authorization": "workspace member",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-PROMPT-EDIT",
+   "entity": "AgentDefinition",
+   "action": "update",
+   "surface": "/studio — build composer",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 314,
+   "currentBehaviour": "setState; placeholder 'Ask Apragya to find and track leads...'. The submit button is disabled while empty.",
+   "requiredBehaviour": "Draft persistence; submitted verbatim.",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "workspace member",
+   "validation": "non-empty, max length",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-ATTACH-ADD",
+   "entity": "BuildAttachment",
+   "action": "create",
+   "surface": "/studio composer — '+' and '📎' (both open the same picker)",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 328,
+   "currentBehaviour": "Reads only File.name into a string[], then resets the input value. No upload, no size check, no MIME check, no bytes read. Two visually distinct buttons ('Add context' and 'Attach a file') invoke the identical handler.",
+   "requiredBehaviour": "Authorized presigned upload with MIME/size validation and scanning; attach by id to the build.",
+   "apiMethodPath": "POST /api/v1/files:presign then POST /api/v1/studio/builds/{id}/attachments",
+   "authorization": "workspace member with file.upload",
+   "validation": "MIME allowlist, size cap, count cap, virus scan",
+   "sideEffect": "object-store write (none today)"
+  },
+  {
+   "id": "OP-STUDIO-ATTACH-REMOVE",
+   "entity": "BuildAttachment",
+   "action": "delete",
+   "surface": "/studio composer — '×' on an attachment chip",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 370,
+   "currentBehaviour": "Filters the name out of local state by index. Duplicate filenames are keyed `${name}-${index}` and removal by index is correct, but nothing exists to delete.",
+   "requiredBehaviour": "Delete the uploaded object and its row.",
+   "apiMethodPath": "DELETE /api/v1/studio/builds/{id}/attachments/{attachmentId}",
+   "authorization": "uploader or workspace admin",
+   "validation": "attachment belongs to the build",
+   "sideEffect": "object-store delete"
+  },
+  {
+   "id": "OP-STUDIO-BUILD-SUBMIT",
+   "entity": "Run",
+   "action": "create",
+   "surface": "/studio — '↑' send",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 300,
+   "currentBehaviour": "Calls recordRun({agent: prompt.slice(0,60), source:'Agent Studio'}), which fabricates a COMPLETED SUCCESSFUL run from the shared sampleTrace (6 credits, 3260ms, status 'success'), charges 6 credits, writes an audit row, then clears the prompt and attachments. NO AGENT IS CREATED. The confirmation claims the request is 'queued'.",
+   "requiredBehaviour": "Create an AgentDefinition draft (or a queued build job) from the prompt plus attachments; runs appear only when the agent actually executes.",
+   "apiMethodPath": "POST /api/v1/studio/workspaces/{id}/agents",
+   "authorization": "workspace member with agent.create",
+   "validation": "non-empty prompt; attachment ids owned by caller; idempotency key",
+   "sideEffect": "build pipeline (none today); today it writes a fake run + audit event"
+  },
+  {
+   "id": "OP-STUDIO-OPEN-RUNS",
+   "entity": "Run",
+   "action": "list",
+   "surface": "/studio — 'Open Runs' link in the confirmation",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 385,
+   "currentBehaviour": "Navigates to /app/runs, which leaves the studio shell entirely and re-enters AppShell.",
+   "requiredBehaviour": "Link to the run inside the studio's own Activity/Logs surface.",
+   "apiMethodPath": "GET /api/v1/runs?agentId=",
+   "authorization": "workspace member",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-TEMPLATE-CATEGORY",
+   "entity": "StudioTemplateCategory",
+   "action": "read",
+   "surface": "/studio — 7 template category cards",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 421,
+   "currentBehaviour": "setCategory(item) swaps the right-hand panel. Each card prints '{count} templates' from a hardcoded number that exceeds the array length in 6 of 7 cases (82 advertised vs 25 present).",
+   "requiredBehaviour": "Server-supplied categories whose counts are the real row counts.",
+   "apiMethodPath": "GET /api/v1/studio/template-categories",
+   "authorization": "workspace member",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-TEMPLATE-APPLY",
+   "entity": "StudioWorkflowTemplate",
+   "action": "read",
+   "surface": "/studio — 25 workflow tiles",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 465,
+   "currentBehaviour": "setPrompt(workflow.name) — overwrites whatever is in the composer with the template's 2-3 word TITLE (e.g. 'Lead qualifier'), not a prompt. The panel caption promises 'click one to prefill your prompt'. It also does not scroll the composer into view, so on a small viewport the click appears to do nothing.",
+   "requiredBehaviour": "Insert the template's real prompt text (and its graph definition), warn on overwrite, and focus the composer.",
+   "apiMethodPath": "GET /api/v1/studio/templates/{id}",
+   "authorization": "workspace member",
+   "validation": "template exists and is active",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-HEALTH-READ",
+   "entity": "Run",
+   "action": "read",
+   "surface": "/studio — 'Agent Health' panel",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 127,
+   "currentBehaviour": "passing = success/total of the localStorage runs array — but recordRun only ever writes status 'success', so it is always 100% (or 0% with no runs). avgLatency averages run.ms, which is always 3260, so it always reads '3.3s'. 'Active agents' is the hardcoded string '1'. The 'Last 30 days' chip is decorative: no date filter is applied, and the array is capped at the last 25 runs regardless.",
+   "requiredBehaviour": "Aggregate real run outcomes over an explicit window; active agents from the agent table.",
+   "apiMethodPath": "GET /api/v1/studio/workspaces/{id}/health?window=30d",
+   "authorization": "workspace member",
+   "validation": "window in an allowed set",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-ACTIVITY-CHART",
+   "entity": "Run",
+   "action": "read",
+   "surface": "/studio — 'Recent Activity' / 'Runs per day across all agents'",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 494,
+   "currentBehaviour": "Renders seven empty flex columns containing only the day letters M T W T F S S. There are no bars, no values and no data binding of any kind — a titled chart with no chart in it.",
+   "requiredBehaviour": "Real per-day run counts for the selected window.",
+   "apiMethodPath": "GET /api/v1/studio/workspaces/{id}/activity?window=7d",
+   "authorization": "workspace member",
+   "validation": "window allowed",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-CALENDAR-NAV",
+   "entity": "StudioWorkspace",
+   "action": "read",
+   "surface": "/studio — mini calendar ‹ ›",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 189,
+   "currentBehaviour": "Local Date cursor; renders a fixed 35-cell grid and highlights today. Purely decorative — no schedules, runs or events are plotted on it, despite sitting beside a Schedules nav item.",
+   "requiredBehaviour": "Bind to scheduled jobs and run history for the workspace.",
+   "apiMethodPath": "GET /api/v1/studio/workspaces/{id}/schedule?month=",
+   "authorization": "workspace member",
+   "validation": "month format",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-STUDIO-ACCOUNT-NAV",
+   "entity": "StudioWorkspace",
+   "action": "read",
+   "surface": "/studio sidebar footer and header",
+   "sourceFile": "src/screens/studio/AgentStudio.tsx",
+   "sourceLine": 23,
+   "currentBehaviour": "Three plain navigations: the user tile → /app/account, 'Settings' → /app/setup, '←' → /app. All leave the studio shell.",
+   "requiredBehaviour": "unchanged, or studio-scoped settings.",
+   "apiMethodPath": "n/a (client navigation)",
+   "authorization": "authenticated",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CANVAS-OPEN",
+   "entity": "AgentDefinition",
+   "action": "read",
+   "surface": "/app/build/agent-studio",
+   "sourceFile": "src/app/app/build/agent-studio/page.tsx",
+   "sourceLine": 1,
+   "currentBehaviour": "ORPHANED ROUTE. Verified by grep: no nav item, tile or link anywhere points to it — the sidebar's 'Agent Studio' (appNav.ts:35) and the dashboard builder tile (appData.ts:174) both point at /studio. Reachable only by typing the URL. This is the second, incompatible Agent Studio implementation.",
+   "requiredBehaviour": "Decide: fold the canvas into the studio as an agent-detail view, or link and finish it. Two studios with divergent data models cannot both ship.",
+   "apiMethodPath": "GET /api/v1/studio/agents/{id}/graph",
+   "authorization": "workspace member",
+   "validation": "agent exists in tenant",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CANVAS-TAB-SELECT",
+   "entity": "AgentDefinition",
+   "action": "read",
+   "surface": "/app/build/agent-studio — Canvas | Tests | Runs",
+   "sourceFile": "src/screens/app/AgentStudio.tsx",
+   "sourceLine": 58,
+   "currentBehaviour": "Local tab state; not reflected in the URL, so a tab cannot be linked to or restored on refresh (every other app surface uses ?tab=).",
+   "requiredBehaviour": "Query-param tabs consistent with the rest of the app.",
+   "apiMethodPath": "n/a (routed tab)",
+   "authorization": "workspace member",
+   "validation": "tab in allowed set",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CANVAS-NODE-SELECT",
+   "entity": "AgentNode",
+   "action": "read",
+   "surface": "/app/build/agent-studio — 6 node buttons",
+   "sourceFile": "src/screens/app/AgentStudio.tsx",
+   "sourceLine": 78,
+   "currentBehaviour": "setSelected(id) against the module-constant canvasNodes (default selection is index 2, 'Reason'). Nodes cannot be added, removed, reordered or connected; the 'canvas' is a vertical ordered list with a dotted background image.",
+   "requiredBehaviour": "Load the agent's real graph; select a node to edit it.",
+   "apiMethodPath": "GET /api/v1/studio/agents/{id}/nodes",
+   "authorization": "workspace member",
+   "validation": "node belongs to the agent",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CANVAS-INSPECTOR-READ",
+   "entity": "AgentNode",
+   "action": "read",
+   "surface": "/app/build/agent-studio — Inspector panel",
+   "sourceFile": "src/screens/app/AgentStudio.tsx",
+   "sourceLine": 102,
+   "currentBehaviour": "Shows the selected node's label and kind, then three CONSTANT rows identical for every node: Model 'Auto-routed · best for task', Guardrails 'Content filter · approval cap', On failure 'Pause for human review'. Nothing is editable.",
+   "requiredBehaviour": "Per-node editable config persisted to AgentNode.config, including the model, guardrail bindings and failure policy.",
+   "apiMethodPath": "PATCH /api/v1/studio/agents/{id}/nodes/{nodeId}",
+   "authorization": "workspace member with agent.edit",
+   "validation": "config schema per node type",
+   "sideEffect": "audit event agent.node.updated"
+  },
+  {
+   "id": "OP-CANVAS-TESTRUN",
+   "entity": "Run",
+   "action": "execute",
+   "surface": "/app/build/agent-studio — 'Run test'",
+   "sourceFile": "src/screens/app/AgentStudio.tsx",
+   "sourceLine": 33,
+   "currentBehaviour": "setTimeout(900), then recordRun({agent: agents[0]?.agent ?? 'Untitled agent', source:'Agent Studio test'}), then navigate('/app/runs'). The agent name comes from the FIRST agent of the first installed marketplace app — not from the canvas being edited — so the recorded run is attributed to an unrelated agent. Charges 6 credits and writes an audit row.",
+   "requiredBehaviour": "Execute the edited agent against a test input, persist a real run with real steps, and stay on the page to show the result.",
+   "apiMethodPath": "POST /api/v1/studio/agents/{id}/test-runs",
+   "authorization": "workspace member with agent.test",
+   "validation": "agent has a runnable graph; test input required",
+   "sideEffect": "LLM/tool calls; credit spend"
+  },
+  {
+   "id": "OP-CANVAS-TESTS-LIST",
+   "entity": "AgentTest",
+   "action": "list",
+   "surface": "/app/build/agent-studio — Tests tab",
+   "sourceFile": "src/screens/app/AgentStudio.tsx",
+   "sourceLine": 132,
+   "currentBehaviour": "Four inline literals with a fixed pass/fail. Nothing executes them; the one permanent 'fail' ('Rejects a lead with no contactable email') blocks nothing despite the copy 'Tests run as part of the build gate'. No add, edit, delete or run control.",
+   "requiredBehaviour": "CRUD golden tests, execute them, persist results, and enforce the publish gate.",
+   "apiMethodPath": "GET/POST /api/v1/studio/agents/{id}/tests; POST /api/v1/studio/agents/{id}/tests:run",
+   "authorization": "workspace member with agent.test",
+   "validation": "input/expectation schema",
+   "sideEffect": "LLM/tool calls on execution"
+  },
+  {
+   "id": "OP-CANVAS-RUNS-NAV",
+   "entity": "Run",
+   "action": "list",
+   "surface": "/app/build/agent-studio — Runs tab",
+   "sourceFile": "src/screens/app/AgentStudio.tsx",
+   "sourceLine": 152,
+   "currentBehaviour": "The whole tab is one sentence plus a button that navigates to /app/runs. It renders no runs itself. Note this is a <button> inside body text, not a link — no middle-click, no copy-link.",
+   "requiredBehaviour": "Embed the agent's own run list, filtered to this agent.",
+   "apiMethodPath": "GET /api/v1/runs?agentId={id}",
+   "authorization": "workspace member",
+   "validation": "paging",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CANVAS-DEPLOY",
+   "entity": "AgentDefinition",
+   "action": "transition",
+   "surface": "MISSING on /app/build/agent-studio",
+   "sourceFile": "src/screens/app/AgentStudio.tsx",
+   "sourceLine": 117,
+   "currentBehaviour": "The Inspector states 'Deploy publishes an immutable snapshot. In-flight runs finish on the previous version; new runs pick up the new one.' There is no Deploy control on the page, and the public page advertises 'One-Click Deploy'.",
+   "requiredBehaviour": "Publish an immutable agent version; route new runs to it while in-flight runs finish on the prior one.",
+   "apiMethodPath": "POST /api/v1/studio/agents/{id}/publish",
+   "authorization": "tenant admin with agent.publish",
+   "validation": "all blocking tests pass; graph valid",
+   "sideEffect": "audit event agent.published"
+  },
+  {
+   "id": "OP-AGENT-CATALOG-LIST",
+   "entity": "CatalogAgent",
+   "action": "list",
+   "surface": "/app/agent-portal (filter All / Enterprise Agents)",
+   "sourceFile": "src/screens/app/AgentPortal.tsx",
+   "sourceLine": 160,
+   "currentBehaviour": "Renders all 60 catalogue agents grouped by their 14 bundles from a static import. Bundle FIN's 3 agents show 'Ships with Finance & Accounting — install the app to run it' for an app that does not exist in the marketplace, so they are permanently unrunnable.",
+   "requiredBehaviour": "GET tenant-visible agents with real install/enable state; resolve or remove the FIN bundle.",
+   "apiMethodPath": "GET /api/v1/agents?scope=catalog",
+   "authorization": "member of tenant",
+   "validation": "paging",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-AGENT-CATALOG-SEARCH",
+   "entity": "CatalogAgent",
+   "action": "list",
+   "surface": "/app/agent-portal search box",
+   "sourceFile": "src/screens/app/AgentPortal.tsx",
+   "sourceLine": 165,
+   "currentBehaviour": "Client-side substring match over `${name} ${blurb} ${groupName}` lowercased; empty groups are dropped. Works, but only over the 60 static rows.",
+   "requiredBehaviour": "Server-side search with the same fields.",
+   "apiMethodPath": "GET /api/v1/agents?q=",
+   "authorization": "member of tenant",
+   "validation": "q length",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-AGENT-CATALOG-FILTER",
+   "entity": "CatalogAgent",
+   "action": "list",
+   "surface": "/app/agent-portal — 7 filter chips",
+   "sourceFile": "src/screens/app/AgentPortal.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "Only 'All'/'Enterprise Agents' show data and only 'Recent Runs' shows runs. 'Business Solution Agents', 'Agents', 'Workflows' and 'Automations' each render the SAME static EmptyFilter ('No {label} yet') regardless of tenant state — four permanently empty surfaces.",
+   "requiredBehaviour": "Four real collections, or remove the chips.",
+   "apiMethodPath": "GET /api/v1/agents?kind=business_solution|custom|workflow|automation",
+   "authorization": "member of tenant",
+   "validation": "kind in allowed set",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-AGENT-RUN",
+   "entity": "Run",
+   "action": "execute",
+   "surface": "/app/agent-portal — 'Run' on an installed agent card",
+   "sourceFile": "src/screens/app/AgentPortal.tsx",
+   "sourceLine": 268,
+   "currentBehaviour": "recordRun({agent: agent.name, source: group.name}) — instantly fabricates a completed successful run from sampleTrace, charges 6 credits and increments the card's run counter. No confirmation, no input, no latency, no failure path. The run's identity is the agent's DISPLAY NAME.",
+   "requiredBehaviour": "Queue a real run against the installed agent with its required input; show queued/running/failed states.",
+   "apiMethodPath": "POST /api/v1/agents/{agentId}/runs",
+   "authorization": "member of tenant; app installed and agent enabled",
+   "validation": "agent installed; required inputs present; idempotency key",
+   "sideEffect": "LLM/tool calls; credit spend"
+  },
+  {
+   "id": "OP-AGENT-RUNCOUNT-READ",
+   "entity": "Run",
+   "action": "read",
+   "surface": "/app/agent-portal — '{n} runs' per card",
+   "sourceFile": "src/screens/app/AgentPortal.tsx",
+   "sourceLine": 153,
+   "currentBehaviour": "Builds a Map keyed by run.agent (a display string) over the capped 25-run array — so counts silently decay as older runs are evicted, and any agent rename resets its count to zero.",
+   "requiredBehaviour": "Server-side count per agent id over full history.",
+   "apiMethodPath": "GET /api/v1/agents/{agentId}/runs:count",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-RUN-LIST",
+   "entity": "Run",
+   "action": "list",
+   "surface": "/app/runs",
+   "sourceFile": "src/screens/app/Runs.tsx",
+   "sourceLine": 16,
+   "currentBehaviour": "Renders the localStorage runs array, newest first, capped at 25 by recordRun's .slice(0,25) — older runs are silently and permanently discarded. No filter, no search, no date range, no paging.",
+   "requiredBehaviour": "Paged, filterable tenant-scoped run history with retention policy.",
+   "apiMethodPath": "GET /api/v1/runs?agentId=&status=&from=&to=&page=",
+   "authorization": "member of tenant",
+   "validation": "paging; date range",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-RUN-TRACE-READ",
+   "entity": "RunStep",
+   "action": "read",
+   "surface": "/app/runs — expand a run",
+   "sourceFile": "src/screens/app/Runs.tsx",
+   "sourceLine": 72,
+   "currentBehaviour": "Expands to the six steps of the shared sampleTrace — every run in the system shows the identical trace, including the same lead #4821, the same 'Assigned to Priya S.' and the same token counts. The page's own copy is 'Nothing runs silently.'",
+   "requiredBehaviour": "Per-run persisted steps with real payloads, and replay.",
+   "apiMethodPath": "GET /api/v1/runs/{id}/steps",
+   "authorization": "member of tenant",
+   "validation": "run in tenant",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-COPILOT-TOGGLE",
+   "entity": "CopilotThread",
+   "action": "read",
+   "surface": "floating ✨ button on every /app/* page",
+   "sourceFile": "src/components/CopilotDock.tsx",
+   "sourceLine": 94,
+   "currentBehaviour": "Toggles local open state. Mounted in AppShell, so it is absent from /studio and from every public page.",
+   "requiredBehaviour": "unchanged, plus presence on the studio shell if the Copilot is meant to be global.",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-COPILOT-OPEN-EVENT",
+   "entity": "CopilotThread",
+   "action": "update",
+   "surface": "/app/sales-pos settings — 'Open Copilot'",
+   "sourceFile": "src/components/CopilotDock.tsx",
+   "sourceLine": 20,
+   "currentBehaviour": "window CustomEvent 'apragya:copilot' raises the dock. The event carries NO payload, so the copilot receives none of the context the POS panel just promised ('add a field for the customer's region' etc.). Only one dispatcher exists (pos/settings.tsx:879).",
+   "requiredBehaviour": "Pass surface + record context so the copilot can act on it.",
+   "apiMethodPath": "POST /api/v1/copilot/threads (body.context)",
+   "authorization": "member of tenant",
+   "validation": "context schema; caller must have access to the referenced record",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-COPILOT-ASK",
+   "entity": "CopilotMessage",
+   "action": "create",
+   "surface": "Copilot dock — 'Ask or instruct…'",
+   "sourceFile": "src/components/CopilotDock.tsx",
+   "sourceLine": 26,
+   "currentBehaviour": "NO DELAY AND NO NETWORK. setFlag('usedCopilot') (which ticks the onboarding checklist), spend(2), then synchronously appends a canned paragraph. The seeded greeting invites 'install the Contracts app' and 'who approved invoice 4821?' — the dock can do neither; it has no tools, no record access and no approval path.",
+   "requiredBehaviour": "Persist the turn, run a real tool-using agent against tenant records, gate consequential actions behind an approval, audit every action.",
+   "apiMethodPath": "POST /api/v1/copilot/threads/{id}/messages",
+   "authorization": "member of tenant; tool calls re-checked against the caller's own permissions",
+   "validation": "non-empty; max length; every proposed action authorized independently",
+   "sideEffect": "LLM + tool calls against tenant data (none today); credit spend"
+  },
+  {
+   "id": "OP-COPILOT-CREDITS-READ",
+   "entity": "CreditPoolPeriod",
+   "action": "read",
+   "surface": "Copilot dock header — '{n} credits left'",
+   "sourceFile": "src/components/CopilotDock.tsx",
+   "sourceLine": 52,
+   "currentBehaviour": "Reads creditsLeft from localStorage and formats with toLocaleString().",
+   "requiredBehaviour": "Server balance.",
+   "apiMethodPath": "GET /api/v1/billing/credits",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-COPILOT-HISTORY",
+   "entity": "CopilotThread",
+   "action": "list",
+   "surface": "MISSING",
+   "sourceFile": "src/components/CopilotDock.tsx",
+   "sourceLine": 11,
+   "currentBehaviour": "The thread is one useState array re-seeded on every mount. Closing the dock keeps it (AppShell stays mounted) but a reload or a full page navigation loses everything. No history control exists.",
+   "requiredBehaviour": "Persisted threads with history and per-user scoping.",
+   "apiMethodPath": "GET /api/v1/copilot/threads",
+   "authorization": "own threads",
+   "validation": "paging",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIPPY-TOGGLE",
+   "entity": "VippyConversation",
+   "action": "read",
+   "surface": "public pages — '✦ Ask Vippy anything' pill and 💬 bubble",
+   "sourceFile": "src/components/VippyWidget.tsx",
+   "sourceLine": 74,
+   "currentBehaviour": "Two separate controls open the same panel; the pill is hidden below the sm breakpoint. Rendered by SiteLayout on every marketing page.",
+   "requiredBehaviour": "unchanged",
+   "apiMethodPath": "n/a (client state)",
+   "authorization": "anonymous",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-VIPPY-SEND",
+   "entity": "VippyConversation",
+   "action": "create",
+   "surface": "public pages — Vippy composer",
+   "sourceFile": "src/components/VippyWidget.tsx",
+   "sourceLine": 13,
+   "currentBehaviour": "Synchronously pushes the visitor's text and a canned reply that echoes it back inside curly quotes. No delay, no network, no credits, no rate limit, no persistence. Because the user's raw text is interpolated into the reply, it is the one place in this domain where untrusted input is reflected straight back into the DOM (React escapes it today, but the pattern must not survive into a server-rendered answer).",
+   "requiredBehaviour": "Rate-limited unauthenticated endpoint answering from public docs only, with abuse protection, retention limits and no tenant data.",
+   "apiMethodPath": "POST /api/v1/public/vippy/messages",
+   "authorization": "anonymous; IP + token bucket rate limit; CAPTCHA-free abuse controls",
+   "validation": "non-empty; max length; never echo unescaped input; no tenant data in scope",
+   "sideEffect": "LLM provider call (none today)"
+  },
+  {
+   "id": "OP-CREDITS-SPEND",
+   "entity": "CreditLedgerEntry",
+   "action": "create",
+   "surface": "every run/ask/build in this domain",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1020,
+   "currentBehaviour": "`if (creditsLeft < credits) return false; update(prev => ({...prev, creditsUsed: prev.creditsUsed + credits})); return true` — a read-then-write over React state persisted to localStorage. Not atomic (two tabs both pass the check), no ledger row, no reservation, no refund when the call fails, and spend(0) always returns true so zero-cost tools bypass the check entirely. creditsUsed never resets, so the 'monthly' 1000 is a lifetime cap.",
+   "requiredBehaviour": "Atomic reserve → settle/refund against an append-only ledger, keyed by idempotency key, inside the same transaction as the work it funds.",
+   "apiMethodPath": "internal service: credits.reserve / credits.settle / credits.refund",
+   "authorization": "server-side only; never trusted from the client",
+   "validation": "amount > 0; sufficient balance under row lock; idempotency key unique",
+   "sideEffect": "ledger write + audit event"
+  },
+  {
+   "id": "OP-CHECKLIST-COPILOT-FLAG",
+   "entity": "CreditPoolPeriod",
+   "action": "update",
+   "surface": "onboarding checklist — 'Try the AI Copilot'",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1086,
+   "currentBehaviour": "setFlag('usedCopilot') fires on the first Copilot ask and permanently ticks the checklist item, even though the ask performed nothing.",
+   "requiredBehaviour": "Derive completion from a real persisted Copilot message.",
+   "apiMethodPath": "GET /api/v1/onboarding/checklist",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-CHECKLIST-AGENT-FLAG",
+   "entity": "Artifact",
+   "action": "read",
+   "surface": "onboarding checklist — 'Create your first agent'",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 2185,
+   "currentBehaviour": "done = state.artifacts.length > 0 and the task links to /app/build/vibe-studio — so ANY Vibe artifact (a web app, a deck, an RPA bot) marks 'Create your first agent' complete, and creating an agent in either Agent Studio does not.",
+   "requiredBehaviour": "Tick on a real agent record, and point the task at the surface that creates one.",
+   "apiMethodPath": "GET /api/v1/onboarding/checklist",
+   "authorization": "member of tenant",
+   "validation": "none",
+   "sideEffect": "none"
+  }
+ ],
+ "surfaces": [
+  {
+   "route": "/app/business",
+   "screenFile": "src/screens/app/business/Suite.tsx",
+   "title": "Business Suite home",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "loaded",
+    "personalised greeting with fallback"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "empty",
+    "denied",
+    "per-tenant entitlement"
+   ]
+  },
+  {
+   "route": "/app/business?category={id}",
+   "tab": "writing | social | marketing | business | creative | development | productivity | data | education | image",
+   "screenFile": "src/screens/app/business/Suite.tsx",
+   "title": "Suite category (10 tabs, 102 tools)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "loaded",
+    "unknown-category message"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "404 status",
+    "paging",
+    "search",
+    "denied"
+   ]
+  },
+  {
+   "route": "/app/business/tool/[slug]",
+   "screenFile": "src/screens/app/business/Tool.tsx",
+   "title": "Suite tool runner (102 slugs, one shared shell)",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "idle",
+    "running (button loading)",
+    "success (canned)",
+    "insufficient-credits (same styling as success)"
+   ],
+   "statesMissing": [
+    "real output",
+    "error",
+    "cancel",
+    "run history",
+    "per-tool input form",
+    "denied",
+    "404 for unknown slug (silently redirects)"
+   ]
+  },
+  {
+   "route": "/app/business/chat",
+   "screenFile": "src/screens/app/business/Chat.tsx",
+   "title": "AI chat",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "empty with 6 suggestions",
+    "thinking",
+    "message list",
+    "insufficient-credits"
+   ],
+   "statesMissing": [
+    "persistence",
+    "session list/resume",
+    "streaming",
+    "error",
+    "retry",
+    "stop",
+    "export",
+    "denied"
+   ]
+  },
+  {
+   "route": "/app/prompt-lab",
+   "screenFile": "src/screens/app/PromptLab.tsx",
+   "title": "Prompt Lab",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "empty",
+    "running",
+    "result (fabricated metering)",
+    "insufficient-credits"
+   ],
+   "statesMissing": [
+    "save template",
+    "template CRUD",
+    "variable binding",
+    "multi-model compare",
+    "run history",
+    "error",
+    "cancel",
+    "input validation"
+   ]
+  },
+  {
+   "route": "/app/build/vibe-studio",
+   "screenFile": "src/screens/app/VibeStudio.tsx",
+   "title": "Vibe Studio",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "idle",
+    "building (4 fake steps)",
+    "done",
+    "artifact list",
+    "published badge"
+   ],
+   "statesMissing": [
+    "failure",
+    "cancel",
+    "artifact open/rename/delete",
+    "version history",
+    "rollback",
+    "publish permission check",
+    "Progress/Playbooks/Settings tabs (all no-op)",
+    "empty-prompt feedback on capability cards"
+   ]
+  },
+  {
+   "route": "/app/build/agent-studio",
+   "screenFile": "src/screens/app/AgentStudio.tsx",
+   "title": "Agent Studio canvas (ORPHANED — nothing links here)",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "canvas node list",
+    "node selection",
+    "static inspector",
+    "static tests",
+    "runs pointer"
+   ],
+   "statesMissing": [
+    "reachable entry point",
+    "load a real agent",
+    "add/remove/connect nodes",
+    "editable inspector",
+    "execute tests",
+    "deploy",
+    "error",
+    "empty",
+    "denied"
+   ]
+  },
+  {
+   "route": "/studio",
+   "screenFile": "src/screens/studio/AgentStudio.tsx",
+   "title": "Agent Studio workspace (the linked one)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "build composer",
+    "attachment chips",
+    "sent confirmation",
+    "help panel",
+    "template browser",
+    "agent health (from local runs)",
+    "calendar",
+    "theme toggle"
+   ],
+   "statesMissing": [
+    "agent creation",
+    "9 sidebar destinations",
+    "working search",
+    "real attachments",
+    "activity chart data",
+    "failure",
+    "denied",
+    "empty-workspace state"
+   ]
+  },
+  {
+   "route": "/studio/workspace/[workspaceId]/home",
+   "screenFile": "src/screens/studio/AgentStudio.tsx",
+   "title": "Agent Studio workspace by id — DUPLICATE of /studio, workspaceId ignored",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "identical render to /studio"
+   ],
+   "statesMissing": [
+    "workspace resolution",
+    "404 for unknown id",
+    "authorization against the workspace",
+    "any scoping at all"
+   ]
+  },
+  {
+   "route": "/app/agent-portal",
+   "screenFile": "src/screens/app/AgentPortal.tsx",
+   "title": "Agent Portal (consumer of agentCatalog: 60 agents, 14 bundles)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "catalogue list",
+    "search + no-match",
+    "installed vs not-installed card",
+    "recent runs",
+    "empty runs"
+   ],
+   "statesMissing": [
+    "4 filter chips that are permanently empty",
+    "real execution",
+    "run input",
+    "failure",
+    "paging",
+    "FIN bundle has no installable app"
+   ]
+  },
+  {
+   "route": "/app/runs",
+   "screenFile": "src/screens/app/Runs.tsx",
+   "title": "Runs (reads what both studios write)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "empty",
+    "list",
+    "expandable trace"
+   ],
+   "statesMissing": [
+    "filter/search/date range",
+    "paging",
+    "retention beyond 25",
+    "replay",
+    "per-run distinct trace",
+    "failure states"
+   ]
+  },
+  {
+   "route": "(overlay) every /app/* page",
+   "screenFile": "src/components/CopilotDock.tsx",
+   "title": "AI Copilot dock",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "closed",
+    "open",
+    "thread",
+    "insufficient-credits"
+   ],
+   "statesMissing": [
+    "persistence",
+    "tool calls",
+    "record access",
+    "approval gate",
+    "error",
+    "loading",
+    "history",
+    "presence on /studio"
+   ]
+  },
+  {
+   "route": "(overlay) every public page",
+   "screenFile": "src/components/VippyWidget.tsx",
+   "title": "Public Vippy widget",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "closed",
+    "open",
+    "thread"
+   ],
+   "statesMissing": [
+    "any network call",
+    "rate limiting",
+    "persistence",
+    "loading",
+    "error",
+    "retention/consent notice"
+   ]
+  },
+  {
+   "route": "/business-suite",
+   "screenFile": "src/lib/pages/product.ts:136 via src/screens/ProductPage.tsx",
+   "title": "Business Suite marketing page",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static content"
+   ],
+   "statesMissing": [
+    "catalogue truth: advertises '16 categories' from appData.suiteTools, a SECOND tool taxonomy that disagrees with the 10 categories actually shipped"
+   ]
+  },
+  {
+   "route": "/vibe-studio",
+   "screenFile": "src/lib/pages/product.ts:10",
+   "title": "Vibe Studio marketing page",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static content"
+   ],
+   "statesMissing": [
+    "advertises 12 vibeSkills; the product ships 6 capabilities with different names"
+   ]
+  },
+  {
+   "route": "/agent-studio",
+   "screenFile": "src/lib/pages/product.ts:66",
+   "title": "Agent Studio marketing page",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static content"
+   ],
+   "statesMissing": [
+    "advertises Visual Builder, RAG, HITL, Guardrails, Test Suite and One-Click Deploy; the linked studio has none of the six and the canvas that gestures at them is unreachable"
+   ]
+  },
+  {
+   "route": "/prompt-lab",
+   "screenFile": "src/lib/pages/product.ts:208",
+   "title": "Prompt Lab marketing page",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static content"
+   ],
+   "statesMissing": [
+    "advertises side-by-side comparison, persisted variants/threads and Save to library; none exists"
+   ]
+  }
+ ],
+ "falseSuccessCopy": [
+  {
+   "file": "src/screens/app/business/Tool.tsx",
+   "line": 35,
+   "text": "{tool.name} produced a result for “{input}”. It cost {cost} AI Credits from the tenant pool and is tagged to your active company.",
+   "why": "Nothing was produced — the sentence is a template literal echoing the user's own input after a 700ms setTimeout. Credits ARE deducted for it. There is also no 'active company' concept anywhere in the codebase (grep confirms the phrase appears only in this file and the marketing page)."
+  },
+  {
+   "file": "src/screens/app/business/Tool.tsx",
+   "line": 70,
+   "text": "Output is soft-tagged to your active company.",
+   "why": "No company tagging exists; SuiteToolRun has no record at all, let alone a company_id."
+  },
+  {
+   "file": "src/screens/app/business/Chat.tsx",
+   "line": 42,
+   "text": "{model} answered “{prompt}”… the turn cost {n} AI Credit from the tenant pool and is logged against your account.",
+   "why": "No model was called and nothing is logged against any account. The turn is not persisted anywhere; a refresh erases it. (The same sentence does honestly admit 'This rebuild simulates the reply'.)"
+  },
+  {
+   "file": "src/screens/app/PromptLab.tsx",
+   "line": 69,
+   "text": "When a prompt works, save it to the library and Vibe Studio and Agent Studio builds can reach for it.",
+   "why": "There is no save control in Prompt Lab and no library; no Vibe or Agent Studio surface can reference a prompt."
+  },
+  {
+   "file": "src/screens/app/PromptLab.tsx",
+   "line": 210,
+   "text": "{model} · {ms/1000}s · {tokens} tokens · {credits} credits",
+   "why": "Presented as run telemetry. The latency is 1200 + random*900 and the token count is userPrompt.length/3 + 180; no call was made. It is also rendered for the insufficient-credits result, metering a call that could not happen."
+  },
+  {
+   "file": "src/screens/app/VibeStudio.tsx",
+   "line": 17,
+   "text": "Wiring tools + guardrails / Snapshotting version 1",
+   "why": "Two of the four progress steps name work that never happens: no tool or guardrail is bound and no snapshot is written — publishArtifact later mutates the row in place."
+  },
+  {
+   "file": "src/screens/app/VibeStudio.tsx",
+   "line": 203,
+   "text": "Versioned inside your tenant. Refine it in conversation, edit the graph by hand, or publish — publishing needs the app-publish permission and creates an immutable snapshot.",
+   "why": "Four claims, four failures: the artifact is in browser-global localStorage not a tenant; there is no refine or graph-edit control; publishArtifact performs no permission check; and it creates no snapshot."
+  },
+  {
+   "file": "src/screens/app/VibeStudio.tsx",
+   "line": 197,
+   "text": "Build complete",
+   "why": "Announced after 1.8s of setTimeouts. Critically, spend(15)'s return value is ignored, so this renders even when the credit pool is empty — a build that was not funded is reported complete."
+  },
+  {
+   "file": "src/screens/app/VibeStudio.tsx",
+   "line": 222,
+   "text": "each opens its own workspace",
+   "why": "Clicking a capability card calls build(), which returns immediately if the prompt is empty. No workspace exists for any of the six capabilities."
+  },
+  {
+   "file": "src/screens/app/VibeStudio.tsx",
+   "line": 142,
+   "text": "One builder for apps, sites, mobile, decks, sheets, reports, RPA bots and agents — each with its own purpose-built workspace, using your tools, on your LLM.",
+   "why": "Eight artifact types are claimed; the capability list offers six ids and produces none of them. 'Your tools' and 'your LLM' have no configuration surface — the key chip is the constant 'Claude · SaaS Key'."
+  },
+  {
+   "file": "src/screens/app/VibeStudio.tsx",
+   "line": 145,
+   "text": "Not sure where to start? Tell me your problem - I'll ask a few quick questions and guide you to build it.",
+   "why": "First person, promising an interactive intake. There is no conversation of any kind — a single textarea submits straight to the fake build."
+  },
+  {
+   "file": "src/screens/studio/AgentStudio.tsx",
+   "line": 308,
+   "text": "Sent to the builder — “{prompt}” is queued in Runs.",
+   "why": "Nothing is queued and there is no builder. recordRun writes an already-COMPLETED, already-SUCCESSFUL run with a canned 6-step trace, charges 6 credits and writes an audit row saying an agent ran."
+  },
+  {
+   "file": "src/screens/studio/AgentStudio.tsx",
+   "line": 404,
+   "text": "Attachments become context the builder reads. Anything you send is queued in Runs, and every action it takes is recorded in the Audit Trail under your name.",
+   "why": "Only File.name is captured and it is discarded on submit; nothing is read. The audit row is written with a hardcoded user 'owner' and role 'Org_admin', not the signed-in identity, and with an empty ip."
+  },
+  {
+   "file": "src/screens/studio/AgentStudio.tsx",
+   "line": 151,
+   "text": "Active agents: 1",
+   "why": "Hardcoded string in the Agent Health list. No agent exists in the tenant and none can be created from this screen."
+  },
+  {
+   "file": "src/screens/studio/AgentStudio.tsx",
+   "line": 137,
+   "text": "Run reliability across your agents / Last 30 days / Runs passing {n}%",
+   "why": "recordRun only ever writes status 'success', so the figure is always 100% once any run exists, and the '30 days' window is never applied — the array is simply the last 25 runs."
+  },
+  {
+   "file": "src/screens/studio/AgentStudio.tsx",
+   "line": 489,
+   "text": "Recent Activity — Runs per day across all agents (This week)",
+   "why": "The chart body renders seven empty columns containing only day letters. There is no series, no bars and no data binding."
+  },
+  {
+   "file": "src/screens/studio/AgentStudio.tsx",
+   "line": 438,
+   "text": "{count} templates / {count} workflows · click one to prefill your prompt",
+   "why": "Verified: 82 templates advertised across the 7 categories, 25 actually present (sales 12/4, support 8/3, engineering 11/3, marketing 10/3, productivity 19/3, operations 16/3). Clicking also prefills only the tile's 2-3 word title, not a prompt."
+  },
+  {
+   "file": "src/screens/app/AgentStudio.tsx",
+   "line": 118,
+   "text": "Deploy publishes an immutable snapshot. In-flight runs finish on the previous version; new runs pick up the new one.",
+   "why": "There is no Deploy control on the page, no versions, and no run routing. The route itself is unreachable from the UI."
+  },
+  {
+   "file": "src/screens/app/AgentStudio.tsx",
+   "line": 129,
+   "text": "Catch regressions before they ship. Tests run as part of the build gate.",
+   "why": "The four tests are literals with fixed pass/fail; nothing executes them and no gate exists. One is permanently 'fail' and blocks nothing."
+  },
+  {
+   "file": "src/screens/app/AgentStudio.tsx",
+   "line": 48,
+   "text": "Every node, tool call, and guardrail is inspectable.",
+   "why": "The Inspector shows three constant strings identical for all six nodes; nothing is editable and no tool call or guardrail is bound to anything."
+  },
+  {
+   "file": "src/components/CopilotDock.tsx",
+   "line": 14,
+   "text": "Ask questions or take actions in plain English — \"how many credits are left?\", \"install the Contracts app\", \"who approved invoice 4821?\"",
+   "why": "The dock has no tools, no record access and no install capability; every reply is the same canned paragraph. Asking anything still charges 2 credits and permanently ticks the onboarding 'Try the AI Copilot' task."
+  },
+  {
+   "file": "src/components/CopilotDock.tsx",
+   "line": 39,
+   "text": "Anything I change is audit-logged under your name, and consequential actions pause for your approval first.",
+   "why": "The Copilot changes nothing, writes no audit event, and has no approval path wired to it."
+  },
+  {
+   "file": "src/components/VippyWidget.tsx",
+   "line": 22,
+   "text": "Once you're signed in, the same assistant answers from your tenant's data and can take actions for you.",
+   "why": "Vippy makes no network call at all, and the signed-in Copilot it points to is equally canned."
+  },
+  {
+   "file": "src/screens/Onboarding.tsx",
+   "line": 187,
+   "text": "Queued for your first run: “{intent}”",
+   "why": "The landing-hero prompt is carried through /register?intent → /onboarding?intent purely to be displayed. Nothing is queued: verified by grep, no code ever writes the ?prompt= parameter that VibeStudio.tsx:103 reads."
+  },
+  {
+   "file": "src/screens/app/Runs.tsx",
+   "line": 96,
+   "text": "Traces are auditable the same way your systems of record are — who, what, when, before, after.",
+   "why": "Every run renders the identical shared sampleTrace constant (same lead #4821, same 'Assigned to Priya S.', same token counts). There is no who, no before and no after."
+  },
+  {
+   "file": "src/screens/app/business/Suite.tsx",
+   "line": 97,
+   "text": "View all →",
+   "why": "Navigates to ?category=writing — 12 tools of 102 — rather than an all-tools listing."
+  },
+  {
+   "file": "src/screens/app/AgentPortal.tsx",
+   "line": 138,
+   "text": "Build one in Agent Studio, or install an app that ships with them.",
+   "why": "Shown on four filter chips (Business Solution Agents, Agents, Workflows, Automations) that are hardcoded empty. Neither Agent Studio can create any of them, so following the advice cannot change the state."
+  }
+ ],
+ "openQuestions": [
+  "TWO AGENT STUDIOS: /studio (src/screens/studio/AgentStudio.tsx, prompt-first, linked from the sidebar and the dashboard tile) and /app/build/agent-studio (src/screens/app/AgentStudio.tsx, node canvas, unreachable from any link). They share no data model, no state and no route family. Are these one product in two phases, two products, or is the canvas dead code to delete? The schema differs completely depending on the answer.",
+  "STUDIO WORKSPACE SCOPE: /studio/workspace/[workspaceId]/home accepts an id the component never reads. What does a studio workspace scope — agents only, or also knowledge/tables/files/schedules/logs? Is it per-tenant, per-team or per-user, and how does a user get a default one? Cannot be inferred from the source.",
+  "MODEL CATALOGUE: four hardcoded lists disagree in both membership and format (chatModels: 'Claude Sonnet 4.6','Claude Opus 4.6','GPT-4.1','Gemini 2.5 Pro','Llama 3.3 70B'; PromptLab: 'Claude Sonnet 4','Claude Opus 4','GPT-4o','Gemini Pro'; vibeModels: 'Default · claude-sonnet-4-6','claude-opus-5','claude-sonnet-5','claude-haiku-4-5'; studioModel: 'claude-sonnet-4-6'). Which models are actually licensed and callable, and which surfaces may use which? Do not infer a provider contract from these strings.",
+  "CREDIT ECONOMICS: costs are hardcoded per surface with no basis — suite tools 0-4 by tool, chat 1/turn, Prompt Lab 3/run flat regardless of model or tokens, Vibe build 15, Copilot 2/ask, agent run always 6. Is a credit a fixed unit of currency, a token proxy, or a per-model multiplier? What is the real price list?",
+  "ZERO-COST TOOLS: seven tools are priced 0 (hashtag-generator, invoice-description-writer, git-commit-message-writer, task-breakdown, checklist-generator, citation-formatter, alt-text-generator). Because spend(0) can never fail they run on an exhausted pool. Is free-tier metering intended, or is 0 a data-entry error?",
+  "CREDIT UNITS: Vibe Studio labels the same number 'AIU' while every other surface says 'AI Credits'. Are these the same unit? If not, what is the conversion?",
+  "PLAN CONSTANTS: MONTHLY_CREDITS=1000, APP_QUOTA=5, TRIAL_DAYS=13 are module constants applied to every tenant, and creditsUsed never resets so the 'monthly' allowance is a lifetime cap. What are the real per-plan allowances, the reset boundary, the timezone that boundary uses, and does the trial start at signup?",
+  "SUITE TOOL TAXONOMY: two incompatible catalogues exist — businessData.suiteCategories (10 categories / 102 tools / costs 0-4, used by the product) and appData.suiteTools (16 category-shaped 'tools' with different costs: AI Chat 2, Image Generation 12, Code 4, used by the /business-suite marketing page). Which is canonical? Note the product charges 1 per chat turn while the marketing catalogue prices AI Chat at 2.",
+  "PER-TOOL INPUT FORMS: Tool.tsx states outright that the live product's per-tool forms were not transcribed and every tool shares one textarea. What are the real input schemas for all 102 tools? Without them SuiteTool.inputSchema cannot be populated.",
+  "VIBE CAPABILITY vs SKILL: the product ships 6 capabilities (agent, business-solution-agents, web-app, erp-custom-agents, mobile-app, web-rpa-bot) while the marketing page advertises 12 vibeSkills with a different artifact vocabulary (Agent, App, Web app, Mobile app, Bot, Knowledge bot, Document, Spreadsheet, Deck, Website, Extension). Which set is the release scope, and what does each actually produce?",
+  "ARTIFACT SKILL vs KIND: addArtifact writes the same capability display name into both columns. Are these intended to be different axes (skill = builder used, kind = artifact produced) or is one redundant?",
+  "PUBLISH PERMISSION: the UI names an 'app-publish permission' that is enforced nowhere and does not exist in any permission list. What is the real permission name and who holds it?",
+  "ARTIFACT VERSIONING: publishArtifact sets status='published' AND bumps version 1→2 in one step, so a published artifact is never at the version that was reviewed. Should publishing freeze the current version, or open the next draft? Rollback semantics are unspecified.",
+  "TEMPLATE COUNTS: Agent Studio advertises 82 templates and ships 25. Is the gap an unbuilt backlog (keep the target) or stale copy (count the rows)?",
+  "FIN BUNDLE: the agent catalogue defines a 'Finance & Accounting' (FIN) bundle with 3 agents but the marketplace has no FIN app, so those agents are permanently unrunnable. Conversely apps PP, PPTX, EVT, RQA and POD ship zero agents while the marketing copy says every app ships with bound agents. Which side is wrong?",
+  "CUSTOM AGENTS IN THE PLATFORM CATALOGUE: exactly two of the 60 catalogue agents carry custom:true ('Lead Qualify & Route', 'Resume Screening'). Are these seeded examples for every tenant, or tenant-authored records that leaked into a shared catalogue? This decides whether catalog_agents needs a nullable tenant_id.",
+  "AGENT IDENTITY: Run.agent, Schedule.target and PosSettings.agents.disabled[] all key on an agent's display NAME. Are agent names guaranteed unique and immutable, or does this need a stable id plus a name snapshot on every run? (Recommending the latter, but the product rule is unstated.)",
+  "RUN STATUS VOCABULARY: the Run type declares 'success' | 'needs-review' | 'failed' but only 'success' is ever written. What produces 'needs-review' — a HITL pause, a guardrail hit, or a low confidence score — and what resumes it?",
+  "RUN RETENTION: recordRun caps history at 25 runs, silently discarding older ones, which also decays the per-agent run counts on the Agent Portal. What is the real retention period and is it plan-dependent?",
+  "AGENT NODE THRESHOLD: the canvas hardcodes an HITL node labelled 'HITL if > ₹50,000' and a 'Max 12 tool calls' guardrail, and the approvals sample uses a '₹50,000' approval cap, while migration 0001 defaults tenants to USD. Are guardrail thresholds per-tenant, per-company or per-agent, and in which currency? I have not inferred any monetary or approval policy from these strings.",
+  "AGENT BLURB CLAIMS: several catalogue blurbs assert regulated behaviour — 'Payroll Compliance Checker: validates statutory calculations against current PF/ESI/PT rates and thresholds', 'Travel Policy Checker: reviews against the tenant's band-based travel policy', 'Contract Compliance Checker'. No rates, bands, policies or jurisdictions exist in the repository. These must come from an explicit product decision; I have invented none.",
+  "COPILOT CAPABILITY: the greeting advertises taking actions ('install the Contracts app') and the reply promises approval gating. Which tools may the Copilot call, which actions are 'consequential', and does it act with the caller's permissions or its own service identity?",
+  "COPILOT CONTEXT: the 'apragya:copilot' window event carries no payload, so the POS settings panel that promises 'add a field for the customer's region' hands the dock no record context. What context should a surface pass, and is there an allowlist?",
+  "PUBLIC VIPPY DATA HANDLING: anonymous, unauthenticated, no rate limit and no consent notice. What is its knowledge source (public docs only?), its retention period, its abuse controls, and how does an anonymous conversation carry over to a tenant after signup as the copy promises?",
+  "PROMPT LAB DEFAULT TEMPERATURE: useState(2) against a 0-2 range ships the Lab at maximum temperature. Intended, or a bug that should default to ~0.7?",
+  "PROMPT LAB VARIABLES: {{variable}} placeholders are detected and displayed but there is no input to bind them, so a template can never be executed with data. Are variables bound at run time, at agent-binding time, or both?",
+  "PROMPT LIBRARY SHARING: PromptTemplate's doc comment says 'saved prompts the team can reach for'. What are the sharing scopes (private/team/tenant) and who may promote a prompt to a shared scope?",
+  "ONBOARDING INTENT: the hero prompt is captured into ?intent, displayed as 'Queued for your first run', then dropped — and VibeStudio reads a ?prompt= parameter nothing ever sets. Should the intent become a real first build, or should the promise be removed from the onboarding copy?",
+  "MULTI-COMPANY TAGGING: both the tool page and the marketing page say outputs are 'soft-tagged to your active company' and that users may 're-tag or untag' freely. No active-company selector exists anywhere. What sets the active company, and is the tag advisory (as the copy says) or an access boundary?",
+  "ORPHANED / DEAD SURFACES to confirm for removal or completion: /app/build/agent-studio (unlinked), Vibe Studio's Progress / My Playbooks / Settings tabs (no-op), the nine Agent Studio sidebar destinations, the Agent Studio header search input (no handler), and the four permanently empty Agent Portal filters."
+ ]
+}

@@ -106,15 +106,46 @@ export function MicrosoftMark() {
   )
 }
 
-export function SsoButtons({ onPick, disabled }: { onPick: (p: 'google' | 'microsoft') => void; disabled?: boolean }) {
+/**
+ * Single sign-on entry points.
+ *
+ * `available` is false until a real OAuth client is registered (decision D3).
+ * A disabled button with a reason is honest; a button that manufactures an
+ * identity from `you@google.com` — which is what this used to do — is not.
+ */
+export function SsoButtons({
+  onPick,
+  disabled,
+  available = false,
+}: {
+  onPick: (p: 'google' | 'microsoft') => void
+  disabled?: boolean
+  available?: boolean
+}) {
+  const reason = available ? undefined : 'Single sign-on is not configured on this deployment yet.'
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      <Button variant="secondary" disabled={disabled} onClick={() => onPick('google')} type="button">
-        <GoogleMark /> Continue with Google
-      </Button>
-      <Button variant="secondary" disabled={disabled} onClick={() => onPick('microsoft')} type="button">
-        <MicrosoftMark /> Continue with Microsoft
-      </Button>
+    <div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Button
+          variant="secondary"
+          disabled={disabled || !available}
+          title={reason}
+          onClick={() => onPick('google')}
+          type="button"
+        >
+          <GoogleMark /> Continue with Google
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={disabled || !available}
+          title={reason}
+          onClick={() => onPick('microsoft')}
+          type="button"
+        >
+          <MicrosoftMark /> Continue with Microsoft
+        </Button>
+      </div>
+      {reason && <p className="mt-2 text-center text-[12px] text-fg-muted">{reason}</p>}
     </div>
   )
 }

@@ -1,11 +1,13 @@
 'use client'
 
+import { StatCard } from '../../../components/StatCard'
+
 import { useState } from 'react'
 import { Button } from '../../../components/ui'
 import { Icon } from '../../../components/Icon'
 import { money } from '../../../lib/posData'
 import { useWorkspace, type PosDoc } from '../../../lib/workspace'
-import { Dialog, Label, inputClass } from '../travel/shell'
+import { Dialog, Label, inputClass } from '../../../components/EnterpriseUi'
 
 export function PageHead({
   title,
@@ -27,17 +29,8 @@ export function PageHead({
   )
 }
 
-export function Stat({ label, value, sub, currency }: { label: string; value: string; sub?: string; currency?: string }) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-5">
-      <p className="text-[11px] font-semibold tracking-[0.06em] text-fg-muted uppercase">{label}</p>
-      <p className="mt-2.5 text-[24px] leading-none font-bold">
-        {currency && <span className="mr-1.5 text-[14px] font-medium text-fg-muted">{currency}</span>}
-        {value}
-      </p>
-      {sub && <p className="mt-2.5 text-[12px] text-fg-muted">{sub}</p>}
-    </div>
-  )
+export function Stat(props: Omit<React.ComponentProps<typeof StatCard>, 'variant'>) {
+  return <StatCard {...props} variant="pos" />
 }
 
 export function Bar({ value, max }: { value: number; max: number }) {

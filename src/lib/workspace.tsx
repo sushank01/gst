@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { marketApps, sampleTrace } from './appData'
 import type { CheckPoint, GuardrailAction, GuardrailType } from './guardrailData'
@@ -910,6 +910,7 @@ function migrate(stored: Partial<Persisted>): Persisted {
 }
 
 function read(): Persisted {
+  if (typeof window === 'undefined') return empty
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return empty
@@ -933,7 +934,8 @@ function read(): Persisted {
 }
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<Persisted>(() => read())
+  const [state, setState] = useState<Persisted>(empty)
+  useEffect(() => { setState(read()) }, [])
 
   const update = useCallback((next: Persisted | ((prev: Persisted) => Persisted)) => {
     setState((prev) => {

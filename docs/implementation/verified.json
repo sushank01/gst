@@ -1,0 +1,154 @@
+[
+  { "id": "AUTH-PASSWORD-HASH", "domain": "Identity", "surface": "server", "entity": "User", "operation": "hash/verify password",
+    "sourceFile": "src/server/auth/password.ts", "requiredBehaviour": "scrypt, per-password salt, constant-time compare, cost encoded in the hash, transparent rehash on login",
+    "apiMethodPath": "internal", "validation": "min length 10, entropy floor", "authorization": "n/a",
+    "persistence": "postgres users.password_hash", "status": "VERIFIED",
+    "evidence": "npm test :: 'password hashing: correct verifies, wrong does not, hashes are salted'; 'weaker stored parameters are detected for rehash'" },
+
+  { "id": "AUTH-LOGIN-WRONG-PASSWORD", "domain": "Identity", "surface": "/login", "entity": "Session", "operation": "sign in",
+    "sourceFile": "src/app/api/v1/auth/login/route.ts", "requiredBehaviour": "wrong password is refused with a uniform 401 and issues no cookie",
+    "apiMethodPath": "POST /api/v1/auth/login", "validation": "zod strict", "authorization": "public",
+    "states": "loading error success", "persistence": "postgres sessions", "status": "VERIFIED",
+    "evidence": "npm test :: 'login with the wrong password is 401'; live curl 401; browser login shows the server message" },
+
+  { "id": "AUTH-ENUMERATION", "domain": "Identity", "surface": "/login", "entity": "Session", "operation": "sign in",
+    "sourceFile": "src/server/auth/service.ts", "requiredBehaviour": "an unknown address is indistinguishable from a wrong password, in message and in timing",
+    "apiMethodPath": "POST /api/v1/auth/login", "authorization": "public", "status": "VERIFIED",
+    "evidence": "npm test :: 'sign-in for an unknown address fails the same way'; equivalentWork() burns one scrypt" },
+
+  { "id": "AUTH-LOCKOUT", "domain": "Identity", "surface": "/login", "entity": "User", "operation": "lockout",
+    "sourceFile": "src/server/auth/service.ts", "requiredBehaviour": "8 consecutive failures lock the account for 15 minutes, then it unlocks",
+    "apiMethodPath": "POST /api/v1/auth/login", "authorization": "public", "status": "VERIFIED",
+    "evidence": "npm test :: 'repeated failures lock the account, and the lock expires'" },
+
+  { "id": "AUTH-SESSION-REVOCATION", "domain": "Identity", "surface": "server", "entity": "Session", "operation": "revoke",
+    "sourceFile": "src/server/auth/session.ts", "requiredBehaviour": "revoked, expired, idle and suspended-user sessions all stop resolving immediately",
+    "apiMethodPath": "POST /api/v1/auth/logout", "authorization": "session", "status": "VERIFIED",
+    "evidence": "npm test :: 'sessions: revoked, expired and idle sessions all stop resolving'; 'suspending a user invalidates live sessions immediately'" },
+
+  { "id": "AUTH-COOKIE-HTTPONLY", "domain": "Identity", "surface": "browser", "entity": "Session", "operation": "cookie",
+    "sourceFile": "src/server/http/cookies.ts", "requiredBehaviour": "httpOnly, SameSite=lax, Secure in production; only the SHA-256 is stored",
+    "authorization": "n/a", "status": "VERIFIED",
+    "evidence": "npm test :: 'only the token hash is stored, never the token'; browser document.cookie does not contain the session" },
+
+  { "id": "AUTH-PASSWORD-RESET", "domain": "Identity", "surface": "/login", "entity": "AuthToken", "operation": "reset password",
+    "sourceFile": "src/server/auth/service.ts", "requiredBehaviour": "single-use token, expiry enforced, all sessions revoked on reset, unknown address reveals nothing",
+    "apiMethodPath": "POST /api/v1/auth/password/{forgot,reset}", "authorization": "public", "status": "VERIFIED",
+    "evidence": "npm test :: 'password reset consumes its token once, works, and ends every session'; 'an expired reset token is refused'" },
+
+  { "id": "AUTH-API-INDEPENDENT", "domain": "Identity", "surface": "server", "entity": "Session", "operation": "authorize",
+    "sourceFile": "src/server/http/handler.ts", "requiredBehaviour": "protected endpoints refuse anonymous and forged cookies regardless of the frontend",
+    "apiMethodPath": "all /api/v1 business routes", "authorization": "session", "status": "VERIFIED",
+    "evidence": "npm test :: 'PROTECTED: business endpoints refuse an anonymous request'; 'a forged cookie value does not authenticate'; live curl 401" },
+
+  { "id": "TENANT-ISOLATION-READ", "domain": "Tenancy", "surface": "server", "entity": "Tenant", "operation": "read scope",
+    "sourceFile": "src/server/tenancy/context.ts", "requiredBehaviour": "the tenant comes from the session; naming another tenant id is refused; another tenant's record is 404 not 403",
+    "authorization": "membership", "status": "VERIFIED",
+    "evidence": "npm test :: 'ISOLATION: a session cannot bind to a tenant it has no membership in'; 'ISOLATION: leads never cross tenants, by list or by id'" },
+
+  { "id": "TENANT-ISOLATION-WRITE", "domain": "Tenancy", "surface": "server", "entity": "Membership", "operation": "write scope",
+    "sourceFile": "src/server/services/tenancy.ts", "requiredBehaviour": "cross-tenant update and archive are refused and leave the target untouched",
+    "authorization": "membership", "status": "VERIFIED",
+    "evidence": "npm test :: 'ISOLATION: removing a membership in another tenant is refused'" },
+
+  { "id": "TENANT-RBAC", "domain": "Tenancy", "surface": "server", "entity": "Membership", "operation": "authorize",
+    "sourceFile": "src/server/tenancy/permissions.ts", "requiredBehaviour": "server-side role check; a viewer cannot write whatever the UI shows",
+    "authorization": "role", "status": "VERIFIED",
+    "evidence": "npm test :: 'a viewer is refused a write by the server, whatever the UI shows'; 'a viewer may read but not write'" },
+
+  { "id": "TENANT-LAST-OWNER", "domain": "Tenancy", "surface": "/app/setup", "entity": "Membership", "operation": "role change",
+    "sourceFile": "src/server/services/tenancy.ts", "requiredBehaviour": "a workspace cannot lose its last owner; the owner rows are locked during the check",
+    "apiMethodPath": "PATCH /api/v1/members/{id}", "authorization": "member.manage", "status": "VERIFIED",
+    "evidence": "npm test :: 'a workspace cannot lose its last owner by demotion or removal'" },
+
+  { "id": "TENANT-INVITE-LIFECYCLE", "domain": "Tenancy", "surface": "/app/setup", "entity": "Invitation", "operation": "invite/accept",
+    "sourceFile": "src/server/services/tenancy.ts", "requiredBehaviour": "invitation row and its delivery are enqueued in one transaction; acceptance is single-use; expiry is enforced and recorded",
+    "apiMethodPath": "POST /api/v1/members", "authorization": "member.invite", "sideEffect": "outbox invitation.send", "status": "VERIFIED",
+    "evidence": "npm test :: 'inviting queues delivery in the same transaction and records audit'; 'accepting an invitation ... cannot be replayed'; 'an expired invitation is refused and marked expired'" },
+
+  { "id": "AUDIT-REAL-ACTOR", "domain": "Governance", "surface": "/app/governance", "entity": "AuditEvent", "operation": "append",
+    "sourceFile": "src/server/events/audit.ts", "requiredBehaviour": "actor taken from the session, append-only, secrets redacted at any depth",
+    "authorization": "server", "persistence": "postgres audit_events", "status": "VERIFIED",
+    "evidence": "npm test :: 'every mutation writes an audit row with the real actor'; 'audit detail redacts secrets even when a caller passes them'" },
+
+  { "id": "OUTBOX-EXACTLY-ONCE", "domain": "Platform", "surface": "server", "entity": "OutboxMessage", "operation": "enqueue/deliver",
+    "sourceFile": "src/server/events/outbox.ts", "requiredBehaviour": "duplicate effects collapse on an idempotency key; leases, backoff and a dead-letter state; expired leases are released",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'outbox: an identical effect is enqueued once'; 'claim, deliver, and retry with a dead letter at the end'; 'an expired lease is released for another dispatcher'" },
+
+  { "id": "JOBS-FENCING", "domain": "Platform", "surface": "server", "entity": "Job", "operation": "claim/complete",
+    "sourceFile": "src/server/jobs/queue.ts", "requiredBehaviour": "one claim per job under concurrency; a late result from a superseded worker is rejected; checkpoints resume",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'a job is claimed once, even by two workers racing'; 'FENCING: a late result from a superseded worker is rejected'; 'checkpoints survive so a bounded step resumes'" },
+
+  { "id": "JOBS-RETRY-DEADLETTER", "domain": "Platform", "surface": "server", "entity": "Job", "operation": "retry",
+    "sourceFile": "src/server/jobs/queue.ts", "requiredBehaviour": "exponential backoff to a bounded dead-letter; every attempt recorded",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'failures back off, then dead-letter instead of retrying forever'" },
+
+  { "id": "SCHEDULE-OCCURRENCE-ONCE", "domain": "Platform", "surface": "/app/admin/scheduled-jobs", "entity": "Schedule", "operation": "dispatch",
+    "sourceFile": "src/server/jobs/scheduler.ts", "requiredBehaviour": "exactly one job per occurrence even with two dispatchers; repeated dispatch is a no-op",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'a due schedule creates exactly one job per occurrence, even across two dispatchers'; 'running the dispatcher twice ... does not double-create'" },
+
+  { "id": "SCHEDULE-DST", "domain": "Platform", "surface": "/app/admin/scheduled-jobs", "entity": "Schedule", "operation": "occurrence calculation",
+    "sourceFile": "src/server/jobs/cron.ts", "requiredBehaviour": "local time tracked across DST; a non-existent local time still runs; an ambiguous one runs once",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'a local 09:00 tracks the zone across DST'; 'spring forward: a job at a local time that does not exist still runs'; 'fall back: an hourly job runs once per real hour'" },
+
+  { "id": "SCHEDULE-MISSED", "domain": "Platform", "surface": "/app/admin/scheduled-jobs", "entity": "Schedule", "operation": "catch-up",
+    "sourceFile": "src/server/jobs/scheduler.ts", "requiredBehaviour": "a long outage records missed occurrences instead of firing a burst; overlap policy is honoured",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'a long outage records missed runs rather than firing a burst'; 'overlap policy skip records a missed occurrence'" },
+
+  { "id": "DB-MIGRATIONS", "domain": "Platform", "surface": "server", "entity": "Migration", "operation": "apply",
+    "sourceFile": "src/server/db/migrate.ts", "requiredBehaviour": "applied once in a transaction, checksummed; editing a shipped migration is an error; re-run is a no-op",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'a fresh database applies every migration'; 're-running migrations is a no-op'; 'editing an already-applied migration is refused'" },
+
+  { "id": "DB-MONEY-EXACT", "domain": "Platform", "surface": "server", "entity": "Money", "operation": "store",
+    "sourceFile": "migrations/0001_identity_and_tenancy.sql", "requiredBehaviour": "numeric(18,4) plus an explicit currency; no float anywhere in the money path",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'money survives the round trip exactly — no float drift' (0.1 + 0.2 + 19.9999 = 20.2999)" },
+
+  { "id": "API-ERROR-ENVELOPE", "domain": "Platform", "surface": "server", "entity": "ApiError", "operation": "respond",
+    "sourceFile": "src/server/http/errors.ts", "requiredBehaviour": "one envelope with code, message, per-field errors, request id and conflict version; unknown fields rejected; malformed body is 400 not a crash",
+    "status": "VERIFIED",
+    "evidence": "npm test :: 'register rejects unknown fields rather than ignoring them'; 'a malformed body is a 400, not a crash'; live curl 422 'Unknown field: isAdmin'" },
+
+  { "id": "CRM-LEAD-PERSISTENCE", "domain": "CRM", "surface": "/app/crm?tab=leads", "entity": "Lead", "operation": "create/list",
+    "sourceFile": "src/screens/app/crm/useServerLeads.tsx", "requiredBehaviour": "durable typed records; survive server restart and a new browser; list/count/filter agree",
+    "apiMethodPath": "GET|POST /api/v1/crm/leads", "authorization": "record.read / record.create",
+    "states": "loading refreshing empty filtered-empty error denied retry", "persistence": "postgres leads+parties", "status": "VERIFIED",
+    "evidence": "npm test :: 'the total reflects the filter'; 'pagination does not repeat or drop rows'; live: created via curl, rendered in the browser, created in the browser, read back via API after a server restart" },
+
+  { "id": "CRM-PARTY-MODEL", "domain": "CRM", "surface": "/app/crm", "entity": "Party", "operation": "link",
+    "sourceFile": "migrations/0003_crm.sql", "requiredBehaviour": "relationships are foreign keys, not display-name strings; one organisation per name per tenant",
+    "persistence": "postgres parties", "status": "VERIFIED",
+    "evidence": "npm test :: 'a lead creates its person and organisation as linked records, not name strings'; 'two leads at the same company share one organisation record'" },
+
+  { "id": "CRM-OPTIMISTIC-CONCURRENCY", "domain": "CRM", "surface": "/app/crm?tab=leads", "entity": "Lead", "operation": "update",
+    "sourceFile": "src/server/services/crm.ts", "requiredBehaviour": "a stale version is a 409 carrying the current version; the first edit survives",
+    "apiMethodPath": "PATCH /api/v1/crm/leads/{id}", "status": "VERIFIED",
+    "evidence": "npm test :: 'CONFLICT: a stale version is refused and reports the current one'" },
+
+  { "id": "CRM-LEAD-CONVERSION", "domain": "CRM", "surface": "/app/crm?tab=leads", "entity": "Lead", "operation": "convert",
+    "sourceFile": "src/server/services/crm.ts", "requiredBehaviour": "conversion preserves the lead and links the deal; cannot be repeated; stage history recorded",
+    "apiMethodPath": "POST /api/v1/crm/leads/{id}/convert", "status": "VERIFIED",
+    "evidence": "npm test :: 'conversion creates a deal, keeps the lead, and records the stage move'; 'a lead cannot be converted twice'" },
+
+  { "id": "CRM-ARCHIVE-NOT-DELETE", "domain": "CRM", "surface": "/app/crm?tab=leads", "entity": "Lead", "operation": "archive",
+    "sourceFile": "src/server/services/crm.ts", "requiredBehaviour": "archive hides from the default list and is reversible; history is never destroyed",
+    "apiMethodPath": "DELETE /api/v1/crm/leads/{id}", "status": "VERIFIED",
+    "evidence": "npm test :: 'archive hides from the default list, restore brings it back, history is kept'" },
+
+  { "id": "SSO-BUTTONS-HONEST", "domain": "Identity", "surface": "/login,/register", "entity": "OAuth", "operation": "sign in",
+    "sourceFile": "src/components/ui.tsx", "requiredBehaviour": "no fabricated identity; the control states that SSO is unconfigured",
+    "status": "BLOCKED", "blockedBy": "D3 — OAuth client credentials",
+    "evidence": "browser: buttons disabled with 'Single sign-on is not configured on this deployment yet.'" },
+
+  { "id": "EXEC-PLATFORM", "domain": "Platform", "surface": "server", "entity": "Executor", "operation": "run long jobs",
+    "sourceFile": "docs/implementation/decisions.md", "requiredBehaviour": "a production executor for work exceeding one request",
+    "status": "BLOCKED", "blockedBy": "D1 — execution platform (App Runner eligibility / Vercel plan / ECS)",
+    "evidence": "queue, leases, fencing, retries and the cron engine are implemented and tested against a local worker; only the remote adapter is blocked" }
+]

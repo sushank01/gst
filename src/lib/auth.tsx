@@ -1,123 +1,160 @@
 'use client'
 
-import { createContext, useCallback, useContext, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { ApiClientError, api } from './api.ts'
 import type { OnboardingProfile, Session, User } from './types'
 
 /**
- * Client-side session stub. The real product authenticates against the
- * Apragya tenant service; this keeps the same shape so swapping in a
- * fetch-based implementation touches only this file.
+ * Real authentication against the server.
+ *
+ * Nothing here decides who you are. The session lives in an httpOnly cookie the
+ * browser cannot read, `/auth/session` is the only source of identity, and the
+ * server re-checks every request independently. The previous implementation
+ * minted a local identity from whatever email was typed and ignored the
+ * password entirely; that is gone.
  */
-
-const STORAGE_KEY = 'apragya.session'
 
 type SignUpInput = {
   fullName: string
   email: string
+  password: string
   organization?: string
-  provider?: User['provider']
 }
 
+export type TenantSummary = { id: string; name: string; slug: string; role: string; currency: string }
+
 type AuthValue = {
+  /** False until the server has been asked who this is. Guards must wait. */
+  ready: boolean
   session: Session | null
+  tenants: TenantSummary[]
+  activeTenantId: string | null
   signUp: (input: SignUpInput) => Promise<Session>
-  signIn: (input: { email: string; provider?: User['provider'] }) => Promise<Session>
-  completeOnboarding: (profile: Omit<OnboardingProfile, 'completedAt'>) => void
-  signOut: () => void
+  signIn: (input: { email: string; password: string }) => Promise<Session>
+  signOut: () => Promise<void>
+  completeOnboarding: (profile: Omit<OnboardingProfile, 'completedAt'>) => Promise<void>
+  switchTenant: (tenantId: string) => Promise<void>
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthValue | null>(null)
 
-function read(): Session | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as Session) : null
-  } catch {
-    return null
-  }
+type SessionResponse = {
+  user: { id: string; email: string; fullName: string; emailVerified: boolean }
+  activeTenantId: string | null
+  tenants: TenantSummary[]
 }
 
-function write(session: Session | null) {
-  try {
-    if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
-    else localStorage.removeItem(STORAGE_KEY)
-  } catch {
-    /* storage unavailable (private mode) — session stays in memory */
+/**
+ * Onboarding is "complete" when the account has a workspace. That is a server
+ * fact — a membership row — rather than a flag the browser could set to skip
+ * the wizard.
+ */
+function toSession(response: SessionResponse): Session {
+  const active = response.tenants.find((tenant) => tenant.id === response.activeTenantId) ?? null
+  const user: User = {
+    id: response.user.id,
+    fullName: response.user.fullName,
+    email: response.user.email,
+    organization: active?.name ?? null,
+    provider: 'password',
+  }
+  return {
+    user,
+    onboarding: active
+      ? { workspaceName: active.name, industry: '', teamSize: '', apps: [], completedAt: '' }
+      : null,
   }
 }
-
-const latency = (ms = 550) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(() => read())
+  const [session, setSession] = useState<Session | null>(null)
+  const [tenants, setTenants] = useState<TenantSummary[]>([])
+  const [activeTenantId, setActiveTenantId] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
 
-  const persist = useCallback((next: Session | null) => {
-    setSession(next)
-    write(next)
+  const load = useCallback(async () => {
+    try {
+      const response = await api.get<SessionResponse>('/auth/session')
+      setSession(toSession(response))
+      setTenants(response.tenants)
+      setActiveTenantId(response.activeTenantId)
+    } catch (error) {
+      // 401 is the normal signed-out answer, not a failure worth surfacing.
+      if (!(error instanceof ApiClientError) || !error.isAuth) console.warn('session lookup failed', error)
+      setSession(null)
+      setTenants([])
+      setActiveTenantId(null)
+    } finally {
+      setReady(true)
+    }
   }, [])
 
+  useEffect(() => {
+    void load()
+  }, [load])
+
   const signUp = useCallback(
-    async ({ fullName, email, organization, provider = 'password' }: SignUpInput) => {
-      await latency()
-      const next: Session = {
-        user: {
-          id: crypto.randomUUID(),
-          fullName: fullName.trim(),
-          email: email.trim().toLowerCase(),
-          organization: organization?.trim() || null,
-          provider,
-        },
-        onboarding: null,
-      }
-      persist(next)
-      return next
-    },
-    [persist],
-  )
-
-  const signIn = useCallback(
-    async ({ email, provider = 'password' }: { email: string; provider?: User['provider'] }) => {
-      await latency()
-      const existing = read()
-      const next: Session = existing?.user.email === email.trim().toLowerCase()
-        ? existing
-        : {
-            user: {
-              id: crypto.randomUUID(),
-              fullName: email.split('@')[0].replace(/[._-]+/g, ' '),
-              email: email.trim().toLowerCase(),
-              organization: null,
-              provider,
-            },
-            onboarding: null,
-          }
-      persist(next)
-      return next
-    },
-    [persist],
-  )
-
-  const completeOnboarding = useCallback(
-    (profile: Omit<OnboardingProfile, 'completedAt'>) => {
-      setSession((current) => {
-        if (!current) return current
-        const next: Session = {
-          ...current,
-          onboarding: { ...profile, completedAt: new Date().toISOString() },
-        }
-        write(next)
-        return next
+    async (input: SignUpInput) => {
+      await api.post('/auth/register', {
+        email: input.email.trim(),
+        fullName: input.fullName.trim(),
+        password: input.password,
       })
+      const response = await api.get<SessionResponse>('/auth/session')
+      const next = toSession(response)
+      setSession(next)
+      setTenants(response.tenants)
+      setActiveTenantId(response.activeTenantId)
+      return next
     },
     [],
   )
 
-  const signOut = useCallback(() => persist(null), [persist])
+  const signIn = useCallback(async (input: { email: string; password: string }) => {
+    await api.post('/auth/login', { email: input.email.trim(), password: input.password })
+    const response = await api.get<SessionResponse>('/auth/session')
+    const next = toSession(response)
+    setSession(next)
+    setTenants(response.tenants)
+    setActiveTenantId(response.activeTenantId)
+    return next
+  }, [])
+
+  const signOut = useCallback(async () => {
+    // Revoke server-side first; clearing local state alone would leave a live
+    // session that any other tab could keep using.
+    await api.post('/auth/logout').catch(() => undefined)
+    setSession(null)
+    setTenants([])
+    setActiveTenantId(null)
+  }, [])
+
+  /**
+   * Creates the workspace. The wizard's other answers are collected but not yet
+   * persisted anywhere server-side, so they are deliberately not claimed as
+   * saved — see Loop 12 in the implementation plan.
+   */
+  const completeOnboarding = useCallback(
+    async (profile: Omit<OnboardingProfile, 'completedAt'>) => {
+      await api.post('/tenants', { name: profile.workspaceName.trim() })
+      await load()
+    },
+    [load],
+  )
+
+  const switchTenant = useCallback(
+    async (tenantId: string) => {
+      await api.post('/tenants/switch', { tenantId })
+      await load()
+    },
+    [load],
+  )
 
   const value = useMemo(
-    () => ({ session, signUp, signIn, completeOnboarding, signOut }),
-    [session, signUp, signIn, completeOnboarding, signOut],
+    () => ({ ready, session, tenants, activeTenantId, signUp, signIn, signOut, completeOnboarding, switchTenant, refresh: load }),
+    [ready, session, tenants, activeTenantId, signUp, signIn, signOut, completeOnboarding, switchTenant, load],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

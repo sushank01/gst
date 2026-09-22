@@ -1,5 +1,7 @@
 'use client'
 
+import { Dialog } from '../../components/Dialog'
+
 import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { useSearchParams } from '../../lib/router'
@@ -131,21 +133,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 const inputClass =
   'mt-1.5 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] font-normal text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none'
 
-function Dialog({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal>
-      <div className="max-h-[85dvh] w-full max-w-lg overflow-y-auto rounded-2xl border border-line bg-surface p-6">
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="text-[18px] font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="text-fg-muted transition hover:text-fg">
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 function DpiaPane() {
   const { dpias, addDpia } = useWorkspace()
@@ -205,7 +192,7 @@ function DpiaPane() {
       )}
 
       {open && (
-        <Dialog title="New DPIA" onClose={() => setOpen(false)}>
+        <Dialog size="lg" title="New DPIA" onClose={() => setOpen(false)}>
           <div className="mt-5 grid gap-4">
             <Field label="Title">
               <input value={title} onChange={(event) => setTitle(event.target.value)} className={inputClass} />
@@ -309,7 +296,7 @@ function DecisionsPane() {
       )}
 
       {open && (
-        <Dialog title="New automated decision" onClose={() => setOpen(false)}>
+        <Dialog size="lg" title="New automated decision" onClose={() => setOpen(false)}>
           <div className="mt-5 grid gap-4">
             <Field label="Name">
               <input value={name} onChange={(event) => setName(event.target.value)} className={inputClass} />
@@ -475,7 +462,7 @@ function InventoryPane() {
       <p className="mt-4 text-[13px] text-fg-muted">{dataInventory.length} results</p>
 
       {open && (
-        <Dialog title={editing ? 'Edit field' : 'Add field'} onClose={() => setOpen(false)}>
+        <Dialog size="lg" title={editing ? 'Edit field' : 'Add field'} onClose={() => setOpen(false)}>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <Field label="Entity">
               <input
@@ -681,7 +668,7 @@ function FlowsPane() {
       )}
 
       {open && (
-        <Dialog title="New flow" onClose={() => setOpen(false)}>
+        <Dialog size="lg" title="New flow" onClose={() => setOpen(false)}>
           <div className="mt-5 grid gap-4">
             <Field label="Flow">
               <input
@@ -819,7 +806,7 @@ function RetentionPane() {
       )}
 
       {open && (
-        <Dialog title="Set retention policy" onClose={() => setOpen(false)}>
+        <Dialog size="lg" title="Set retention policy" onClose={() => setOpen(false)}>
           <p className="mt-1.5 text-[13px] text-fg-muted">
             {connections.length
               ? 'Applies to data this tenant has pulled through the connector.'

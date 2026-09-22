@@ -186,8 +186,8 @@ export const quickTools = [
 ]
 
 export const jumpCards = [
-  { icon: '👥', name: 'Contacts', blurb: 'Shared across apps', to: '/app/crm/contacts' },
-  { icon: '🏢', name: 'Accounts', blurb: 'Customers, vendors, partners', to: '/app/crm/accounts' },
-  { icon: '🎯', name: 'Leads', blurb: 'CRM pipeline', to: '/app/crm/leads' },
+  { icon: '👥', name: 'Contacts', blurb: 'Shared across apps', to: '/app/crm?tab=contacts' },
+  { icon: '🏢', name: 'Accounts', blurb: 'Customers, vendors, partners', to: '/app/crm?tab=companies' },
+  { icon: '🎯', name: 'Leads', blurb: 'CRM pipeline', to: '/app/crm?tab=leads' },
   { icon: '🛍', name: 'Marketplace', blurb: 'Discover more apps', to: '/app/marketplace' },
 ]

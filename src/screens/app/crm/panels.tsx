@@ -9,12 +9,13 @@ import {
   leadSources,
   leadStatuses,
   pipelineStages,
-  scoreBands,
   settingsGroups,
   timeRanges,
 } from '../../../lib/crmData'
 import { CountUp } from '../../../components/CountUp'
 import { useAuth } from '../../../lib/auth'
+import { Dialog } from '../../../components/Dialog'
+import { useLeadFilters, useServerLeads, type ServerLead } from './useServerLeads'
 import { useRecords } from './records'
 
 function greeting() {
@@ -167,13 +168,25 @@ export function CrmDashboard() {
 
 /* ---------------------------------- Leads --------------------------------- */
 
+/**
+ * Leads — the first screen moved off browser state onto the server.
+ *
+ * Filtering, searching and paging are SQL, so the count beside the list is the
+ * number of matching rows rather than the number that happened to be loaded.
+ * Every real fetch state is rendered: a failure shows an error with a retry
+ * instead of an empty list, which is the distinction the prototype could not
+ * make because its data was always present.
+ */
 export function CrmLeads() {
-  const [status, setStatus] = useState('All')
+  const { filters, query, status, source, page, pageSize, setQuery, setStatus, setSource, setPageSize, setPage } =
+    useLeadFilters()
   const [view, setView] = useState('List')
   const [byScore, setByScore] = useState(false)
-  const { records, create, dialog, list } = useRecords('crm.leads')
+  const [creating, setCreating] = useState(false)
+  const leads = useServerLeads(filters)
 
-  const visible = records.filter((lead) => status === 'All' || (lead.fields.Status ?? 'New') === status)
+  const pageCount = Math.max(1, Math.ceil(leads.total / pageSize))
+  const shown = byScore ? [...leads.leads].sort((a, b) => b.score - a.score) : leads.leads
 
   return (
     <div className="space-y-5">
@@ -189,21 +202,30 @@ export function CrmLeads() {
 
           <div className="flex flex-wrap items-center gap-2.5">
             <Segmented options={['List', 'Board']} value={view} onChange={setView} />
-            <SearchBox placeholder="Search leads..." />
-            <Select label="/ page" options={['25 / page', '50 / page', '100 / page']} />
-            <span className="text-[13px] text-fg-muted">
-              {visible.length} lead{visible.length === 1 ? '' : 's'}
+            <SearchBox placeholder="Search leads..." value={query} onChange={setQuery} />
+            <Select
+              label="/ page"
+              value={`${pageSize} / page`}
+              onChange={(value) => setPageSize(parseInt(value, 10) || 25)}
+              options={['25 / page', '50 / page', '100 / page']}
+            />
+            <span className="text-[13px] text-fg-muted" aria-live="polite">
+              {leads.refreshing ? 'Updating…' : `${leads.total} lead${leads.total === 1 ? '' : 's'}`}
             </span>
-            <Action onClick={() => setByScore(true)}>✦ Score leads</Action>
-            <Action variant="solid" onClick={() => create()}>
+            <Action onClick={() => setByScore(true)}>Show highest scores</Action>
+            <Action variant="solid" onClick={() => setCreating(true)}>
               + New lead
             </Action>
           </div>
         </div>
 
         <Toolbar>
-          <Select label="All sources" options={leadSources} />
-          <Select label="All scores" options={scoreBands} />
+          <Select
+            label="All sources"
+            value={source || 'All sources'}
+            onChange={(value) => setSource(value === 'All sources' ? '' : value)}
+            options={['All sources', ...leadSources]}
+          />
           <button
             onClick={() => setByScore((prev) => !prev)}
             aria-pressed={byScore}
@@ -216,22 +238,182 @@ export function CrmLeads() {
         </Toolbar>
       </div>
 
-      {visible.length ? (
-        list(byScore ? (a, b) => Number(b.fields.Score ?? 0) - Number(a.fields.Score ?? 0) : undefined)
+      {leads.loading ? (
+        <div role="status" className="rounded-2xl border border-line bg-surface px-6 py-16 text-center text-[14px] text-fg-muted">
+          Loading leads…
+        </div>
+      ) : leads.error ? (
+        /* An error is never rendered as an empty list — that is how a failed
+           request gets mistaken for "you have no data". */
+        <div role="alert" className="rounded-2xl border border-bad/40 bg-bad-muted/30 px-6 py-10 text-center">
+          <p className="text-[15px] font-medium text-fg">
+            {leads.denied ? 'You do not have access to leads in this workspace.' : 'We could not load your leads.'}
+          </p>
+          <p className="mt-1.5 text-[13px] text-fg-muted">{leads.error.message}</p>
+          {leads.canRetry && (
+            <div className="mt-4">
+              <Action onClick={leads.refetch}>Try again</Action>
+            </div>
+          )}
+          {leads.error.requestId && (
+            <p className="mt-3 font-mono text-[11px] text-fg-muted">Reference {leads.error.requestId}</p>
+          )}
+        </div>
+      ) : shown.length ? (
+        view === 'Board' ? (
+          <div className="grid gap-4 md:grid-cols-3">
+            {leadStatuses
+              .filter((item) => item !== 'All')
+              .map((stage) => (
+                <section key={stage}>
+                  <h3 className="mb-3 font-semibold">{stage}</h3>
+                  <LeadRows rows={shown.filter((lead) => lead.status === stage)} />
+                </section>
+              ))}
+          </div>
+        ) : (
+          <LeadRows rows={shown} />
+        )
       ) : (
         <BigEmpty
           icon="👤"
-          title={records.length ? `No ${status.toLowerCase()} leads` : 'No leads yet'}
-          blurb="Capture your first lead — press c, or import from a CSV."
+          title={query || status !== 'All' || source ? 'No leads match these filters' : 'No leads yet'}
+          blurb="Create your first lead to start building your pipeline."
           action={
-            <Action variant="solid" onClick={() => create()}>
+            <Action variant="solid" onClick={() => setCreating(true)}>
               + New lead
             </Action>
           }
         />
       )}
-      {dialog}
+
+      {leads.total > pageSize && (
+        <nav aria-label="Lead pagination" className="flex items-center justify-end gap-3 text-sm">
+          <button
+            disabled={page === 0}
+            onClick={() => setPage(page - 1)}
+            className="rounded-xl border border-line px-3 py-2 disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span>
+            Page {page + 1} of {pageCount}
+          </span>
+          <button
+            disabled={page + 1 >= pageCount}
+            onClick={() => setPage(page + 1)}
+            className="rounded-xl border border-line px-3 py-2 disabled:opacity-40"
+          >
+            Next
+          </button>
+        </nav>
+      )}
+
+      {creating && (
+        <NewLeadDialog
+          pending={leads.writing}
+          fieldErrors={leads.fieldErrors}
+          error={leads.writeError?.message ?? null}
+          onClose={() => setCreating(false)}
+          onSubmit={async (input) => {
+            const created = await leads.createLead(input)
+            if (created) setCreating(false)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+/** One row per server record. Money-free, so no formatting decisions here. */
+function LeadRows({ rows }: { rows: ServerLead[] }) {
+  return (
+    <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+      {rows.map((lead) => (
+        <li key={lead.id} className="flex flex-wrap items-center gap-4 px-6 py-3.5 text-[14px]">
+          <span className="min-w-[10rem] flex-1 font-medium">{lead.name}</span>
+          <span className="min-w-0 flex-1 truncate text-[13px] text-fg-muted">
+            {[lead.company, lead.email].filter(Boolean).join(' · ') || '—'}
+          </span>
+          <span className="rounded-lg px-2.5 py-1 text-[11px] font-medium tone-sky">{lead.status}</span>
+          {lead.source && <span className="text-[12px] text-fg-muted">{lead.source}</span>}
+          <span className="w-10 text-right font-mono text-[12px]">{lead.score}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function NewLeadDialog({
+  onClose,
+  onSubmit,
+  pending,
+  fieldErrors,
+  error,
+}: {
+  onClose: () => void
+  onSubmit: (input: { name: string; email?: string; company?: string; source?: string; score?: number }) => void
+  pending: boolean
+  fieldErrors: Record<string, string>
+  error: string | null
+}) {
+  const [values, setValues] = useState({ name: '', email: '', company: '', source: leadSources[0], score: '0' })
+  const set = (key: string, value: string) => setValues((prev) => ({ ...prev, [key]: value }))
+
+  return (
+    <Dialog title="New lead" onClose={onClose}>
+      <div className="mt-5 grid gap-4">
+        {(['name', 'email', 'company'] as const).map((field) => (
+          <label key={field}>
+            <span className="text-[13px] text-fg-2">
+              {field === 'name' ? 'Name' : field === 'email' ? 'Email' : 'Company'}
+              {field === 'name' && <span className="text-bad"> *</span>}
+            </span>
+            <input
+              value={values[field]}
+              onChange={(event) => set(field, event.target.value)}
+              className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[14px] focus:border-accent focus:outline-none"
+            />
+            {fieldErrors[field] && <span className="mt-1 block text-[12px] text-bad">{fieldErrors[field]}</span>}
+          </label>
+        ))}
+        <label>
+          <span className="text-[13px] text-fg-2">Source</span>
+          <select
+            value={values.source}
+            onChange={(event) => set('source', event.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[14px]"
+          >
+            {leadSources.map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+      {/* A server error that is not field-specific still has to be visible. */}
+      {error && !Object.keys(fieldErrors).length && (
+        <p role="alert" className="mt-4 text-[13px] text-bad">
+          {error}
+        </p>
+      )}
+      <div className="mt-6 flex justify-end gap-3">
+        <Action onClick={onClose}>Cancel</Action>
+        <Action
+          variant="solid"
+          onClick={() =>
+            onSubmit({
+              name: values.name,
+              email: values.email || undefined,
+              company: values.company || undefined,
+              source: values.source,
+              score: Number(values.score) || 0,
+            })
+          }
+        >
+          {pending ? 'Creating…' : 'Create lead'}
+        </Action>
+      </div>
+    </Dialog>
   )
 }
 
@@ -240,7 +422,7 @@ export function CrmLeads() {
 export function CrmContacts() {
   const [type, setType] = useState('All')
   const [archived, setArchived] = useState(false)
-  const { records, create, dialog, list, exportCsv, importCsv } = useRecords('crm.contacts')
+  const { records, query, setQuery, create, dialog, list, exportCsv, importCsv } = useRecords('crm.contacts')
 
   const visible = records.filter((item) => type === 'All' || (item.fields.Type ?? 'Prospect') === type)
   const duplicates = records.filter(
@@ -259,7 +441,7 @@ export function CrmContacts() {
         <p className="mt-1.5 text-[15px] text-fg-muted">Manage leads, clients, vendors, and partners across your org.</p>
 
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
-          <SearchBox placeholder="Search contacts..." />
+          <SearchBox placeholder="Search contacts..." value={query} onChange={setQuery} />
           <Action onClick={() => setType('All')}>
             ⇄ Find duplicates{duplicates.length ? ` (${duplicates.length})` : ''}
           </Action>
@@ -289,7 +471,7 @@ export function CrmContacts() {
       </Card>
 
       {visible.length ? (
-        list()
+        list(undefined, visible)
       ) : (
         <BigEmpty
           icon="👤"
@@ -310,7 +492,7 @@ export function CrmContacts() {
 /* -------------------------------- Companies ------------------------------- */
 
 export function CrmCompanies() {
-  const { records, create, dialog, list, exportCsv, importCsv } = useRecords('crm.companies')
+  const { records, query, setQuery, create, dialog, list, exportCsv, importCsv } = useRecords('crm.companies')
 
   return (
     <div className="space-y-5">
@@ -326,11 +508,11 @@ export function CrmCompanies() {
         <div className="mt-5 flex flex-wrap items-center gap-2.5">
           <Action onClick={() => create('Prospect company')}>Prospects only</Action>
           <Action onClick={() => create('Sales customer')}>Needs Sales Customer</Action>
-          <SearchBox placeholder="Search companies..." />
+          <SearchBox placeholder="Search companies..." value={query} onChange={setQuery} />
           <Select label="/ page" options={['25 / page', '50 / page', '100 / page']} />
           <Action onClick={importCsv}>⤒ Import</Action>
           <Action onClick={() => exportCsv('companies')}>⤓ CSV</Action>
-          <Action onClick={() => exportCsv('companies')}>⤓ Excel</Action>
+          <Action onClick={() => exportCsv('companies')}>⤓ CSV (spreadsheet)</Action>
           <Action variant="solid" onClick={() => create()}>
             + Add Company
           </Action>
@@ -361,7 +543,7 @@ export function CrmCompanies() {
 export function CrmDeals() {
   const [view, setView] = useState('Board')
   const [favourites, setFavourites] = useState(false)
-  const { records, create, dialog, list } = useRecords('crm.deals')
+  const { records, query, setQuery, create, dialog, list } = useRecords('crm.deals')
 
   const dealsIn = (stage: string) => records.filter((deal) => (deal.fields.Stage ?? 'New') === stage)
   const valueOf = (rows: typeof records) => rows.reduce((total, deal) => total + Number(deal.fields.Value ?? 0), 0)
@@ -376,7 +558,7 @@ export function CrmDeals() {
         <Select label="Source" options={leadSources} />
         <Select label="Owner" options={['Me', 'Unassigned']} />
         <Action onClick={() => setFavourites((prev) => !prev)}>{favourites ? '★ All deals' : '★ Favorites'}</Action>
-        <SearchBox placeholder="Search deals..." />
+        <SearchBox placeholder="Search deals..." value={query} onChange={setQuery} />
         <Action variant="solid" onClick={() => create()}>
           + New deal
         </Action>
@@ -528,12 +710,12 @@ export function CrmCalendar() {
 
 export function CrmActivities() {
   const [view, setView] = useState('Timeline')
-  const { records, create, dialog, list } = useRecords('crm.activities')
+  const { records, query, setQuery, create, dialog, list } = useRecords('crm.activities')
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2.5">
-        <SearchBox placeholder="Search activities..." />
+        <SearchBox placeholder="Search activities..." value={query} onChange={setQuery} />
         <Select label="All types" options={activityTypes} />
         <Select label="Any time" options={timeRanges} />
         <div className="ml-auto flex items-center gap-2.5">

@@ -25,9 +25,9 @@ export function PageHeader({
   )
 }
 
-export function EmptyState({ icon, title, blurb, action }: { icon: string; title: string; blurb: string; action?: ReactNode }) {
+export function EmptyState({ icon, title, blurb, action, spacing = 'compact' }: { icon: string; title: string; blurb: string; action?: ReactNode; spacing?: 'compact' | 'roomy' }) {
   return (
-    <div className="rounded-2xl border border-dashed border-line bg-surface px-6 py-12 text-center">
+    <div className={`rounded-2xl border border-dashed border-line bg-surface px-6 text-center ${spacing === 'roomy' ? 'py-14' : 'py-12'}`}>
       <span aria-hidden className="text-2xl">
         {icon}
       </span>

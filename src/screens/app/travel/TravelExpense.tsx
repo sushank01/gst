@@ -3,7 +3,7 @@
 import { Link, useSearchParams } from '../../../lib/router'
 import { Icon } from '../../../components/Icon'
 import { marketApps } from '../../../lib/appData'
-import { teTabs, type TeTabId } from '../../../lib/travelExpenseData'
+import { teTabs } from '../../../lib/travelExpenseData'
 import { useWorkspace } from '../../../lib/workspace'
 import {
   AgencyReviewPane,
@@ -22,7 +22,7 @@ const app = marketApps.find((item) => item.code === 'TE')
 export default function TravelExpense() {
   const [params, setParams] = useSearchParams()
   const { installed, trialDaysLeft } = useWorkspace()
-  const tab = (teTabs.find((item) => item.id === params.get('tab'))?.id ?? 'dashboard') as TeTabId
+  const tab = (teTabs.find((item) => item.id === params.get('tab'))?.id ?? 'dashboard')
 
   if (!app || !installed.includes('TE')) {
     return (

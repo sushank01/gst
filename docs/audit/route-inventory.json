@@ -1,0 +1,352 @@
+[
+  {
+    "route": "/[...slug]",
+    "file": "src/app/[...slug]/page.tsx",
+    "imports": [
+      "next/navigation",
+      "../../screens/ProductPage",
+      "../../lib/pages"
+    ]
+  },
+  {
+    "route": "/app/[slug]",
+    "file": "src/app/app/[slug]/page.tsx",
+    "imports": [
+      "../../../screens/app/GenericPortal"
+    ]
+  },
+  {
+    "route": "/app/account",
+    "file": "src/app/app/account/page.tsx",
+    "imports": [
+      "../../../screens/app/workspace"
+    ]
+  },
+  {
+    "route": "/app/admin/scheduled-jobs",
+    "file": "src/app/app/admin/scheduled-jobs/page.tsx",
+    "imports": [
+      "../../../../screens/app/AdminScheduledJobs"
+    ]
+  },
+  {
+    "route": "/app/agent-portal",
+    "file": "src/app/app/agent-portal/page.tsx",
+    "imports": [
+      "../../../screens/app/AgentPortal"
+    ]
+  },
+  {
+    "route": "/app/approvals",
+    "file": "src/app/app/approvals/page.tsx",
+    "imports": [
+      "../../../screens/app/Approvals"
+    ]
+  },
+  {
+    "route": "/app/asset-management",
+    "file": "src/app/app/asset-management/page.tsx",
+    "imports": [
+      "../../../screens/app/assets/AssetManagement"
+    ]
+  },
+  {
+    "route": "/app/build/agent-studio",
+    "file": "src/app/app/build/agent-studio/page.tsx",
+    "imports": [
+      "../../../../screens/app/AgentStudio"
+    ]
+  },
+  {
+    "route": "/app/build/vibe-studio",
+    "file": "src/app/app/build/vibe-studio/page.tsx",
+    "imports": [
+      "../../../../screens/app/VibeStudio"
+    ]
+  },
+  {
+    "route": "/app/business/chat",
+    "file": "src/app/app/business/chat/page.tsx",
+    "imports": [
+      "../../../../screens/app/business/Chat"
+    ]
+  },
+  {
+    "route": "/app/business",
+    "file": "src/app/app/business/page.tsx",
+    "imports": [
+      "../../../screens/app/business/Suite"
+    ]
+  },
+  {
+    "route": "/app/business/tool/[slug]",
+    "file": "src/app/app/business/tool/[slug]/page.tsx",
+    "imports": [
+      "../../../../../screens/app/business/Tool"
+    ]
+  },
+  {
+    "route": "/app/client-portal",
+    "file": "src/app/app/client-portal/page.tsx",
+    "imports": [
+      "../../../screens/app/ClientPortal"
+    ]
+  },
+  {
+    "route": "/app/compliance-center",
+    "file": "src/app/app/compliance-center/page.tsx",
+    "imports": [
+      "../../../screens/app/ComplianceCenter"
+    ]
+  },
+  {
+    "route": "/app/crm",
+    "file": "src/app/app/crm/page.tsx",
+    "imports": [
+      "../../../screens/app/crm/Crm"
+    ]
+  },
+  {
+    "route": "/app/governance",
+    "file": "src/app/app/governance/page.tsx",
+    "imports": [
+      "../../../screens/app/Governance"
+    ]
+  },
+  {
+    "route": "/app/guardrails",
+    "file": "src/app/app/guardrails/page.tsx",
+    "imports": [
+      "../../../screens/app/Guardrails"
+    ]
+  },
+  {
+    "route": "/app/hr",
+    "file": "src/app/app/hr/page.tsx",
+    "imports": [
+      "../../../screens/app/hr/Hr"
+    ]
+  },
+  {
+    "route": "/app/inbox",
+    "file": "src/app/app/inbox/page.tsx",
+    "imports": [
+      "../../../screens/app/workspace"
+    ]
+  },
+  {
+    "route": "/app/integrations",
+    "file": "src/app/app/integrations/page.tsx",
+    "imports": [
+      "../../../screens/app/Integrations"
+    ]
+  },
+  {
+    "route": "/app/marketplace",
+    "file": "src/app/app/marketplace/page.tsx",
+    "imports": [
+      "../../../screens/app/Marketplace"
+    ]
+  },
+  {
+    "route": "/app/me/announcements",
+    "file": "src/app/app/me/announcements/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/attendance",
+    "file": "src/app/app/me/attendance/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/documents",
+    "file": "src/app/app/me/documents/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/leaves",
+    "file": "src/app/app/me/leaves/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/onboarding",
+    "file": "src/app/app/me/onboarding/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me",
+    "file": "src/app/app/me/page.tsx",
+    "imports": [
+      "../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/payslips",
+    "file": "src/app/app/me/payslips/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/profile",
+    "file": "src/app/app/me/profile/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/team-approvals",
+    "file": "src/app/app/me/team-approvals/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app/me/timesheets",
+    "file": "src/app/app/me/timesheets/page.tsx",
+    "imports": [
+      "../../../../screens/app/portals"
+    ]
+  },
+  {
+    "route": "/app",
+    "file": "src/app/app/page.tsx",
+    "imports": [
+      "../../screens/app/Overview"
+    ]
+  },
+  {
+    "route": "/app/pitch-pilot/[[...section]]",
+    "file": "src/app/app/pitch-pilot/[[...section]]/page.tsx",
+    "imports": [
+      "../../../../screens/app/pitch/PitchPilot"
+    ]
+  },
+  {
+    "route": "/app/prompt-lab",
+    "file": "src/app/app/prompt-lab/page.tsx",
+    "imports": [
+      "../../../screens/app/PromptLab"
+    ]
+  },
+  {
+    "route": "/app/runners",
+    "file": "src/app/app/runners/page.tsx",
+    "imports": [
+      "../../../screens/app/Runners"
+    ]
+  },
+  {
+    "route": "/app/runs",
+    "file": "src/app/app/runs/page.tsx",
+    "imports": [
+      "../../../screens/app/Runs"
+    ]
+  },
+  {
+    "route": "/app/sales-pos",
+    "file": "src/app/app/sales-pos/page.tsx",
+    "imports": [
+      "../../../screens/app/pos/SalesPos"
+    ]
+  },
+  {
+    "route": "/app/scheduled-jobs",
+    "file": "src/app/app/scheduled-jobs/page.tsx",
+    "imports": [
+      "../../../screens/app/ScheduledJobs"
+    ]
+  },
+  {
+    "route": "/app/setup/companies",
+    "file": "src/app/app/setup/companies/page.tsx",
+    "imports": [
+      "../../../../screens/app/setup/Companies"
+    ]
+  },
+  {
+    "route": "/app/setup",
+    "file": "src/app/app/setup/page.tsx",
+    "imports": [
+      "../../../screens/app/setup/Setup"
+    ]
+  },
+  {
+    "route": "/app/support-ticketing",
+    "file": "src/app/app/support-ticketing/page.tsx",
+    "imports": [
+      "../../../screens/app/support/SupportTicketing"
+    ]
+  },
+  {
+    "route": "/app/travel-expense",
+    "file": "src/app/app/travel-expense/page.tsx",
+    "imports": [
+      "../../../screens/app/travel/TravelExpense"
+    ]
+  },
+  {
+    "route": "/login",
+    "file": "src/app/login/page.tsx",
+    "imports": [
+      "../../screens/Login"
+    ]
+  },
+  {
+    "route": "/marketplace",
+    "file": "src/app/marketplace/page.tsx",
+    "imports": [
+      "../../screens/PublicMarketplace"
+    ]
+  },
+  {
+    "route": "/onboarding",
+    "file": "src/app/onboarding/page.tsx",
+    "imports": [
+      "react",
+      "../../screens/Onboarding",
+      "../../routes/Protected"
+    ]
+  },
+  {
+    "route": "/",
+    "file": "src/app/page.tsx",
+    "imports": [
+      "../screens/Landing"
+    ]
+  },
+  {
+    "route": "/register",
+    "file": "src/app/register/page.tsx",
+    "imports": [
+      "react",
+      "../../screens/Register"
+    ]
+  },
+  {
+    "route": "/studio",
+    "file": "src/app/studio/page.tsx",
+    "imports": [
+      "../../screens/studio/AgentStudio",
+      "../../routes/Protected"
+    ]
+  },
+  {
+    "route": "/studio/workspace/[workspaceId]/home",
+    "file": "src/app/studio/workspace/[workspaceId]/home/page.tsx",
+    "imports": [
+      "../../../../../screens/studio/AgentStudio",
+      "../../../../../routes/Protected"
+    ]
+  }
+]

@@ -148,7 +148,8 @@ export default function VibeStudio() {
         <form
           onSubmit={(event) => {
             event.preventDefault()
-            build()
+            // Fire-and-forget by design; `build` reports its own failures in state.
+            void build()
           }}
           className="mt-8 rounded-2xl border border-line bg-surface p-5 text-left shadow-sm focus-within:border-accent"
         >

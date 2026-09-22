@@ -1,0 +1,642 @@
+[
+ {
+  "domain": "Pitch",
+  "question": "Currency: Rfp.estimate is a bare number rendered with a literal '$' via toLocaleString('en-US') (panes.tsx:19). No currency is stored anywhere in Pitch Pilot, and the Brand Kit phone placeholder is '+91 98…'. Is Pitch Pilot single-currency per tenant, per company, or per RFP? Pipeline aggregates cannot be defined until this is answered, and mixed-currency sums must not be invented."
+ },
+ {
+  "domain": "Pitch",
+  "question": "What 'estimate' actually means: the client's stated budget, our bid amount, a weighted forecast, or a contract ceiling? It drives both 'Pipeline value' tiles and is never labelled beyond 'Total estimate, in-flight RFPs'. Nothing in the source says who sets it or when."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Stage semantics and who transitions: 'Extracting' → 'Your turn' → 'Drafting' → 'Out for client' → Won/Lost. Which transitions are system-driven (extraction completing) vs manual? Which are reversible? Is 'Out for client' a send event with an external artefact or just an internal label? updateRfp has zero callers, so the prototype gives no evidence either way."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Win-rate denominator and cycle-time boundaries: is win rate Won/(Won+Lost) over all time (what the code does) or over a period, and does it exclude RFPs abandoned without a decision? Which two stages bound the promised 'cycle time'? Do not pick one silently — it is a reported business metric."
+ },
+ {
+  "domain": "Pitch",
+  "question": "deadline type and timezone: the column is a string that is always ''. Is a submission deadline a date, or a datetime in the issuing authority's timezone (which is how public solicitations usually work)? date vs timestamptz is a migration-level decision."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Field data types in extraction schemas: the 22 stock field labels include money ('Budget range', 'Day rate', 'Bond'), dates ('Submission deadline'), integers ('Team size') and tabular content ('Compliance matrix'), but a field is only a display string today. Do fields carry types, required flags, and validation, or is every extracted value free text? This determines whether ExtractedFieldValue needs typed columns."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Are stock schemas tenant-editable? panes.tsx:599 says 'Edit defaults', panes.tsx:648 says 'Fields are fixed'. Fork-on-edit, admin-only edit, or truly immutable? The two copy strings on one screen contradict each other."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Are `verticals` and `kbCategories` fixed platform catalogs or tenant-extensible? Both are module constants today, and Rfp.vertical is additionally the same string as one of the stock schema names ('Government / Municipal'), conflating two vocabularies."
+ },
+ {
+  "domain": "Pitch",
+  "question": "monthlyAiBudget = 1000 units: the dashboard renders it as '$ 1000' beside creditsUsed, but MONTHLY_CREDITS is also 1000 and creditsUsed is a credit count. Is the Pitch budget denominated in credits or in currency, is it per-app or the shared tenant pool, and who sets it? No Pitch operation currently calls spend(), so there is no evidence of the intended economics."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Do Knowledge Base documents carry files at all, or are they meant to be text authored in-app? The screen says 'Upload' and the dialog offers only a title — either the file input is missing or the 'Upload' framing is wrong. This decides whether KnowledgeDocument needs an object-store row."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Deck output format and scope: .pptx only, or PDF as well? Which slides are generated (the previews mention cover, footer, CTA)? Is the deck an answer to the RFP's questions, a capability deck, or both? The product's headline feature has no implementation to infer from — and no rendering provider is named anywhere, so none may be assumed."
+ },
+ {
+  "domain": "Pitch",
+  "question": "RFP ownership and assignment: 'My queue' and 'Your turn' imply per-user assignment, but Rfp has no owner field and there is no assignment control. Is an RFP owned by one person, a team, or unassigned until someone picks it up?"
+ },
+ {
+  "domain": "Pitch",
+  "question": "Tenant vs company scoping: the platform has Companies and intercompany pairs, and Pitch Pilot participates in neither. Are RFPs bid by a specific legal entity (which would affect the brand kit, the contact strip and the pipeline roll-up), or is Pitch Pilot tenant-level only?"
+ },
+ {
+  "domain": "Pitch",
+  "question": "Retention and residency for uploaded client RFPs and generated decks: these are third-party confidential documents. How long are the source PDFs kept, who may download them, and does a Won/Lost decision change retention? Nothing in the prototype addresses storage at all."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Sample-data semantics: should loading samples be refused when the tenant already has real RFPs, and should clearing delete only sample-tagged rows? The current implementation wipes real data under both labels, so the intended behaviour cannot be read off the code."
+ },
+ {
+  "domain": "Pitch",
+  "question": "Does 'Out for client' imply an external share surface (a client-visible link or portal) that would need its own access model, or is the deck delivered out-of-band by email? 'Sent, awaiting reply' is the only evidence and it is ambiguous."
+ },
+ {
+  "domain": "Sales",
+  "question": "Subscription cadence: no interval, anchor, start or end field exists anywhere. What billing frequencies must be supported, what is the period key format, and does billing anchor to the subscription start or to a calendar boundary?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Subscription sweep scope: should 'Run due now' bill only periods whose due date has passed, and should a manual run be limited to one per tenant per business date? Source only filters on status === 'Active'."
+ },
+ {
+  "domain": "Sales",
+  "question": "Payment terms: dueDate is never populated. Are terms held on the customer, the contract, the invoice, or a tenant default — and are they net days, end-of-month, or a schedule?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Money semantics: is PosDoc.total tax-inclusive or tax-exclusive, and does it include or exclude discounts and shipping? No subtotal/tax/discount breakdown exists to disambiguate."
+ },
+ {
+  "domain": "Sales",
+  "question": "Currency policy: the till hardcodes USD labelled 'Org default' while Company.currency exists and is never read. Is the domain single-currency per company, and if not, what FX source and rate-snapshot point apply?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Rate contract semantics: the blurb promises an agreed rate, a committed volume and a term, none of which are captured. What defines precedence when a contract, a price list and a manual override disagree?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Quotation status semantics: who may move a quote to Sent/Accepted/Rejected, what triggers Expired (no validity date exists), and what distinguishes Superseded from Cancelled?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Quotation title: it is currently stored in the same `reason` column used for credit/return/refund reasons. Confirm these are two distinct concepts before the column is split."
+ },
+ {
+  "domain": "Sales",
+  "question": "Over-delivery: is shipping more than the ordered quantity allowed, blocked, or allowed within a tolerance? Nothing in source addresses it."
+ },
+ {
+  "domain": "Sales",
+  "question": "3-way match basis: are the price and quantity tolerances percentages of a line or of the document total, and are they evaluated at invoice creation, at posting, or both?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Return semantics: are returns raised per invoice line or at header level, and what caps a partial refund — invoiced quantity, invoiced value, or the remaining credit?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Credit note 'Applied': what can a credit be applied to (a specific invoice, the account balance, a future invoice), and is partial application allowed?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Refund execution: 'Sent' and 'Failed' imply an outbound payment path. No provider, method or contract is named anywhere in source — this needs an explicit product decision and must not be inferred."
+ },
+ {
+  "domain": "Sales",
+  "question": "Cash variance 'recent average': the policy stores amberAverage/redAverage but no code computes an average and no window length is defined. Over how many shifts or days?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Variance reason: the settings hint promises a blocking reason prompt above a threshold. Is the reason free text or a controlled taxonomy, and who may override the block?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Cashier identity: shifts store session.user.fullName as a string, defaulting to the literal 'Cashier'. Should a cashier be a platform user, an HR employee record, or a POS-specific operator?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Terminal / till identity: there is no terminal entity, so nothing prevents two concurrent open shifts. Is a shift per terminal, per cashier, or per store?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Warehouse source: the till offers two hardcoded warehouse names. Should these come from the Inventory app, and is the POS-to-inventory posting in scope at all?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Tax model: the seeded slabs render CGST/SGST/IGST strings and the within-state vs inter-state choice depends on buyer and seller registration, neither of which is captured. The statutory rules, the jurisdiction determination and the applicable rates must be supplied as an explicit decision — they must not be inferred from the seed array or from marketing copy."
+ },
+ {
+  "domain": "Sales",
+  "question": "Tax rate changes: must posted documents retain the rate in force at posting (rate snapshot), and do tax categories need effective-from/to dating?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Loyalty accrual: 'net subtotal' is undefined (before or after discount, before or after tax), the rounding rule for fractional points is unspecified, points have no expiry rule, and no currency is attached to pointValue."
+ },
+ {
+  "domain": "Sales",
+  "question": "Loyalty tiers: what window defines 'lifetime spend', in which currency, and do tiers ever downgrade?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Customer groups: the pane exists with no linkage. Is a customer in exactly one group, and does the group drive pricing, tax or only reporting?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Report definitions: cohort granularity and retention window, the margin cost basis (there is no unit cost anywhere), the Z-report boundary (business date vs shift), and the cashflow forecast method are all undefined in source."
+ },
+ {
+  "domain": "Sales",
+  "question": "Fiscal calendar: the dashboard states 'no fiscal year configured, assuming calendar year'. What is the fiscal year start, and does the monthly chart need a year filter (today it buckets by month across all years)?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Role model: this domain has no roles at all — every audit row is hardcoded to user 'owner' / role 'Org_admin'. The POS role catalogue (cashier, shift manager, sales editor, AR/finance approver) and the separation-of-duties rules for credit notes and refunds need to be defined."
+ },
+ {
+  "domain": "Sales",
+  "question": "Company scoping: Company and IntercompanyPair exist in the workspace store but no POS record references a company. Are sales documents, tills and settings scoped per legal entity?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Document deletion: every list offers an unconfirmed hard delete, including of invoices, credit notes and refunds. Which documents may ever be deleted rather than voided, and does deletion need to preserve the reference number?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Custom fields: which records should carry them (customer, each document kind, shift), and should dropdown options be captured at definition time?"
+ },
+ {
+  "domain": "Sales",
+  "question": "Settings undo: the Change History promises undo but stores no before/after values. Which settings changes must be reversible, and what happens when a later change conflicts with the reverted one?"
+ },
+ {
+  "domain": "Sales",
+  "question": "AI agents: the 'Quote Quality Reviewer' has no model, prompt, credit cost or output contract in source. What does it emit, where is it surfaced, and what does the auto-pause credit threshold actually gate?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Stage semantics: what operationally distinguishes 'Allocated' from 'Issued', and what puts a unit into 'Awaiting check' (return inspection? periodic audit?). Which stages may hold a custodian, and which transitions are legal from which? The prototype allows every stage to follow every other."
+ },
+ {
+  "domain": "Asset",
+  "question": "Authoritative issue rule: the requests pane states an asset cannot be issued without a matching approved request, while the register lets anyone set 'Issued' directly. Which is the real rule, and is there a break-glass path for emergency issue?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Approval ladder semantics: within one level, must every listed approver agree or does any one suffice? Does a rejection at level 2 end the request or return it to level 1? Is there an SLA, escalation or delegation?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Approver identity: what does the seeded role 'Manager (unknown)' resolve to, and what does 'By Department head' resolve to given that no department exists on any record in the codebase?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Self-approval: may a requester approve their own request (the UI currently allows it and the copy appears to endorse it), and may an Asset admin approve unilaterally regardless of the ladder?"
+ },
+ {
+  "domain": "Asset",
+  "question": "The 'Issued' request status has no control that sets it: who performs issue, is a specific unit chosen at that moment, and must that unit be In Stock and of the requested type? Must a request name an asset type at all?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Request withdrawal/cancellation by the requester is absent from both the UI and the status vocabulary — is it in scope, and what status value should it use?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Asset type 'config' (the ⚙ 3 badge, hasConfig/configCount): what are these configuration rows? Specification templates, accessory bundles, approval overrides? Nothing in the source says, and only a count is rendered."
+ },
+ {
+  "domain": "Asset",
+  "question": "Four taxonomies ship empty and are read by nothing: 'models', 'warranty', 'numbering', 'notification'. What entries and what additional columns do they carry? In particular, what are the numbering rules ('Numbering & Naming') — prefix only, or per-company/per-year sequences with a reset policy?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Should make, model and mode of purchase (Purchase/Lease/Rental) be captured on an asset? Their taxonomies are seeded but no form, filter or report references them. Lease/rental in particular would imply terms and end dates the model does not have."
+ },
+ {
+  "domain": "Asset",
+  "question": "'Department usage' report: no department attribute exists on any asset, assignment or user. Where does department come from — the custodian's HR record, the project, or the owning company?"
+ },
+ {
+  "domain": "Asset",
+  "question": "'Asset ledger' report: is it a custody/event ledger or a financial one (cost, depreciation, book value)? The columns cannot be inferred from the source."
+ },
+ {
+  "domain": "Asset",
+  "question": "'Support notes' report and the Support taxonomies (Reasons, Notification): is there a distinct asset service/repair record, or should these link to tickets in the Support & Ticketing app? What does the 'Notification' taxonomy configure — recipients, channels, events?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Is asset cost, depreciation or book value in scope at all? There is no money field anywhere in this domain today, yet the Loop 29 gate speaks of 'financial history'. If yes: what depreciation method, and per company or per tenant?"
+ },
+ {
+  "domain": "Asset",
+  "question": "'Receive from purchase': which purchasing source feeds it? Purchase & Payables exists only as a marketplace card, and no PO entity exists in the codebase."
+ },
+ {
+  "domain": "Asset",
+  "question": "How does a user account link to an employee record? The My Asset empty state instructs the user to ask an admin to link it, but no employee identity, link feature or admin screen exists."
+ },
+ {
+  "domain": "Asset",
+  "question": "Leaver detection currently depends on a '(leaver)' suffix inside a display name. What is the authoritative source of employment status, and what should the offboarding recovery flow actually do (auto-raise a Return request? block the exit checklist?)."
+ },
+ {
+  "domain": "Asset",
+  "question": "Retirement with reason 'Sold' or 'Donated': are proceeds, buyer and disposal documents recorded, and does disposal post anywhere financially?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Custom fields: are they global or per asset type? Where do options for the 'select' type come from? Are they editable after values exist, and what happens to values when a field is deleted?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Change History: what exactly is revertible — configuration only, or record changes too — and at what granularity? What does 'reverted' mean for an entry that has since been superseded?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Taxonomy scope: are master taxonomies tenant-wide or per company? Assets are expected to be company-scoped, so a shared taxonomy with per-company tag sequences needs confirmation."
+ },
+ {
+  "domain": "Asset",
+  "question": "Agent controls: is 'Pause AI agents' genuinely tenant-wide as its label says (it is stored per app today, with a duplicate copy in POS), and is the auto-pause credit threshold per app or per tenant?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Should ITAM be installed by default? defaultInstalled is ['CRM','HR'], so every fresh workspace lands on the not-installed gate for this app."
+ },
+ {
+  "domain": "Asset",
+  "question": "The warranty alert window is the hardcoded constant 60 days. Should it be tenant-configurable, and per asset type?"
+ },
+ {
+  "domain": "Asset",
+  "question": "Who may see other people's requests and the detail text they contain? Today every signed-in user sees every request in the tenant, including the free-text justification."
+ },
+ {
+  "domain": "Support",
+  "question": "CSAT scale is contradictory in the source and must be decided, not guessed: the settings input for 'Low-score threshold' is min=1 max=5 and the dashboard averages a number to one decimal, but the 'What the customer sees' panel offers only 'Thumbs Up / Thumbs Down' (settings.tsx:523-533 vs 592-600). Is CSAT a 1–5 rating, a binary satisfied/not, or a 5-point scale presented as two buttons?"
+ },
+ {
+  "domain": "Support",
+  "question": "Is NPS per-ticket or per-relationship, and what triggers it? The review-queue copy claims 'every NPS detractor (0–6)' joins the low-score queue and a report tab is named NPS, but no model, survey, cadence or capture surface exists anywhere (settings.tsx:734-736, supportData.ts:62)."
+ },
+ {
+  "domain": "Support",
+  "question": "What exactly starts and stops an SLA clock? Statuses carry a 'waiting — SLA paused' behaviour but nothing pauses anything. Confirm: does the clock pause for the whole time in a waiting status, resume on the next active status, and is the first-response clock separate from the resolution clock?"
+ },
+ {
+  "domain": "Support",
+  "question": "What counts as a 'first response'? The SLA report prints a First-response column but no first-response timestamp exists. Is it the first public outbound agent message only, or does an auto-response satisfy it?"
+ },
+ {
+  "domain": "Support",
+  "question": "How is 'reopen' defined for the Reopen Rate report — any transition from a closed-behaviour status back to an active one, only within N days of resolution, or only customer-initiated reopens?"
+ },
+ {
+  "domain": "Support",
+  "question": "Should the SLA detector measure from ticket creation (as the prototype does) or from the last customer reply / last status change? The current sweep uses createdAt with no business hours (settings.tsx:1048-1052)."
+ },
+ {
+  "domain": "Support",
+  "question": "Auto-close currently reuses the CSAT 'Skip tickets older than (days)' value as its window (settings.tsx:1057). Is that intentional, or does auto-close need its own configurable window — and must a ticket awaiting a CSAT response be exempt?"
+ },
+ {
+  "domain": "Support",
+  "question": "Which entitlement actually gates SLA Policies and Routing Rules? Today the gate is a hardcoded constant map, not a plan record, and there is no implementation behind it. Confirm whether these ship, and in which plan tier."
+ },
+ {
+  "domain": "Support",
+  "question": "Ticket reference scheme: is SUP-0001 per tenant, per company or global, does it reset annually, and what is the format beyond 9999? The prototype derives it from array length, which is neither gap-free nor collision-safe."
+ },
+ {
+  "domain": "Support",
+  "question": "Should tickets be scoped to a legal entity (Company) as well as a tenant? The workspace models multiple companies and intercompany pairs, but a ticket carries no company reference at all."
+ },
+ {
+  "domain": "Support",
+  "question": "Service tier → SLA policy resolution is by display NAME today ('create a policy called \"Platinum\"'). Confirm this becomes a foreign key, and decide the behaviour when a mapped policy is renamed or deleted — silently fall back to the default (current behaviour) or block the change?"
+ },
+ {
+  "domain": "Support",
+  "question": "Where does a customer's service tier live? The Tiers pane says 'Set a customer's tier on their contact record', but support has no contact entity and no defined link to the CRM app."
+ },
+ {
+  "domain": "Support",
+  "question": "Are the four service tiers (Bronze/Silver/Gold/Platinum) a fixed platform vocabulary or tenant-editable? They are a hardcoded const array today while every other taxonomy is editable."
+ },
+ {
+  "domain": "Support",
+  "question": "Email provider and sending contract for CSAT surveys, auto-responses, scheduled report emails and ticket notifications — no provider, credential, sender domain, bounce handling or suppression list exists in the repository. This must be chosen explicitly; it cannot be inferred."
+ },
+ {
+  "domain": "Support",
+  "question": "Inbound email: which protocol and credential model (IMAP password, OAuth app password, or a provider API), and what is the thread-matching key — RFC Message-ID/In-Reply-To/References, a reference token injected into the subject, or a per-ticket reply-to address? None is specified in source."
+ },
+ {
+  "domain": "Support",
+  "question": "Inbound channel providers (SMS / WhatsApp / chat) and their webhook signature scheme, replay window and tenant-resolution strategy — unspecified; must not be invented."
+ },
+ {
+  "domain": "Support",
+  "question": "Business-hours semantics: which timezone source (tenant, team or policy), what holiday-calendar format, and does a schedule attach to an SLA policy, a team, or both?"
+ },
+ {
+  "domain": "Support",
+  "question": "Auto-response matching: what conditions are supported (channel, category, keyword, business hours), and what is the message template/merge-field syntax? Canned responses have the same open question — 'body' has no defined variable syntax today."
+ },
+ {
+  "domain": "Support",
+  "question": "Shift handoff requires a team model that does not exist. Define teams, membership, and the 'incoming team's own assignment strategy' named in the copy (round-robin, least-loaded, manual?)."
+ },
+ {
+  "domain": "Support",
+  "question": "Report exports offers an 'Excel' format that currently produces CSV. Is a real XLSX writer required, or should the option be removed?"
+ },
+ {
+  "domain": "Support",
+  "question": "Which report each scheduled export actually runs, on what cadence options, in whose timezone, and to which recipients — the current schedule row has none of these and hardcodes 'weekly / every Monday'."
+ },
+ {
+  "domain": "Support",
+  "question": "Roles and permissions for support are entirely absent: every audit row is written as role 'Org_admin'. Define the role set (agent, senior agent, supervisor, admin, end user, portal user) and, specifically, who may reassign another agent's ticket, who may see internal notes, who may export, and who may edit ticket fields."
+ },
+ {
+  "domain": "Support",
+  "question": "Should the 'Types' taxonomy (Question/Problem/Incident/Task/Feature Request) be applied to tickets? It is fully editable in Settings but no ticket carries a type and nothing reads it."
+ },
+ {
+  "domain": "Support",
+  "question": "Tags: free-text (current behaviour) or a managed vocabulary? And should the tag filter support multiple comma-separated tags with AND or OR semantics — the placeholder says 'tag(s)' but only one needle is matched."
+ },
+ {
+  "domain": "Support",
+  "question": "KB article visibility: the widget Help tab and the partner portal 'Help / KB' tab both imply public articles, but an article has only draft/published/archived with no internal-vs-public flag. Define the visibility model, and whether portal visibility is per-role."
+ },
+ {
+  "domain": "Support",
+  "question": "KB multi-language: the Tiers & search copy is explicitly about a German customer and an English article. Is the KB multi-locale with translated variants of one article, or one article per locale?"
+ },
+ {
+  "domain": "Support",
+  "question": "Attachments: tickets, replies and KB articles have no file handling at all. Confirm whether attachments are in scope and which object store/limits/virus-scanning apply."
+ },
+ {
+  "domain": "Support",
+  "question": "Widget public intake: which tenant identifier goes in the embed snippet (it is hardcoded to 'acme' today), what origin allowlist and rate limits apply, and what anti-abuse measure is acceptable for an anonymous ticket-creation endpoint."
+ },
+ {
+  "domain": "Support",
+  "question": "'My requests' matches on an exact email string equality. Should requester identity be a contact record (so an agent-created ticket appears for its requester), and should portal users and internal employees share one requester identity model?"
+ },
+ {
+  "domain": "Support",
+  "question": "Data retention and deletion for tickets, thread messages, raw inbound messages and CSAT comments — the prototype has no delete path for tickets and truncates its audit log at 500 entries, so neither retention nor legal hold is expressed anywhere."
+ },
+ {
+  "domain": "Business",
+  "question": "TWO AGENT STUDIOS: /studio (src/screens/studio/AgentStudio.tsx, prompt-first, linked from the sidebar and the dashboard tile) and /app/build/agent-studio (src/screens/app/AgentStudio.tsx, node canvas, unreachable from any link). They share no data model, no state and no route family. Are these one product in two phases, two products, or is the canvas dead code to delete? The schema differs completely depending on the answer."
+ },
+ {
+  "domain": "Business",
+  "question": "STUDIO WORKSPACE SCOPE: /studio/workspace/[workspaceId]/home accepts an id the component never reads. What does a studio workspace scope — agents only, or also knowledge/tables/files/schedules/logs? Is it per-tenant, per-team or per-user, and how does a user get a default one? Cannot be inferred from the source."
+ },
+ {
+  "domain": "Business",
+  "question": "MODEL CATALOGUE: four hardcoded lists disagree in both membership and format (chatModels: 'Claude Sonnet 4.6','Claude Opus 4.6','GPT-4.1','Gemini 2.5 Pro','Llama 3.3 70B'; PromptLab: 'Claude Sonnet 4','Claude Opus 4','GPT-4o','Gemini Pro'; vibeModels: 'Default · claude-sonnet-4-6','claude-opus-5','claude-sonnet-5','claude-haiku-4-5'; studioModel: 'claude-sonnet-4-6'). Which models are actually licensed and callable, and which surfaces may use which? Do not infer a provider contract from these strings."
+ },
+ {
+  "domain": "Business",
+  "question": "CREDIT ECONOMICS: costs are hardcoded per surface with no basis — suite tools 0-4 by tool, chat 1/turn, Prompt Lab 3/run flat regardless of model or tokens, Vibe build 15, Copilot 2/ask, agent run always 6. Is a credit a fixed unit of currency, a token proxy, or a per-model multiplier? What is the real price list?"
+ },
+ {
+  "domain": "Business",
+  "question": "ZERO-COST TOOLS: seven tools are priced 0 (hashtag-generator, invoice-description-writer, git-commit-message-writer, task-breakdown, checklist-generator, citation-formatter, alt-text-generator). Because spend(0) can never fail they run on an exhausted pool. Is free-tier metering intended, or is 0 a data-entry error?"
+ },
+ {
+  "domain": "Business",
+  "question": "CREDIT UNITS: Vibe Studio labels the same number 'AIU' while every other surface says 'AI Credits'. Are these the same unit? If not, what is the conversion?"
+ },
+ {
+  "domain": "Business",
+  "question": "PLAN CONSTANTS: MONTHLY_CREDITS=1000, APP_QUOTA=5, TRIAL_DAYS=13 are module constants applied to every tenant, and creditsUsed never resets so the 'monthly' allowance is a lifetime cap. What are the real per-plan allowances, the reset boundary, the timezone that boundary uses, and does the trial start at signup?"
+ },
+ {
+  "domain": "Business",
+  "question": "SUITE TOOL TAXONOMY: two incompatible catalogues exist — businessData.suiteCategories (10 categories / 102 tools / costs 0-4, used by the product) and appData.suiteTools (16 category-shaped 'tools' with different costs: AI Chat 2, Image Generation 12, Code 4, used by the /business-suite marketing page). Which is canonical? Note the product charges 1 per chat turn while the marketing catalogue prices AI Chat at 2."
+ },
+ {
+  "domain": "Business",
+  "question": "PER-TOOL INPUT FORMS: Tool.tsx states outright that the live product's per-tool forms were not transcribed and every tool shares one textarea. What are the real input schemas for all 102 tools? Without them SuiteTool.inputSchema cannot be populated."
+ },
+ {
+  "domain": "Business",
+  "question": "VIBE CAPABILITY vs SKILL: the product ships 6 capabilities (agent, business-solution-agents, web-app, erp-custom-agents, mobile-app, web-rpa-bot) while the marketing page advertises 12 vibeSkills with a different artifact vocabulary (Agent, App, Web app, Mobile app, Bot, Knowledge bot, Document, Spreadsheet, Deck, Website, Extension). Which set is the release scope, and what does each actually produce?"
+ },
+ {
+  "domain": "Business",
+  "question": "ARTIFACT SKILL vs KIND: addArtifact writes the same capability display name into both columns. Are these intended to be different axes (skill = builder used, kind = artifact produced) or is one redundant?"
+ },
+ {
+  "domain": "Business",
+  "question": "PUBLISH PERMISSION: the UI names an 'app-publish permission' that is enforced nowhere and does not exist in any permission list. What is the real permission name and who holds it?"
+ },
+ {
+  "domain": "Business",
+  "question": "ARTIFACT VERSIONING: publishArtifact sets status='published' AND bumps version 1→2 in one step, so a published artifact is never at the version that was reviewed. Should publishing freeze the current version, or open the next draft? Rollback semantics are unspecified."
+ },
+ {
+  "domain": "Business",
+  "question": "TEMPLATE COUNTS: Agent Studio advertises 82 templates and ships 25. Is the gap an unbuilt backlog (keep the target) or stale copy (count the rows)?"
+ },
+ {
+  "domain": "Business",
+  "question": "FIN BUNDLE: the agent catalogue defines a 'Finance & Accounting' (FIN) bundle with 3 agents but the marketplace has no FIN app, so those agents are permanently unrunnable. Conversely apps PP, PPTX, EVT, RQA and POD ship zero agents while the marketing copy says every app ships with bound agents. Which side is wrong?"
+ },
+ {
+  "domain": "Business",
+  "question": "CUSTOM AGENTS IN THE PLATFORM CATALOGUE: exactly two of the 60 catalogue agents carry custom:true ('Lead Qualify & Route', 'Resume Screening'). Are these seeded examples for every tenant, or tenant-authored records that leaked into a shared catalogue? This decides whether catalog_agents needs a nullable tenant_id."
+ },
+ {
+  "domain": "Business",
+  "question": "AGENT IDENTITY: Run.agent, Schedule.target and PosSettings.agents.disabled[] all key on an agent's display NAME. Are agent names guaranteed unique and immutable, or does this need a stable id plus a name snapshot on every run? (Recommending the latter, but the product rule is unstated.)"
+ },
+ {
+  "domain": "Business",
+  "question": "RUN STATUS VOCABULARY: the Run type declares 'success' | 'needs-review' | 'failed' but only 'success' is ever written. What produces 'needs-review' — a HITL pause, a guardrail hit, or a low confidence score — and what resumes it?"
+ },
+ {
+  "domain": "Business",
+  "question": "RUN RETENTION: recordRun caps history at 25 runs, silently discarding older ones, which also decays the per-agent run counts on the Agent Portal. What is the real retention period and is it plan-dependent?"
+ },
+ {
+  "domain": "Business",
+  "question": "AGENT NODE THRESHOLD: the canvas hardcodes an HITL node labelled 'HITL if > ₹50,000' and a 'Max 12 tool calls' guardrail, and the approvals sample uses a '₹50,000' approval cap, while migration 0001 defaults tenants to USD. Are guardrail thresholds per-tenant, per-company or per-agent, and in which currency? I have not inferred any monetary or approval policy from these strings."
+ },
+ {
+  "domain": "Business",
+  "question": "AGENT BLURB CLAIMS: several catalogue blurbs assert regulated behaviour — 'Payroll Compliance Checker: validates statutory calculations against current PF/ESI/PT rates and thresholds', 'Travel Policy Checker: reviews against the tenant's band-based travel policy', 'Contract Compliance Checker'. No rates, bands, policies or jurisdictions exist in the repository. These must come from an explicit product decision; I have invented none."
+ },
+ {
+  "domain": "Business",
+  "question": "COPILOT CAPABILITY: the greeting advertises taking actions ('install the Contracts app') and the reply promises approval gating. Which tools may the Copilot call, which actions are 'consequential', and does it act with the caller's permissions or its own service identity?"
+ },
+ {
+  "domain": "Business",
+  "question": "COPILOT CONTEXT: the 'apragya:copilot' window event carries no payload, so the POS settings panel that promises 'add a field for the customer's region' hands the dock no record context. What context should a surface pass, and is there an allowlist?"
+ },
+ {
+  "domain": "Business",
+  "question": "PUBLIC VIPPY DATA HANDLING: anonymous, unauthenticated, no rate limit and no consent notice. What is its knowledge source (public docs only?), its retention period, its abuse controls, and how does an anonymous conversation carry over to a tenant after signup as the copy promises?"
+ },
+ {
+  "domain": "Business",
+  "question": "PROMPT LAB DEFAULT TEMPERATURE: useState(2) against a 0-2 range ships the Lab at maximum temperature. Intended, or a bug that should default to ~0.7?"
+ },
+ {
+  "domain": "Business",
+  "question": "PROMPT LAB VARIABLES: {{variable}} placeholders are detected and displayed but there is no input to bind them, so a template can never be executed with data. Are variables bound at run time, at agent-binding time, or both?"
+ },
+ {
+  "domain": "Business",
+  "question": "PROMPT LIBRARY SHARING: PromptTemplate's doc comment says 'saved prompts the team can reach for'. What are the sharing scopes (private/team/tenant) and who may promote a prompt to a shared scope?"
+ },
+ {
+  "domain": "Business",
+  "question": "ONBOARDING INTENT: the hero prompt is captured into ?intent, displayed as 'Queued for your first run', then dropped — and VibeStudio reads a ?prompt= parameter nothing ever sets. Should the intent become a real first build, or should the promise be removed from the onboarding copy?"
+ },
+ {
+  "domain": "Business",
+  "question": "MULTI-COMPANY TAGGING: both the tool page and the marketing page say outputs are 'soft-tagged to your active company' and that users may 're-tag or untag' freely. No active-company selector exists anywhere. What sets the active company, and is the tag advisory (as the copy says) or an access boundary?"
+ },
+ {
+  "domain": "Business",
+  "question": "ORPHANED / DEAD SURFACES to confirm for removal or completion: /app/build/agent-studio (unlinked), Vibe Studio's Progress / My Playbooks / Settings tabs (no-op), the nine Agent Studio sidebar destinations, the Agent Studio header search input (no handler), and the four permanently empty Agent Portal filters."
+ },
+ {
+  "domain": "Marketing",
+  "question": "Trial length and anchor: marketing says 14 days (Landing hero, pricing footnote, /register stat), the runtime constant TRIAL_DAYS is 13 and never decrements. What is the real length, what does it start from (user signup or tenant creation), and what happens at expiry — downgrade to the free tier, read-only, or lock-out?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Credit allowance: MONTHLY_CREDITS is 1000 for everyone, while Starter advertises 2,000/month and Pro 5,000 + add-ons. Which allowance applies during trial? Does the pool reset on a calendar month or the billing anniversary, and do unused credits roll over?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "App quota: APP_QUOTA is 5 and unenforced; Starter says 'Install up to 3 enterprise apps' and Pro says 'All enterprise apps'; Overview renders a hardcoded '+ 2 included'. What is the trial quota, and do the two seed apps (CRM, HR) count against it?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Gated apps: MFG, IDP, PAY, EVT, RQA and POD carry gated:true with no plan reference, and onboarding installs them regardless. Which plan unlocks each, and should gating be a minimum-plan foreign key or an explicit entitlement table?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Seats: 'free forever for up to 3 users' (/free, Landing), '5 free seats during trial' (trustPoints, /help-center), 'Up to 10 users' (Starter), 'Up to 25 users' (Pro), and a hardcoded '1 / 1 seats' meter. Which applies when, and is the seat count hard-enforced at invite time or merely billed?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Per-plan build caps — Max Web Apps 3/5, Max Mobile Apps 2/3, Max RPA Bots 3/5 — are advertised but no counter exists anywhere in the codebase. What object is being counted, and against which entity?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Currency: all pricing is in ₹ (INR) with the symbol baked into display strings, while the tenant/company default is USD and the in-app dashboards say 'Amounts in USD'. Which currency does billing charge in, and is the billing currency independent of the tenant's reporting currency?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Is there a fourth 'Free' plan row? Three cards render on the landing page (Starter, Pro, Enterprise) but /free describes a distinct free-forever tier. Does it need its own plan record with its own limits?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Two-factor: what factor is intended (TOTP, WebAuthn, SMS)? Is it per-user or enforceable tenant-wide by an admin? How long should 'Remind me later' snooze before the banner returns? None of this is inferable — the auth_tokens table has an 'mfa_enroll' purpose but no code path uses it."
+ },
+ {
+  "domain": "Marketing",
+  "question": "SSO: which identity providers are actually in scope, is SSO configured per tenant (by email domain) or chosen per user, and does it use JIT provisioning as /trust claims? There is no OAuth/OIDC code to infer a provider contract from."
+ },
+ {
+  "domain": "Marketing",
+  "question": "Identity linking: User.provider is a single scalar ('password' | 'google' | 'microsoft'). Can one account hold several linked identities, and can a password be added to a provider-only account?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Onboarding vocabularies: industry and teamSize are stored as display labels. Should they become reference tables with stable ids, and is the industry list (7 entries, duplicated in two files) authoritative?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Onboarding's industry pipeline preload: the wizard promises preloaded triggers, decisions and integrations. What does that actually create — agent bindings, schedules, connector stubs? The 5 landing-page pipelines are unrelated marketing data and do not map to the 7 industries."
+ },
+ {
+  "domain": "Marketing",
+  "question": "The hero prompt (?intent=): should it be persisted as a lead/first-run job, who consumes it after onboarding, and does an abandoned signup's prompt need to be retained (and for how long, given it may contain business data)?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "OnboardingProfile.apps stores app display NAMES while install() takes app CODES. Which is canonical, and should the profile store installation references instead of a name array?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Catalog install counts (2…169 per app) and staff-pick figures ('4.9' rating, '2.4k installs'): are these global marketplace counters, per-tenant counts, or editorial numbers? There is no review or install-event entity to compute either from."
+ },
+ {
+  "domain": "Marketing",
+  "question": "Does uninstalling an app purge its tenant records, archive them, or retain them for reinstall? Today uninstall leaves every record behind and they silently reappear on reinstall."
+ },
+ {
+  "domain": "Marketing",
+  "question": "What should 'Disable' actually do — pause bound agents only, or also hide the app's surfaces and block record writes? Today it changes one button's label and nothing else."
+ },
+ {
+  "domain": "Marketing",
+  "question": "Notifications: only app-install and approval-decision produce one. What are the real categories (the Inbox header mentions @mentions, the dashboard mentions alerts), do they need per-user fan-out with per-user read state, and what retention applies? Today they are tenant-global, share one read flag and are truncated to 50."
+ },
+ {
+  "domain": "Marketing",
+  "question": "The Inbox 'Total today' tile adds pending approvals to unread notifications with no date filter. What window is intended, and in whose timezone — the tenant's or the viewer's?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Audit actor: the client shape stores the literal string 'owner' with an empty IP, while audit_events expects an actor_user_id, actor_kind and IP. Who is the actor for system-generated events, and where does the IP come from in a Next.js deployment?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Role labels: the UI prints 'Org Admin' everywhere while the server model is owner | admin | member | viewer. Which server role does 'Org Admin' mean, and what labels should the other three show?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Billing: there is no payment provider, subscription, invoice or cancellation anywhere. Is one in scope, and does 'no credit card' mean only that the trial needs none while conversion does?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Credit spend attribution: spend() takes only an amount. What reasons, reference types and per-user attribution does the ledger need, and should a failed or cancelled run be refunded?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Contact Sales and Contact Support both state in-page that nothing is submitted. What fields do the real forms carry, where do submissions go, and should a support enquiry create a Ticket in the Support & Ticketing app or land in an external system?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Marketing content: 29 pages, the pricing table, the FAQ set, staff picks and the app/agent catalog are all compiled-in TS constants. Should they move to a CMS (implying draft/publish, locale and link validation), or stay in code and be treated as build-time data?"
+ },
+ {
+  "domain": "Marketing",
+  "question": "Compliance and availability claims on the marketing pages — SOC 2 Type II, GDPR alignment, AES-256, 99.9% uptime SLA, HIPAA, region pinning, VPC/on-prem, SIEM export, 'never used to train models' — have no implementation in this repository. None of these should be inferred into a schema or a behaviour; they need product and legal confirmation before anything is built against them."
+ },
+ {
+  "domain": "Marketing",
+  "question": "Legal: all three legal pages state they are summaries and that the operative documents live at apragya.ai. Terms acceptance is collected at registration and discarded — should an accepted-version and timestamp be recorded, and does a new version require re-acceptance?"
+ }
+]

@@ -30,7 +30,7 @@ export function AttendanceCalendar({
   const offset = (first.getDay() + 6) % 7
   const start = new Date(year, month, 1 - offset)
 
-  const cells = Array.from({ length: 35 }, (_, index) => {
+  const cells = Array.from({ length: Math.ceil((offset + new Date(year, month + 1, 0).getDate()) / 7) * 7 }, (_, index) => {
     const date = new Date(start)
     date.setDate(start.getDate() + index)
     return date

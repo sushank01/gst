@@ -1,0 +1,3706 @@
+{
+ "domain": "Asset Management (ITAM) — /Users/sushank/.codex/worktrees/ac6c/gst",
+ "entities": [
+  {
+   "name": "Asset",
+   "sourceType": "Asset",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:353",
+   "purpose": "One individually tagged unit in the register. Today a flat row in a localStorage array; stage is overwritten in place so no lifecycle history survives.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "In Stock",
+    "Allocated",
+    "Issued",
+    "Awaiting check",
+    "In Repair",
+    "Retired"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "PK. crypto.randomUUID() at workspace.tsx:1720."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. No tenant column exists; all state is one localStorage key 'apragya.workspace'."
+    },
+    {
+     "name": "companyId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. Owning legal entity; needed for tag uniqueness and financial reporting."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Free text, trimmed; only field the create dialog requires (panes.tsx:427)."
+    },
+    {
+     "name": "tagNo",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'<tagPrefix><4-digit seq>'. Must be UNIQUE(tenant_id, company_id, tag_no). Prototype derives seq from array length (workspace.tsx:1717) so it repeats after any delete."
+    },
+    {
+     "name": "assetTypeId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. FK -> AssetTaxonomyEntry of taxonomy 'asset_types'. Replaces the value string."
+    },
+    {
+     "name": "type",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Taxonomy value key e.g. 'laptop'. Keep only as denormalised type_key; no FK today."
+    },
+    {
+     "name": "stage",
+     "tsType": "string",
+     "sqlType": "asset_stage (enum) or text + CHECK",
+     "nullable": false,
+     "notes": "assetData.ts:16. Free string in TS; any of the 6 values settable directly from the table dropdown."
+    },
+    {
+     "name": "project",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "RELATION-BY-NAME. Free text; the project filter list is built from DISTINCT of this string (panes.tsx:143)."
+    },
+    {
+     "name": "projectId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. FK to the Projects app once it exists."
+    },
+    {
+     "name": "purchase",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "RELATION-BY-NAME. Free-text PO reference, placeholder 'PO-1042' (panes.tsx:406)."
+    },
+    {
+     "name": "purchaseOrderId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. FK to Purchase & Payables; required by the 'Receive from purchase' control."
+    },
+    {
+     "name": "assignedTo",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "RELATION-BY-NAME. Display name only. NEVER written to a non-null value anywhere in the app (only ever set to null at panes.tsx:190 and :429), so the column is permanently '—'."
+    },
+    {
+     "name": "currentAssignmentId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. FK -> AssetAssignment; partial unique index enforces one active custodian."
+    },
+    {
+     "name": "currentCustodianId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. FK -> user/employee identity; replaces the name string and the '(leaver)' suffix hack."
+    },
+    {
+     "name": "warrantyEnd",
+     "tsType": "string",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "HTML date input, '' when unset. Date not timestamptz — it is a calendar expiry. daysUntil() returns Infinity for '' (panes.tsx:27)."
+    },
+    {
+     "name": "warrantyStart",
+     "tsType": "string | null",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "NEW. Not captured today; the 'warranty' taxonomy is defined but empty."
+    },
+    {
+     "name": "acquiredAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "Actually the record creation timestamp (workspace.tsx:1722) but rendered as asset 'Age' (panes.tsx:325). Rename to createdAt."
+    },
+    {
+     "name": "acquiredOn",
+     "tsType": "string | null",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "NEW. Real acquisition/receipt date; must be separate from created_at for Age and depreciation."
+    },
+    {
+     "name": "makeId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. 'makes' taxonomy has 10 seeded entries (assetData.ts:75) but no asset form field uses it."
+    },
+    {
+     "name": "modelId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. 'models' taxonomy exists and ships empty; no form field."
+    },
+    {
+     "name": "modeOfPurchaseId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. 'mode_of_purchase' taxonomy (Purchase/Lease/Rental) is seeded but never read."
+    },
+    {
+     "name": "serialNumber",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. Not in the prototype; unique per tenant when present."
+    },
+    {
+     "name": "purchaseCost",
+     "tsType": "number | null",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "NEW and NOT PRESENT in the prototype — no money field exists anywhere in this domain. Proposed because Loop 29 names acquisition and financial history. Never float."
+    },
+    {
+     "name": "purchaseCurrency",
+     "tsType": "string | null",
+     "sqlType": "char(3)",
+     "nullable": true,
+     "notes": "NEW. ISO-4217, paired with purchaseCost. Confirm scope before shipping."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW as a distinct column."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW. No update timestamp today; updateAsset blindly merges a patch."
+    },
+    {
+     "name": "createdByUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. Audit actor is hardcoded 'owner' (workspace.tsx:179)."
+    },
+    {
+     "name": "retiredAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. Replaces removeAsset's hard delete (workspace.tsx:1746) which destroys the unit and any history with it."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AssetTaxonomyEntry",
+     "via": "type: string (taxonomy value key)",
+     "gap": "No FK. Deleting the taxonomy entry (settings.tsx:655) orphans every asset holding that value, despite the UI claiming removal is refused."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Project",
+     "via": "project: string (display name)",
+     "gap": "Relation is a free-text name; renaming it in one asset silently forks the filter list."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "PurchaseOrder",
+     "via": "purchase: string (free-text reference)",
+     "gap": "No purchasing entity exists; 'Receive from purchase' is a canned string."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "assignedTo: string (full name)",
+     "gap": "Name-string custody, matched by equality against session.user.fullName (panes.tsx:446), and leaver status encoded as a '(leaver)' suffix (panes.tsx:40)."
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetAssignment"
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetEvent"
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetCustomFieldValue"
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetServiceRecord"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Company",
+     "via": "nothing",
+     "gap": "No company column; the whole workspace is one browser-wide blob."
+    }
+   ]
+  },
+  {
+   "name": "AssetAssignment",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:446",
+   "purpose": "One custody period. Required by the My Asset copy ('past and present', 'only your own periods') and by the leaver tile; nothing like it exists today.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Active",
+    "Returned",
+    "Transferred",
+    "Written off"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "assetId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK -> Asset. Partial unique index on (asset_id) WHERE returned_at IS NULL = one active custodian."
+    },
+    {
+     "name": "custodianUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Replaces assignedTo name string."
+    },
+    {
+     "name": "assetRequestId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "The approved request that authorised the issue; the UI claims this is mandatory (panes.tsx:508)."
+    },
+    {
+     "name": "issuedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "issuedByUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "returnedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "returnedToUserId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Vocabulary PROPOSED — not present in source."
+    },
+    {
+     "name": "conditionOut",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "conditionIn",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "note",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Asset",
+     "via": "assetId"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetRequest",
+     "via": "assetRequestId"
+    }
+   ]
+  },
+  {
+   "name": "AssetEvent",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:310",
+   "purpose": "Append-only lifecycle ledger. Today a stage change is an in-place overwrite (updateAsset) that leaves no from/to record, which is exactly what the 'Asset ledger' and 'Audit log' report tabs need.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "created",
+    "stage_changed",
+    "assigned",
+    "returned",
+    "transferred",
+    "sent_for_repair",
+    "repair_closed",
+    "check_started",
+    "check_passed",
+    "retired",
+    "archived",
+    "imported"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "assetId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "kind",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Vocabulary PROPOSED from the 6 stages plus the observed mutators."
+    },
+    {
+     "name": "fromStage",
+     "tsType": "string | null",
+     "sqlType": "asset_stage",
+     "nullable": true
+    },
+    {
+     "name": "toStage",
+     "tsType": "string | null",
+     "sqlType": "asset_stage",
+     "nullable": true
+    },
+    {
+     "name": "actorUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "occurredAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "reasonEntryId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "FK -> AssetTaxonomyEntry ('retirement_reasons' or support 'reasons')."
+    },
+    {
+     "name": "note",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "payload",
+     "tsType": "Record<string, unknown> | null",
+     "sqlType": "jsonb",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Asset",
+     "via": "assetId"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetTaxonomyEntry",
+     "via": "reasonEntryId"
+    }
+   ]
+  },
+  {
+   "name": "AssetRequest",
+   "sourceType": "AssetRequest",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:366",
+   "purpose": "A staff request for an asset. Approve/Reject writes a status and a single approver name; the configured approval ladder is never consulted.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Pending",
+    "Approved",
+    "Rejected",
+    "Issued"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "companyId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "reference",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'REQ-0001'. Derived from array length +1 (workspace.tsx:1762) so it collides after any deletion. Needs UNIQUE(tenant_id, reference) + a real sequence."
+    },
+    {
+     "name": "type",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "assetData.ts:111 — New asset | Replacement | Upgrade | Return | Repair."
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "asset_request_status (enum)",
+     "nullable": false,
+     "notes": "assetData.ts:112. 'Issued' is in the vocabulary but no control ever sets it."
+    },
+    {
+     "name": "raisedBy",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "RELATION-BY-NAME. session.user.fullName, falling back to the literal 'Me' (panes.tsx:484)."
+    },
+    {
+     "name": "raisedByUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. Replaces the name string used by the 'Mine' scope filter."
+    },
+    {
+     "name": "approvedBy",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "RELATION-BY-NAME. Single name; also set when the decision is a rejection (workspace.tsx:1783), so the column really means 'decided by'."
+    },
+    {
+     "name": "decidedByUserId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "decidedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. Not recorded today."
+    },
+    {
+     "name": "decisionNote",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. Rejection captures no reason."
+    },
+    {
+     "name": "detail",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Free-text 'What do you need?'; required (panes.tsx:680)."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "requestedForUserId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. A manager raising on behalf of someone is not expressible today."
+    },
+    {
+     "name": "assetTypeId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. The request names no type, so approval cannot be matched to stock."
+    },
+    {
+     "name": "relatedAssetId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. Required for Replacement / Return / Repair types."
+    },
+    {
+     "name": "issuedAssetId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. Which unit satisfied the request."
+    },
+    {
+     "name": "issuedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "currentLevel",
+     "tsType": "number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "NEW. Pointer into the approval ladder; default 1."
+    },
+    {
+     "name": "cancelledAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. Requester withdrawal has no status value today."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "raisedBy: string / approvedBy: string",
+     "gap": "Both sides of the workflow are display names; 'Waiting on me' filters on status==='Pending' only (panes.tsx:495) and never checks whether the viewer is an approver."
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetRequestApproval"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Asset",
+     "via": "nothing",
+     "gap": "A request is never linked to the unit it produced, so issue cannot be audited."
+    }
+   ]
+  },
+  {
+   "name": "AssetRequestApproval",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:1778",
+   "purpose": "One decision row per configured ladder level. Needed because decideAssetRequest closes the whole request on a single click regardless of how many levels are configured.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Pending",
+    "Approved",
+    "Rejected",
+    "Skipped"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "assetRequestId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "level",
+     "tsType": "number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "UNIQUE(asset_request_id, level)."
+    },
+    {
+     "name": "approvalLevelId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Snapshot FK -> AssetApprovalLevel at the time of raising."
+    },
+    {
+     "name": "resolvedApproverUserId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Vocabulary PROPOSED — the prototype has no per-level state."
+    },
+    {
+     "name": "decidedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "note",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AssetRequest",
+     "via": "assetRequestId"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetApprovalLevel",
+     "via": "approvalLevelId"
+    }
+   ]
+  },
+  {
+   "name": "AssetApprovalLevel",
+   "sourceType": "ApprovalLevel",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:377",
+   "purpose": "One rung of the asset-request approval ladder. Editable and savable, but read by nothing at decision time.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "By Role",
+    "By Person",
+    "By Department head"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Seeded as the literal 'l1' (workspace.tsx:822), not a UUID."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "scope",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. Only 'Asset Requests' exists in the UI (settings.tsx:53); the table is headed as if other scopes follow."
+    },
+    {
+     "name": "level",
+     "tsType": "number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "Assigned as prev.length+1 (settings.tsx:166) and never renumbered after a delete, so the ladder can read 1,3. Needs UNIQUE(tenant_id, scope, level)."
+    },
+    {
+     "name": "type",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "assetData.ts:114."
+    },
+    {
+     "name": "approvers",
+     "tsType": "string[]",
+     "sqlType": "— normalise to AssetApprovalLevelApprover",
+     "nullable": false,
+     "notes": "Array of role LABELS (assetData.ts:115), deduped by string equality (settings.tsx:130)."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "AssetApprovalLevelApprover"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetModuleSettings",
+     "via": "embedded array"
+    }
+   ]
+  },
+  {
+   "name": "AssetApprovalLevelApprover",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:122",
+   "purpose": "Normalises ApprovalLevel.approvers: string[] into rows that can point at a real role or person.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "approvalLevelId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "kind",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "role | user | department_head — mirrors ApprovalLevel.type."
+    },
+    {
+     "name": "roleKey",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "From approverRoles: 'Manager (unknown)', 'IT Admin', 'Finance', 'Department head'. 'Manager (unknown)' is a seeded placeholder with no resolvable identity."
+    },
+    {
+     "name": "userId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true
+    },
+    {
+     "name": "departmentId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "No department model exists anywhere in the app."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AssetApprovalLevel",
+     "via": "approvalLevelId"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Role",
+     "via": "roleKey: string (display label)",
+     "gap": "Approvers are stored as human labels chosen from a hardcoded array, not role ids."
+    }
+   ]
+  },
+  {
+   "name": "AssetModuleSettings",
+   "sourceType": "AssetSettings",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:379",
+   "purpose": "Per-tenant configuration for the ITAM app: approval ladder, custom fields, all taxonomies and agent controls. One embedded object today; must become a settings row plus child tables.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. UNIQUE(tenant_id, app_code)."
+    },
+    {
+     "name": "appCode",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. 'ITAM' (appData.ts:66)."
+    },
+    {
+     "name": "approvalLevels",
+     "tsType": "ApprovalLevel[]",
+     "sqlType": "— child table AssetApprovalLevel",
+     "nullable": false
+    },
+    {
+     "name": "customFields",
+     "tsType": "{ id; label; type }[]",
+     "sqlType": "— child table AssetCustomField",
+     "nullable": false
+    },
+    {
+     "name": "taxonomies",
+     "tsType": "Record<string, TaxonomyEntry[]>",
+     "sqlType": "— child tables AssetTaxonomy/AssetTaxonomyEntry",
+     "nullable": false,
+     "notes": "Nine keys seeded at workspace.tsx:824."
+    },
+    {
+     "name": "agentPauseAll",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Labelled '(all apps)' in the UI but stored inside ITAM settings only."
+    },
+    {
+     "name": "agentAutoRunOnNew",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Default true (workspace.tsx:835); read by nothing."
+    },
+    {
+     "name": "agentAutoPauseAtCredits",
+     "tsType": "string",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Free-text input today, '' meaning off (settings.tsx:322). Must be an integer credit threshold, NULL = off."
+    },
+    {
+     "name": "agentsDisabled",
+     "tsType": "string[]",
+     "sqlType": "— child table AssetAgentSetting",
+     "nullable": false,
+     "notes": "Array of agent display NAMES (settings.tsx:383)."
+    },
+    {
+     "name": "version",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. The UI shows a hardcoded 'v1.0.0' (settings.tsx:433, AssetManagement.tsx:55)."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "updatedByUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "AssetApprovalLevel"
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetCustomField"
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetTaxonomy"
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetAgentSetting"
+    }
+   ]
+  },
+  {
+   "name": "AssetAgentSetting",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:373",
+   "purpose": "Per-agent on/off state for the three ITAM agents. Normalises agents.disabled: string[]; nothing at run time reads it today.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "appCode",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'ITAM'."
+    },
+    {
+     "name": "agentKey",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Stable key replacing the display name: ITAM Warranty & AMC Advisor | ITAM Offboarding Recovery | ITAM Idle Asset Detector (agentCatalog.ts:143)."
+    },
+    {
+     "name": "enabled",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Inverse of membership in disabled[]."
+    },
+    {
+     "name": "trigger",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "manual | on_update. Derived in the UI by substring-matching the agent name for 'Offboarding' (settings.tsx:267) — must become stored metadata."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AssetModuleSettings",
+     "via": "agentsDisabled: string[] of display names",
+     "gap": "Agents are keyed by their human-readable catalog name; renaming an agent silently re-enables it."
+    }
+   ]
+  },
+  {
+   "name": "AssetCustomField",
+   "sourceType": "AssetSettings['customFields'][number]",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:381",
+   "purpose": "Tenant-defined extra field for assets. Definable in Settings but never rendered on any asset form, so no value is ever captured.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "text",
+    "number",
+    "date",
+    "select"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Created as the literal 'New field' (settings.tsx:197); no uniqueness or non-empty check."
+    },
+    {
+     "name": "key",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. Stable slug so renaming a label does not orphan values. UNIQUE(tenant_id, key)."
+    },
+    {
+     "name": "type",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "settings.tsx:232."
+    },
+    {
+     "name": "options",
+     "tsType": "string[] | null",
+     "sqlType": "jsonb",
+     "nullable": true,
+     "notes": "NEW. Type 'select' is offered with no options editor at all."
+    },
+    {
+     "name": "required",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "appliesToAssetTypeId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. Fields are global today; NULL = all types."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "NEW. Order is array position."
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. Delete is unconditional (settings.tsx:237) and would take stored values with it."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "AssetCustomFieldValue"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetModuleSettings",
+     "via": "embedded array"
+    }
+   ]
+  },
+  {
+   "name": "AssetCustomFieldValue",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:356",
+   "purpose": "Value of a custom field on one asset. No storage exists today because the create dialog renders only the six built-in fields.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "assetId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "UNIQUE(asset_id, custom_field_id)."
+    },
+    {
+     "name": "customFieldId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "valueText",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "valueNumber",
+     "tsType": "number | null",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "numeric, never float, in case a tenant models a money field."
+    },
+    {
+     "name": "valueDate",
+     "tsType": "string | null",
+     "sqlType": "date",
+     "nullable": true
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Asset",
+     "via": "assetId"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetCustomField",
+     "via": "customFieldId"
+    }
+   ]
+  },
+  {
+   "name": "AssetTaxonomy",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts:41",
+   "purpose": "The named dropdown list itself. Today only the Record<string, ...> key; the group headings live in a separate hardcoded array.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "asset_types",
+    "makes",
+    "models",
+    "mode_of_purchase",
+    "retirement_reasons",
+    "warranty",
+    "numbering",
+    "reasons",
+    "notification"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "key",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "UNIQUE(tenant_id, key). The nine keys above."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "e.g. 'Asset Types', 'Makes (suggestions)'."
+    },
+    {
+     "name": "groupName",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'General' | 'Support' (assetData.ts:42/54)."
+    },
+    {
+     "name": "systemManaged",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW. The nine keys are platform-defined; tenants can only edit entries."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "AssetTaxonomyEntry"
+    }
+   ]
+  },
+  {
+   "name": "AssetTaxonomyEntry",
+   "sourceType": "TaxonomyEntry",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts:38",
+   "purpose": "One option in a master taxonomy. For 'asset_types' it also carries the tag prefix that mints every asset tag.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. Entries have no id today — the table keys rows on `${value}-${index}` (settings.tsx:598)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "taxonomyId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. Implicit in the Record key today."
+    },
+    {
+     "name": "value",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Immutable key stored on records; UI marks it read-only (settings.tsx:601). New rows are created with value '' (settings.tsx:677) and can be saved as-is, so duplicate empty keys are reachable. Needs UNIQUE(taxonomy_id, value) + non-empty CHECK."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Display only; safe to rename."
+    },
+    {
+     "name": "tagPrefix",
+     "tsType": "string | undefined",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "e.g. 'LAP-'. Falls back to 'AST-' when absent (workspace.tsx:1721). Changing it does not retag existing units."
+    },
+    {
+     "name": "hasConfig",
+     "tsType": "boolean | undefined",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Default false."
+    },
+    {
+     "name": "configCount",
+     "tsType": "number | undefined",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "Display-only '⚙ 3' (settings.tsx:650); seeded 3 for laptop/desktop. Should be derived from AssetTypeConfig, not stored."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "NEW. Order is array position."
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. Delete is unconditional despite the on-screen claim that it is refused while in use."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AssetTaxonomy",
+     "via": "Record<string, ...> key",
+     "gap": "The taxonomy a row belongs to is only the object key it was stored under."
+    },
+    {
+     "kind": "hasMany",
+     "target": "Asset",
+     "target_note": "asset_types entries",
+     "via": "Asset.type: string",
+     "gap": "No FK; nothing prevents deleting an entry that assets still reference."
+    },
+    {
+     "kind": "hasMany",
+     "target": "AssetTypeConfig"
+    }
+   ]
+  },
+  {
+   "name": "AssetTypeConfig",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:649",
+   "purpose": "The 'config' rows the ⚙ badge counts for Laptop and Desktop. Only a count is rendered; nothing can open or edit them.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "assetTypeEntryId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Shape UNINFERABLE from source — see openQuestions."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AssetTaxonomyEntry",
+     "via": "configCount: number",
+     "gap": "Only a count exists; the rows it counts are not modelled anywhere."
+    }
+   ]
+  },
+  {
+   "name": "AssetServiceRecord",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts:103",
+   "purpose": "A repair/support episode. Anchored in source by the 'In Repair' stage, the 'Support notes' report tab and the seeded support Reasons taxonomy; no record type exists today.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Open",
+    "In Repair",
+    "Awaiting check",
+    "Closed",
+    "Cancelled"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "assetId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "reasonEntryId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK -> AssetTaxonomyEntry of 'reasons' (Hardware fault | Software issue | Accessory missing | Upgrade request | Other)."
+    },
+    {
+     "name": "assetRequestId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "A 'Repair' type request may open this."
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Vocabulary PROPOSED from the stage list."
+    },
+    {
+     "name": "openedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "closedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "vendor",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "cost",
+     "tsType": "number | null",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "NEW and not in the prototype. Never float."
+    },
+    {
+     "name": "costCurrency",
+     "tsType": "string | null",
+     "sqlType": "char(3)",
+     "nullable": true
+    },
+    {
+     "name": "note",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Asset",
+     "via": "assetId"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetTaxonomyEntry",
+     "via": "reasonEntryId"
+    }
+   ]
+  },
+  {
+   "name": "AssetRetirement",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts:94",
+   "purpose": "Why and how a unit left the estate. The 'Retired' stage and six retirement reasons are seeded, but choosing a reason is impossible — the stage dropdown retires a unit with no reason and no record.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "end_of_life",
+    "damaged",
+    "lost",
+    "stolen",
+    "sold",
+    "donated"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "assetId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "UNIQUE(asset_id) — a unit retires once."
+    },
+    {
+     "name": "reasonEntryId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK -> AssetTaxonomyEntry of 'retirement_reasons'."
+    },
+    {
+     "name": "retiredOn",
+     "tsType": "string",
+     "sqlType": "date",
+     "nullable": false
+    },
+    {
+     "name": "retiredByUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "proceeds",
+     "tsType": "number | null",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "NEW. Only meaningful for 'sold'; see openQuestions before building disposal accounting."
+    },
+    {
+     "name": "proceedsCurrency",
+     "tsType": "string | null",
+     "sqlType": "char(3)",
+     "nullable": true
+    },
+    {
+     "name": "note",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Asset",
+     "via": "assetId"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "AssetTaxonomyEntry",
+     "via": "reasonEntryId"
+    }
+   ]
+  },
+  {
+   "name": "AssetTagSequence",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:1717",
+   "purpose": "Durable per-prefix counter. Replaces `assets.filter(type).length + 1`, which re-issues a tag that already exists as soon as any asset is deleted.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "companyId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true
+    },
+    {
+     "name": "prefix",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "UNIQUE(tenant_id, company_id, prefix)."
+    },
+    {
+     "name": "nextValue",
+     "tsType": "number",
+     "sqlType": "bigint",
+     "nullable": false,
+     "notes": "Allocated under row lock; pad to 4 digits as today."
+    },
+    {
+     "name": "padWidth",
+     "tsType": "number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "4 in the prototype (String.padStart(4,'0'))."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "AssetTaxonomyEntry",
+     "via": "tagPrefix: string"
+    }
+   ]
+  },
+  {
+   "name": "AssetImportBatch",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:174",
+   "purpose": "Provenance and staging for the register CSV import, which today writes rows straight into state with no validation, no dedup and no record of where they came from.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Uploaded",
+    "Validated",
+    "Committed",
+    "Failed",
+    "Cancelled"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "fileName",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false
+    },
+    {
+     "name": "objectKey",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "File is read client-side with FileReader today; nothing is stored."
+    },
+    {
+     "name": "rowCount",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false
+    },
+    {
+     "name": "acceptedCount",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false
+    },
+    {
+     "name": "rejectedCount",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false
+    },
+    {
+     "name": "errors",
+     "tsType": "unknown[]",
+     "sqlType": "jsonb",
+     "nullable": true
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Vocabulary PROPOSED."
+    },
+    {
+     "name": "uploadedByUserId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "uploadedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Asset",
+     "via": "nothing",
+     "gap": "Imported assets are indistinguishable from hand-created ones."
+    }
+   ]
+  },
+  {
+   "name": "AuditEvent",
+   "sourceType": "AuditEvent",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:161",
+   "purpose": "The row the ITAM Change History pane lists (filtered to action LIKE 'asset.%'). Client-written, client-editable, actor hardcoded.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Success",
+    "Failed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "at",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "user",
+     "tsType": "'owner' | ''",
+     "sqlType": "— replace with actorUserId uuid",
+     "nullable": false,
+     "notes": "Always the literal 'owner' (workspace.tsx:179)."
+    },
+    {
+     "name": "role",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Always 'Org_admin'."
+    },
+    {
+     "name": "action",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Asset actions observed: asset.created, asset.updated, asset.removed, asset.request_raised, asset.request_approved, asset.request_rejected (built by lowercasing the status string, workspace.tsx:1786), asset.settings_updated, asset.settings_reset."
+    },
+    {
+     "name": "status",
+     "tsType": "'Success' | 'Failed'",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Always 'Success' — failures are never recorded."
+    },
+    {
+     "name": "resource",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "asset | asset_request | app."
+    },
+    {
+     "name": "resourceId",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Inconsistent: tagNo for create, raw UUID for update/remove (workspace.tsx:1741/1751), reference for request_raised, UUID for decisions, 'ITAM' for settings. Change History renders it verbatim, so users see bare UUIDs."
+    },
+    {
+     "name": "ip",
+     "tsType": "string",
+     "sqlType": "inet",
+     "nullable": true,
+     "notes": "Always ''."
+    },
+    {
+     "name": "revertedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. The 'Show reverted' filter and the undo promise have no backing column."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "user: 'owner' literal",
+     "gap": "No real actor is ever recorded."
+    }
+   ]
+  }
+ ],
+ "operations": [
+  {
+   "id": "OP-ITAM-SHELL-INSTALL-GATE",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "/app/asset-management (every tab)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+   "sourceLine": 26,
+   "currentBehaviour": "Renders a 'not installed' block when the localStorage installed[] array lacks 'ITAM'. defaultInstalled is ['CRM','HR'] (workspace.tsx:729) so a fresh workspace always sees the gate.",
+   "requiredBehaviour": "Server-side entitlement check per tenant; unentitled requests get 403 from the API, not just a hidden screen.",
+   "apiMethodPath": "GET /api/v1/assets/entitlement",
+   "authorization": "Any tenant member; entitlement resolved server-side",
+   "validation": "appCode must be an installed, non-disabled app for the tenant",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-SHELL-BROWSE-MARKETPLACE",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "/app/asset-management (gate state)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+   "sourceLine": 33,
+   "currentBehaviour": "Link navigates to /app/marketplace.",
+   "requiredBehaviour": "Unchanged; deep-link back to the ITAM card after install.",
+   "apiMethodPath": "n/a (navigation)",
+   "authorization": "Any tenant member",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-SHELL-TAB-NAV",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "/app/asset-management?tab=*",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+   "sourceLine": 66,
+   "currentBehaviour": "router.push of ?tab=<id>; the dashboard tab pushes the bare path. Unknown tab values silently fall back to dashboard (line 24).",
+   "requiredBehaviour": "Keep URL-addressable tabs; unknown tab -> 404 or explicit redirect, not a silent fallback.",
+   "apiMethodPath": "n/a (navigation)",
+   "authorization": "Any tenant member",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-SHELL-TRIAL-BADGE",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "/app/asset-management (header)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+   "sourceLine": 57,
+   "currentBehaviour": "Renders 'Trial · {trialDaysLeft} days left' from the hardcoded constant TRIAL_DAYS = 13 (workspace.tsx:67); it never counts down.",
+   "requiredBehaviour": "Derive from the tenant subscription's trial_ends_at; show expired state.",
+   "apiMethodPath": "GET /api/v1/billing/subscription",
+   "authorization": "Any tenant member",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-ACTIVE-COUNT",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 33,
+   "currentBehaviour": "assets.filter(stage !== 'Retired').length computed in the browser over the localStorage array.",
+   "requiredBehaviour": "Server aggregate scoped to tenant+company, excluding retired and archived units.",
+   "apiMethodPath": "GET /api/v1/assets/metrics",
+   "authorization": "Asset viewer role, tenant-scoped",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-PENDING-REQUESTS",
+   "entity": "AssetRequest",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 34,
+   "currentBehaviour": "assetRequests.filter(status === 'Pending').length; counts every tenant request, not those awaiting this user.",
+   "requiredBehaviour": "Two figures: total pending and pending on the viewer's approval level.",
+   "apiMethodPath": "GET /api/v1/assets/metrics",
+   "authorization": "Asset viewer; approver figure scoped to the caller",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-OUT-OF-WARRANTY",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 35,
+   "currentBehaviour": "daysUntil(warrantyEnd) < 0 evaluated with new Date() in browser-local time; blank warranty yields Infinity and is silently excluded.",
+   "requiredBehaviour": "SQL predicate warranty_end < current_date in the tenant timezone; blank warranty reported separately as 'unknown'.",
+   "apiMethodPath": "GET /api/v1/assets/metrics",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-WARRANTY-EXPIRING",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 36,
+   "currentBehaviour": "0 <= daysUntil(warrantyEnd) <= warrantyAlertDays, where the window is the hardcoded constant 60 (assetData.ts:118).",
+   "requiredBehaviour": "Window must be tenant-configurable settings, not a compile-time constant.",
+   "apiMethodPath": "GET /api/v1/assets/metrics?window=60",
+   "authorization": "Asset viewer",
+   "validation": "window is a positive integer number of days",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-LEAVER-HOLDINGS",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 40,
+   "currentBehaviour": "stage === 'Issued' && assignedTo.endsWith('(leaver)') — employment status inferred from a suffix inside a display name. assignedTo is never set anywhere, so this tile is permanently 0.",
+   "requiredBehaviour": "Join active assignments to employment status on the identity record; no string suffix.",
+   "apiMethodPath": "GET /api/v1/assets/metrics",
+   "authorization": "Asset admin (exposes HR status)",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-EXPIRING-LIST",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 85,
+   "currentBehaviour": "Renders every expiring asset with no cap, no ordering and no link to the unit.",
+   "requiredBehaviour": "Paginated, ordered by warranty_end ascending, each row linking to the asset detail route.",
+   "apiMethodPath": "GET /api/v1/assets?warrantyExpiringWithinDays=60&sort=warrantyEnd",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-LEAVER-LIST",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 105,
+   "currentBehaviour": "Lists name + assignedTo string; permanently empty for the reason above.",
+   "requiredBehaviour": "List with custodian, last working day and a 'start recovery' action.",
+   "apiMethodPath": "GET /api/v1/assets?custodianStatus=leaver",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-DASH-TILE-DRILLTHROUGH",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 68,
+   "currentBehaviour": "No-op — tiles are plain divs with no onClick and no href, so a non-zero count cannot be opened.",
+   "requiredBehaviour": "Each tile links to the register or requests list pre-filtered to that population.",
+   "apiMethodPath": "n/a (navigation)",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-LIST",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 145,
+   "currentBehaviour": "useMemo filter over the whole localStorage array; no pagination, no sort, no server call. Empty state at line 339.",
+   "requiredBehaviour": "Server list with cursor pagination, sort, and the filter set below applied in SQL; tenant+company scoped.",
+   "apiMethodPath": "GET /api/v1/assets",
+   "authorization": "Asset viewer; rows restricted to the caller's tenant and permitted companies",
+   "validation": "limit<=100; unknown filter keys rejected",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-FILTER-TYPE",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 206,
+   "currentBehaviour": "setState only; options come from the asset_types taxonomy, compared against asset.type by string equality.",
+   "requiredBehaviour": "Filter by assetTypeId; selection persisted in the URL so the view is shareable.",
+   "apiMethodPath": "GET /api/v1/assets?assetTypeId=",
+   "authorization": "Asset viewer",
+   "validation": "assetTypeId must exist in the tenant's asset_types taxonomy",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-FILTER-PROJECT",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 219,
+   "currentBehaviour": "setState only. The option list is DISTINCT over the free-text asset.project strings of loaded rows (line 143), so it changes as rows are added and a typo becomes a permanent 'project'.",
+   "requiredBehaviour": "Filter by projectId against a real project list.",
+   "apiMethodPath": "GET /api/v1/assets?projectId=",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-FILTER-STAGE",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 256,
+   "currentBehaviour": "setState only; chips for 'All' plus the six stages.",
+   "requiredBehaviour": "Server filter on stage; multi-select.",
+   "apiMethodPath": "GET /api/v1/assets?stage=",
+   "authorization": "Asset viewer",
+   "validation": "stage must be one of the six enum values",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-STAGE-COUNTS",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 156,
+   "currentBehaviour": "countFor() counts the FULL asset array and ignores the active type/project/search filters, so the chip numbers contradict the table below them.",
+   "requiredBehaviour": "Faceted counts computed over the same predicate as the list.",
+   "apiMethodPath": "GET /api/v1/assets/facets",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-SEARCH",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 274,
+   "currentBehaviour": "Client substring match over name + tagNo + assignedTo, lowercased, no debounce.",
+   "requiredBehaviour": "Server search over name, tag, serial and custodian with a trigram or tsvector index.",
+   "apiMethodPath": "GET /api/v1/assets?q=",
+   "authorization": "Asset viewer",
+   "validation": "q length <= 200",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-EXPORT-CSV",
+   "entity": "Asset",
+   "action": "export",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 159,
+   "currentBehaviour": "Triggers a Blob download named asset-register.csv built with join(','). No quoting, no escaping and no formula guard, so any name containing a comma corrupts the row — even though src/lib/csv.ts already exports csvCell()/downloadCsv() that do this correctly.",
+   "requiredBehaviour": "Server-generated export over the permitted, filtered set using the shared CSV writer; record the export in the audit trail.",
+   "apiMethodPath": "POST /api/v1/assets/exports",
+   "authorization": "Asset viewer; export scoped to the caller's visible rows",
+   "validation": "Filter snapshot validated server-side; formula-injection escaping mandatory",
+   "sideEffect": "File download"
+  },
+  {
+   "id": "OP-ITAM-ASSET-IMPORT-CSV",
+   "entity": "Asset",
+   "action": "import",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 174,
+   "currentBehaviour": "FileReader + row.split(',') with the header row dropped blindly, then one addAsset() per row into localStorage. Its column order (name,type,stage,project,purchase,warranty) does NOT match the exporter's (asset,tag_no,type,stage,project,purchase,assigned_to,warranty_end), so re-importing this screen's own export shifts every column. No validation of stage or type, no dedup, no rollback.",
+   "requiredBehaviour": "Staged upload -> parse with the quoted parser -> validate each row against taxonomies and the stage enum -> show a mapping/error preview -> atomic commit with an AssetImportBatch row.",
+   "apiMethodPath": "POST /api/v1/assets/imports then POST /api/v1/assets/imports/{id}/commit",
+   "authorization": "Asset admin",
+   "validation": "MIME + size checks; header mapping; type and stage must resolve; reject duplicate tags/serials",
+   "sideEffect": "File upload; bulk insert"
+  },
+  {
+   "id": "OP-ITAM-ASSET-RECEIVE-FROM-PURCHASE",
+   "entity": "Asset",
+   "action": "create",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 243,
+   "currentBehaviour": "setNote() with the canned string 'No purchase receipts are waiting. Assets appear here once a PO is received.' No purchasing data is consulted — there is no PO entity in the codebase.",
+   "requiredBehaviour": "List received PO lines awaiting tagging and create one tagged unit per received quantity, linked to the PO line. BLOCKED until a purchasing source is chosen.",
+   "apiMethodPath": "GET /api/v1/assets/receivable-lines; POST /api/v1/assets/receive",
+   "authorization": "Asset admin",
+   "sideEffect": "Reads the purchasing module"
+  },
+  {
+   "id": "OP-ITAM-ASSET-CREATE-OPEN",
+   "entity": "Asset",
+   "action": "create",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 249,
+   "currentBehaviour": "setOpen(true) — opens the New asset dialog. The draft's default type is types[0] evaluated at first render, so it goes stale if taxonomies change in another tab.",
+   "requiredBehaviour": "Open a form seeded from a fresh server-fetched taxonomy.",
+   "apiMethodPath": "GET /api/v1/assets/form-schema",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-CREATE",
+   "entity": "Asset",
+   "action": "create",
+   "surface": "?tab=assets (New asset dialog)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 425,
+   "currentBehaviour": "addAsset() -> workspace.tsx:1712 writes the row plus an audit row into localStorage. Only name is required (disabled={!draft.name.trim()}); assignedTo is hardcoded null; the stage select permits creating a unit directly as 'Issued' or even 'Retired'; warrantyEnd may be any past date; no custom fields, make, model or mode-of-purchase are collected.",
+   "requiredBehaviour": "POST validating name, assetTypeId, stage (creation restricted to In Stock unless a custody record accompanies it), warranty dates, project/PO references and all required custom fields; emit an AssetEvent 'created'.",
+   "apiMethodPath": "POST /api/v1/assets",
+   "authorization": "Asset admin, tenant+company scoped",
+   "validation": "name 1..200 non-blank; assetTypeId exists; stage in enum; warrantyEnd >= acquiredOn; unique tag; unknown fields rejected",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-TAG-ALLOCATE",
+   "entity": "AssetTagSequence",
+   "action": "create",
+   "surface": "?tab=assets (server side of create)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "sourceLine": 1717,
+   "currentBehaviour": "seq = count of existing assets of that type + 1, padded to 4, prefixed by the taxonomy tagPrefix or 'AST-'. Deleting an asset and creating another of the same type re-issues a tag that already existed, and no uniqueness check exists.",
+   "requiredBehaviour": "Allocate from a locked sequence row inside the create transaction; enforce UNIQUE(tenant_id, company_id, tag_no).",
+   "apiMethodPath": "internal (within POST /api/v1/assets)",
+   "authorization": "Service-internal",
+   "validation": "Unique violation retried, never silently reused",
+   "sideEffect": "Sequence increment"
+  },
+  {
+   "id": "OP-ITAM-ASSET-STAGE-SET",
+   "entity": "Asset",
+   "action": "transition",
+   "surface": "?tab=assets (row dropdown)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 307,
+   "currentBehaviour": "updateAsset(id,{stage}) -> workspace.tsx:1736 overwrites stage in place. Any stage may be chosen from any other, including 'Issued' with no request and no custodian, and 'Retired' with no reason. The previous stage is lost; the audit row stores the raw UUID.",
+   "requiredBehaviour": "Replace the free dropdown with guarded transitions (issue / return / send for repair / close repair / start check / retire), each writing an AssetEvent with from/to, actor and reason, and each enforcing its precondition.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/transitions",
+   "authorization": "Asset admin; issue additionally requires an approved request",
+   "validation": "Transition must be legal from the current stage; 'Issued' requires an approved request and a custodian; 'Retired' requires a retirement reason",
+   "sideEffect": "Audit row; asset event"
+  },
+  {
+   "id": "OP-ITAM-ASSET-DELETE",
+   "entity": "Asset",
+   "action": "delete",
+   "surface": "?tab=assets (row 🗑)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 328,
+   "currentBehaviour": "removeAsset(id) -> workspace.tsx:1746 hard-deletes the row from the array immediately, with no confirmation dialog and no undo. The unit, its tag and everything that would have been its custody and financial history vanish; the audit row records only the UUID of something that no longer exists.",
+   "requiredBehaviour": "Replace with archive/void: set archived_at, keep the tag reserved, keep all events and assignments. Permit true deletion only for a never-issued unit created in error, and only with an explicit reason recorded. This is the Loop 29 release gate.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/archive",
+   "authorization": "Asset admin; hard delete restricted to tenant owner",
+   "validation": "Refuse archive while an active assignment exists; require a reason",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-DETAIL-READ",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 303,
+   "currentBehaviour": "No-op — the row has no link, no click target and there is no asset detail route in src/app. A unit cannot be opened.",
+   "requiredBehaviour": "Detail surface showing identity, custody timeline, service history, warranty and custom fields.",
+   "apiMethodPath": "GET /api/v1/assets/{id}",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-EDIT",
+   "entity": "Asset",
+   "action": "update",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 303,
+   "currentBehaviour": "Missing — stage is the only editable attribute after creation; name, type, project, PO reference and warranty cannot be corrected at all.",
+   "requiredBehaviour": "Full edit form with optimistic-concurrency (updatedAt / version) and field-level audit.",
+   "apiMethodPath": "PATCH /api/v1/assets/{id}",
+   "authorization": "Asset admin",
+   "validation": "Same as create; version conflict returns 409",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-ASSIGN",
+   "entity": "AssetAssignment",
+   "action": "create",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 429,
+   "currentBehaviour": "Missing entirely — assignedTo is only ever written as null (panes.tsx:190 and :429). There is no assign control anywhere in the app, which is why the Assigned to column, the My Asset tab and the leaver tile are permanently empty.",
+   "requiredBehaviour": "Issue a unit to a custodian against an approved request; open an AssetAssignment, set the asset to Issued and write an AssetEvent.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/assignments",
+   "authorization": "Asset admin",
+   "validation": "Asset must be In Stock or Allocated; one active assignment per asset; custodian must be an active tenant member; approved request required",
+   "sideEffect": "Audit row; notification to the custodian"
+  },
+  {
+   "id": "OP-ITAM-ASSET-RETURN",
+   "entity": "AssetAssignment",
+   "action": "transition",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 307,
+   "currentBehaviour": "Missing — the nearest thing is flipping the stage dropdown back to 'In Stock', which records nothing about who returned what or in what condition.",
+   "requiredBehaviour": "Close the active assignment with returnedAt, condition and receiver; move the asset to Awaiting check or In Stock.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/assignments/{assignmentId}/return",
+   "authorization": "Asset admin",
+   "validation": "An active assignment must exist",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-TRANSFER",
+   "entity": "AssetAssignment",
+   "action": "transition",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 307,
+   "currentBehaviour": "Missing — no control; a transfer today would be an untracked edit of a name string.",
+   "requiredBehaviour": "Atomically close the current assignment and open the next, preserving both periods.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/transfer",
+   "authorization": "Asset admin",
+   "validation": "Single transaction; target custodian active",
+   "sideEffect": "Audit row; notifications"
+  },
+  {
+   "id": "OP-ITAM-ASSET-REPAIR-OPEN",
+   "entity": "AssetServiceRecord",
+   "action": "create",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts",
+   "sourceLine": 16,
+   "currentBehaviour": "Missing — 'In Repair' is a selectable stage label with no record behind it, despite the support Reasons taxonomy being seeded with five entries.",
+   "requiredBehaviour": "Open a service record with a reason, vendor and expected return; move the asset to In Repair.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/service-records",
+   "authorization": "Asset admin",
+   "validation": "reasonEntryId must belong to the 'reasons' taxonomy",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-REPAIR-CLOSE",
+   "entity": "AssetServiceRecord",
+   "action": "transition",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts",
+   "sourceLine": 16,
+   "currentBehaviour": "Missing.",
+   "requiredBehaviour": "Close the record with an outcome and optional cost, then return the asset to its prior stage.",
+   "apiMethodPath": "POST /api/v1/assets/service-records/{id}/close",
+   "authorization": "Asset admin",
+   "validation": "cost is numeric(18,4) with a currency when present",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-CHECK",
+   "entity": "AssetEvent",
+   "action": "transition",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts",
+   "sourceLine": 16,
+   "currentBehaviour": "Missing — 'Awaiting check' is a label only; nothing defines what the check is, who performs it or what it produces.",
+   "requiredBehaviour": "Record an inspection outcome that routes the unit to In Stock, In Repair or Retired. Semantics unconfirmed — see openQuestions.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/checks",
+   "authorization": "Asset admin",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-RETIRE",
+   "entity": "AssetRetirement",
+   "action": "transition",
+   "surface": "?tab=assets",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts",
+   "sourceLine": 94,
+   "currentBehaviour": "Missing as an operation — a unit is retired by picking 'Retired' in the row dropdown, which captures no reason even though six retirement reasons are seeded and no disposal record is produced.",
+   "requiredBehaviour": "Retire with a mandatory reason, date and optional proceeds; block retirement while an assignment is active; the unit stays queryable and drops out of the active estate.",
+   "apiMethodPath": "POST /api/v1/assets/{id}/retire",
+   "authorization": "Asset admin",
+   "validation": "reasonEntryId from 'retirement_reasons'; no active assignment; retiredOn not in the future",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-ASSET-CUSTOMFIELD-CAPTURE",
+   "entity": "AssetCustomFieldValue",
+   "action": "update",
+   "surface": "?tab=assets (New asset dialog)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 356,
+   "currentBehaviour": "Missing — the dialog renders six fixed fields and never reads assetSettings.customFields, so configured custom fields can never hold a value.",
+   "requiredBehaviour": "Render configured fields by type, validate required ones, persist to AssetCustomFieldValue.",
+   "apiMethodPath": "POST /api/v1/assets (customFields payload)",
+   "authorization": "Asset admin",
+   "validation": "Unknown field keys rejected; number/date coerced and range-checked; select values must be in options",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-ASSET-MAKE-MODEL-CAPTURE",
+   "entity": "Asset",
+   "action": "update",
+   "surface": "?tab=assets (New asset dialog)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 366,
+   "currentBehaviour": "Missing — the makes taxonomy ships ten entries and mode_of_purchase three, but no form field, table column, filter or report references any of them.",
+   "requiredBehaviour": "Capture make, model and mode of purchase on the asset, or retire the taxonomies. Confirm before building.",
+   "apiMethodPath": "POST /api/v1/assets",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-MYASSET-LIST",
+   "entity": "Asset",
+   "action": "list",
+   "surface": "?tab=my_equipment",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 446,
+   "currentBehaviour": "assets.filter(assignedTo === session?.user.fullName) — string equality on a display name against a field nothing ever writes, so this list is permanently empty and the 'not linked to an employee record' message always shows.",
+   "requiredBehaviour": "List by custodian user id from the session, covering current and past assignments.",
+   "apiMethodPath": "GET /api/v1/assets/my",
+   "authorization": "Any tenant member, restricted to their own assignments",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-MYASSET-HISTORY",
+   "entity": "AssetAssignment",
+   "action": "list",
+   "surface": "?tab=my_equipment",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 452,
+   "currentBehaviour": "Missing — the copy promises 'past and present' periods but only the current assignedTo value could ever be shown, and past holders are explicitly excluded.",
+   "requiredBehaviour": "Return the caller's own assignment periods with issue/return dates; never expose other custodians.",
+   "apiMethodPath": "GET /api/v1/assets/my/assignments",
+   "authorization": "Self only",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-MYASSET-ACKNOWLEDGE",
+   "entity": "AssetAssignment",
+   "action": "transition",
+   "surface": "?tab=my_equipment",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 461,
+   "currentBehaviour": "Missing — rows are read-only; a custodian cannot acknowledge receipt, report a fault or start a return.",
+   "requiredBehaviour": "Self-service acknowledge / report issue / request return from this surface.",
+   "apiMethodPath": "POST /api/v1/assets/my/assignments/{id}/acknowledge",
+   "authorization": "Self only",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-REQ-LIST",
+   "entity": "AssetRequest",
+   "action": "list",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 493,
+   "currentBehaviour": "Client filter over the whole array; every tenant request is visible to every user, including other people's request text.",
+   "requiredBehaviour": "Server list scoped by role: requesters see their own, approvers see what is on their level, admins see all.",
+   "apiMethodPath": "GET /api/v1/assets/requests",
+   "authorization": "Role-scoped row filter enforced server-side",
+   "validation": "limit<=100",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-REQ-SCOPE",
+   "entity": "AssetRequest",
+   "action": "list",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 541,
+   "currentBehaviour": "setState only. 'Mine' compares raisedBy to session.user.fullName; 'Waiting on me' merely filters status === 'Pending' (line 495) without checking whether the viewer is an approver at all.",
+   "requiredBehaviour": "'Mine' by raisedByUserId; 'Waiting on me' by an open approval step assigned to the caller.",
+   "apiMethodPath": "GET /api/v1/assets/requests?scope=mine|awaiting_me",
+   "authorization": "Self / approver resolution server-side",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-REQ-FILTER-TYPE",
+   "entity": "AssetRequest",
+   "action": "list",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 512,
+   "currentBehaviour": "setState only; options from the hardcoded requestTypes array.",
+   "requiredBehaviour": "Server filter on the type enum.",
+   "apiMethodPath": "GET /api/v1/assets/requests?type=",
+   "authorization": "As per list",
+   "validation": "type in enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-REQ-FILTER-STATUS",
+   "entity": "AssetRequest",
+   "action": "list",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 523,
+   "currentBehaviour": "setState only; 'Issued' is offered as a filter even though nothing can ever set that status.",
+   "requiredBehaviour": "Server filter on the status enum.",
+   "apiMethodPath": "GET /api/v1/assets/requests?status=",
+   "authorization": "As per list",
+   "validation": "status in enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-REQ-SEARCH",
+   "entity": "AssetRequest",
+   "action": "list",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 565,
+   "currentBehaviour": "Client substring match over reference + type + raisedBy. The placeholder is truncated mid-sentence: 'Search reference, type, person or...'.",
+   "requiredBehaviour": "Server search over reference, detail and requester; fix the placeholder.",
+   "apiMethodPath": "GET /api/v1/assets/requests?q=",
+   "authorization": "As per list",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-REQ-CREATE-OPEN",
+   "entity": "AssetRequest",
+   "action": "create",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 534,
+   "currentBehaviour": "setOpen(true).",
+   "requiredBehaviour": "Open a form that also collects the asset type, the person it is for and any related asset.",
+   "apiMethodPath": "n/a",
+   "authorization": "Any tenant member",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-REQ-CREATE",
+   "entity": "AssetRequest",
+   "action": "create",
+   "surface": "?tab=requests (New request dialog)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 678,
+   "currentBehaviour": "addAssetRequest() -> workspace.tsx:1756 writes to localStorage with status 'Pending', raisedBy = the session full name or the literal 'Me', and a reference derived from array length. Only detail is required. No approval steps are created and nobody is notified.",
+   "requiredBehaviour": "POST that allocates a real reference, snapshots the current approval ladder into AssetRequestApproval rows, sets currentLevel = 1 and notifies level-1 approvers.",
+   "apiMethodPath": "POST /api/v1/assets/requests",
+   "authorization": "Any tenant member",
+   "validation": "type in enum; detail 1..2000; requestedFor must be a tenant member; Replacement/Return/Repair require relatedAssetId",
+   "sideEffect": "Audit row; approver notification"
+  },
+  {
+   "id": "OP-ITAM-REQ-REFERENCE-ALLOCATE",
+   "entity": "AssetRequest",
+   "action": "create",
+   "surface": "?tab=requests (server side)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "sourceLine": 1762,
+   "currentBehaviour": "`REQ-${(assetRequests.length + 1).padStart(4,'0')}` — collides on any deletion and is per-browser, not per-tenant.",
+   "requiredBehaviour": "Allocate from a tenant sequence inside the transaction; UNIQUE(tenant_id, reference).",
+   "apiMethodPath": "internal",
+   "authorization": "Service-internal",
+   "sideEffect": "Sequence increment"
+  },
+  {
+   "id": "OP-ITAM-REQ-APPROVE",
+   "entity": "AssetRequest",
+   "action": "transition",
+   "surface": "?tab=requests (row Approve)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 616,
+   "currentBehaviour": "decideAssetRequest(id,'Approved',me) -> workspace.tsx:1778 sets status and approvedBy in one click. The configured approval ladder is never read, any signed-in user can approve, a requester can approve their own request, no timestamp or note is captured and the decision cannot be reversed.",
+   "requiredBehaviour": "Resolve the caller against the open approval step; record the level decision; advance to the next level or mark the request Approved only when the last level agrees.",
+   "apiMethodPath": "POST /api/v1/assets/requests/{id}/approve",
+   "authorization": "Caller must hold the role/identity on the current open level; self-approval blocked unless explicitly permitted",
+   "validation": "Request must be Pending with an open step for the caller; idempotency key required",
+   "sideEffect": "Audit row; notification to requester and next approver"
+  },
+  {
+   "id": "OP-ITAM-REQ-REJECT",
+   "entity": "AssetRequest",
+   "action": "transition",
+   "surface": "?tab=requests (row Reject)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 623,
+   "currentBehaviour": "Same call with 'Rejected'; the rejecter's name is written into approvedBy, so the column labelled 'Approved by' shows the person who rejected it. No reason is captured.",
+   "requiredBehaviour": "Reject with a mandatory reason, close remaining steps and notify the requester.",
+   "apiMethodPath": "POST /api/v1/assets/requests/{id}/reject",
+   "authorization": "As approve",
+   "validation": "reason 1..1000 required",
+   "sideEffect": "Audit row; notification"
+  },
+  {
+   "id": "OP-ITAM-REQ-ISSUE",
+   "entity": "AssetRequest",
+   "action": "transition",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts",
+   "sourceLine": 112,
+   "currentBehaviour": "Missing — 'Issued' exists in requestStatuses and in the status filter, but no control anywhere sets it and no request is ever linked to an asset.",
+   "requiredBehaviour": "Pick an In Stock unit against an approved request, open the assignment, set the asset to Issued and the request to Issued in one transaction.",
+   "apiMethodPath": "POST /api/v1/assets/requests/{id}/issue",
+   "authorization": "Asset admin",
+   "validation": "Request must be Approved; chosen asset must be In Stock and of the requested type",
+   "sideEffect": "Audit row; custodian notification"
+  },
+  {
+   "id": "OP-ITAM-REQ-DETAIL",
+   "entity": "AssetRequest",
+   "action": "read",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 592,
+   "currentBehaviour": "Missing — rows are not clickable, so the approval trail (which does not exist) cannot be inspected.",
+   "requiredBehaviour": "Detail view with the full approval trail, decision notes and the issued unit.",
+   "apiMethodPath": "GET /api/v1/assets/requests/{id}",
+   "authorization": "Requester, approvers, admins",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-REQ-WITHDRAW",
+   "entity": "AssetRequest",
+   "action": "transition",
+   "surface": "?tab=requests",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 614,
+   "currentBehaviour": "Missing — a requester cannot cancel; the only row actions are Approve and Reject, shown to everyone.",
+   "requiredBehaviour": "Requester withdrawal while Pending. Needs a status value the current vocabulary lacks — see openQuestions.",
+   "apiMethodPath": "POST /api/v1/assets/requests/{id}/withdraw",
+   "authorization": "Requester only, while Pending",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-REQ-APPROVAL-ENFORCE",
+   "entity": "AssetRequestApproval",
+   "action": "execute",
+   "surface": "?tab=requests (server side)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "sourceLine": 1778,
+   "currentBehaviour": "No-op — assetSettings.approvalLevels is read only by the settings editor. decideAssetRequest never consults it, so the ladder configured in Settings has zero runtime effect.",
+   "requiredBehaviour": "Ladder resolution service: snapshot levels at raise time, resolve role/person/department-head to identities, and gate every decision through it.",
+   "apiMethodPath": "internal approval service",
+   "authorization": "Service-internal",
+   "validation": "A request with no resolvable approver must fail loudly, not auto-approve",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-TAB-SELECT",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=reports",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 738,
+   "currentBehaviour": "setState only; the six report tabs are component state and are not URL-addressable, so a report cannot be linked or bookmarked.",
+   "requiredBehaviour": "Put the report key in the query string.",
+   "apiMethodPath": "n/a (navigation)",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-STOCK-SUMMARY",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=reports (Stock summary)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 709,
+   "currentBehaviour": "Client Map reduce counting only 'Issued' and 'In Stock'; the other four stages are silently dropped so the columns never reconcile to the register total. Retired units are included in the grouping, unlike the dashboard.",
+   "requiredBehaviour": "Server aggregate with a column per stage and a row total that reconciles to the register.",
+   "apiMethodPath": "GET /api/v1/assets/reports/stock-summary?groupBy=",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-GROUP-BY",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=reports (Stock summary)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 758,
+   "currentBehaviour": "setState only; two options, 'By asset type' (resolved to the taxonomy label) and 'By project' (free-text string, blank becomes 'Unassigned').",
+   "requiredBehaviour": "Server groupBy over assetTypeId / projectId / companyId / stage.",
+   "apiMethodPath": "GET /api/v1/assets/reports/stock-summary?groupBy=",
+   "authorization": "Asset viewer",
+   "validation": "groupBy in an allowed set",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-EXPORT-CSV",
+   "entity": "Asset",
+   "action": "export",
+   "surface": "?tab=reports",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 768,
+   "currentBehaviour": "Blob download issued-vs-in-stock.csv, again with unescaped join(','). Exports only the Stock summary rows regardless of which report tab is open.",
+   "requiredBehaviour": "Server export of the report actually on screen, using the shared escaping writer.",
+   "apiMethodPath": "POST /api/v1/assets/reports/{key}/exports",
+   "authorization": "Asset viewer, permission-filtered",
+   "validation": "Formula-injection escaping",
+   "sideEffect": "File download"
+  },
+  {
+   "id": "OP-ITAM-RPT-EXPORT-EXCEL",
+   "entity": "Asset",
+   "action": "export",
+   "surface": "?tab=reports",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 774,
+   "currentBehaviour": "Calls the identical exportCsv(): the 'Excel' button downloads a text/csv blob named .csv. No XLSX is produced.",
+   "requiredBehaviour": "Either generate a real XLSX or remove the button.",
+   "apiMethodPath": "POST /api/v1/assets/reports/{key}/exports?format=xlsx",
+   "authorization": "Asset viewer",
+   "sideEffect": "File download"
+  },
+  {
+   "id": "OP-ITAM-RPT-ASSET-LEDGER",
+   "entity": "AssetEvent",
+   "action": "read",
+   "surface": "?tab=reports (Asset ledger)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 806,
+   "currentBehaviour": "Renders a placeholder sentence stating the report needs history the rebuild does not simulate, plus the asset count.",
+   "requiredBehaviour": "Per-asset chronological ledger from AssetEvent. Whether it is a custody or a financial ledger is unresolved.",
+   "apiMethodPath": "GET /api/v1/assets/reports/ledger",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-DEPT-USAGE",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=reports (Department usage)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 806,
+   "currentBehaviour": "Placeholder sentence. No department attribute exists on any asset, assignment or user record in the codebase.",
+   "requiredBehaviour": "Usage by department, which requires a department source on the custodian. BLOCKED on the identity model.",
+   "apiMethodPath": "GET /api/v1/assets/reports/department-usage",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-WARRANTY",
+   "entity": "Asset",
+   "action": "read",
+   "surface": "?tab=reports (Warranty)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 806,
+   "currentBehaviour": "Placeholder sentence, even though warrantyEnd is populated and the dashboard already computes expiry.",
+   "requiredBehaviour": "Expired / expiring / covered buckets with configurable windows, exportable.",
+   "apiMethodPath": "GET /api/v1/assets/reports/warranty",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-SUPPORT-NOTES",
+   "entity": "AssetServiceRecord",
+   "action": "read",
+   "surface": "?tab=reports (Support notes)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 806,
+   "currentBehaviour": "Placeholder sentence; no service record type exists.",
+   "requiredBehaviour": "Service history by asset and reason. Depends on AssetServiceRecord.",
+   "apiMethodPath": "GET /api/v1/assets/reports/service",
+   "authorization": "Asset viewer",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-RPT-AUDIT-LOG",
+   "entity": "AuditEvent",
+   "action": "read",
+   "surface": "?tab=reports (Audit log)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "sourceLine": 806,
+   "currentBehaviour": "Placeholder sentence, despite asset.* audit rows already existing and being listed in Settings > Change History.",
+   "requiredBehaviour": "Filterable server audit query over asset.* actions with real actors.",
+   "apiMethodPath": "GET /api/v1/assets/reports/audit",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-SET-SECTION-SELECT",
+   "entity": "AssetModuleSettings",
+   "action": "read",
+   "surface": "?tab=settings",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 492,
+   "currentBehaviour": "setSection() local state; the settings section is NOT in the URL, so no settings pane is linkable and a reload always lands on Approval Levels.",
+   "requiredBehaviour": "Section in the query string; unknown section handled explicitly.",
+   "apiMethodPath": "n/a (navigation)",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-SET-OPEN-MASTERS",
+   "entity": "AssetTaxonomy",
+   "action": "read",
+   "surface": "?tab=settings -> ?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 493,
+   "currentBehaviour": "The nav item flagged external calls onOpenMasters(), which pushes ?tab=masters; the tab bar then injects a seventh tab (AssetManagement.tsx:42).",
+   "requiredBehaviour": "Unchanged behaviour, URL-addressable as today.",
+   "apiMethodPath": "n/a (navigation)",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-SET-COPILOT-OPEN",
+   "entity": "AssetModuleSettings",
+   "action": "execute",
+   "surface": "?tab=settings (banner)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 27,
+   "currentBehaviour": "document.querySelector('[aria-label=\"Open AI Copilot\"]')?.click() — reaches outside React to synthesise a click on the CopilotDock button; silently does nothing if the dock is absent or already open (the label flips to 'Hide AI Copilot').",
+   "requiredBehaviour": "Shared context/store call, not DOM traversal.",
+   "apiMethodPath": "n/a (client)",
+   "authorization": "Any tenant member",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-APPR-LIST",
+   "entity": "AssetApprovalLevel",
+   "action": "list",
+   "surface": "?tab=settings (Approval Levels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 39,
+   "currentBehaviour": "useState seeded once from assetSettings.approvalLevels; the draft never resyncs if the underlying settings change, and navigating away discards edits with no warning.",
+   "requiredBehaviour": "Server fetch with an explicit dirty/discard guard.",
+   "apiMethodPath": "GET /api/v1/assets/settings/approval-levels",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-APPR-ADD-LEVEL",
+   "entity": "AssetApprovalLevel",
+   "action": "create",
+   "surface": "?tab=settings (Approval Levels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 162,
+   "currentBehaviour": "Local draft push with level = prev.length + 1 and an empty approvers array; a level with no approver can be saved.",
+   "requiredBehaviour": "Create a level with at least one approver; renumber contiguously.",
+   "apiMethodPath": "POST /api/v1/assets/settings/approval-levels",
+   "authorization": "Asset admin",
+   "validation": "approvers.length >= 1; level unique and contiguous",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-APPR-REMOVE-LEVEL",
+   "entity": "AssetApprovalLevel",
+   "action": "delete",
+   "surface": "?tab=settings (Approval Levels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 147,
+   "currentBehaviour": "Local draft filter, hidden when only one level remains. Remaining levels are NOT renumbered, so deleting level 2 of 3 leaves a ladder numbered 1 and 3.",
+   "requiredBehaviour": "Delete with renumbering; refuse or migrate while in-flight requests reference the level.",
+   "apiMethodPath": "DELETE /api/v1/assets/settings/approval-levels/{id}",
+   "authorization": "Asset admin",
+   "validation": "At least one level must remain; in-flight requests keep their snapshot",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-APPR-SET-TYPE",
+   "entity": "AssetApprovalLevel",
+   "action": "update",
+   "surface": "?tab=settings (Approval Levels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 86,
+   "currentBehaviour": "Local draft update. Changing the type does not clear or revalidate the already-chosen approvers, so a 'By Person' level can keep role labels.",
+   "requiredBehaviour": "Type change revalidates approver kinds.",
+   "apiMethodPath": "PATCH /api/v1/assets/settings/approval-levels/{id}",
+   "authorization": "Asset admin",
+   "validation": "type in enum; approver kinds must match the type",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-APPR-ADD-APPROVER",
+   "entity": "AssetApprovalLevelApprover",
+   "action": "create",
+   "surface": "?tab=settings (Approval Levels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 122,
+   "currentBehaviour": "Local draft push of a role LABEL string from the hardcoded approverRoles array, deduped by string equality. 'Manager (unknown)' is offered and is the seeded default, yet resolves to no identity.",
+   "requiredBehaviour": "Pick a real role or person; refuse unresolvable approvers.",
+   "apiMethodPath": "POST /api/v1/assets/settings/approval-levels/{id}/approvers",
+   "authorization": "Asset admin",
+   "validation": "roleKey or userId must resolve to at least one active member",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-APPR-REMOVE-APPROVER",
+   "entity": "AssetApprovalLevelApprover",
+   "action": "delete",
+   "surface": "?tab=settings (Approval Levels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 106,
+   "currentBehaviour": "Local draft filter by string equality; can empty a level completely.",
+   "requiredBehaviour": "Refuse removing the last approver on a level.",
+   "apiMethodPath": "DELETE /api/v1/assets/settings/approval-levels/{id}/approvers/{approverId}",
+   "authorization": "Asset admin",
+   "validation": "At least one approver must remain",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-APPR-SAVE",
+   "entity": "AssetApprovalLevel",
+   "action": "update",
+   "surface": "?tab=settings (Approval Levels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 56,
+   "currentBehaviour": "updateAssetSettings({approvalLevels: draft}) writes the whole array to localStorage and appends one generic asset.settings_updated audit row. Dirty state is a JSON.stringify comparison. No validation, no conflict detection, and the saved ladder still changes nothing at decision time.",
+   "requiredBehaviour": "Transactional save with per-level validation, optimistic concurrency and a diff-level audit entry.",
+   "apiMethodPath": "PUT /api/v1/assets/settings/approval-levels",
+   "authorization": "Asset admin",
+   "validation": "Every level has >=1 resolvable approver; levels contiguous from 1; version conflict returns 409",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-CF-LIST",
+   "entity": "AssetCustomField",
+   "action": "list",
+   "surface": "?tab=settings (Custom Fields)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 180,
+   "currentBehaviour": "Reads assetSettings.customFields from localStorage; empty state at line 246.",
+   "requiredBehaviour": "Server list ordered by sortOrder, excluding archived.",
+   "apiMethodPath": "GET /api/v1/assets/settings/custom-fields",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-CF-ADD",
+   "entity": "AssetCustomField",
+   "action": "create",
+   "surface": "?tab=settings (Custom Fields)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 193,
+   "currentBehaviour": "Immediately persists a field literally labelled 'New field' with type 'text'. No key, no uniqueness check; clicking twice creates two identical fields.",
+   "requiredBehaviour": "Create with a validated label and a generated immutable key.",
+   "apiMethodPath": "POST /api/v1/assets/settings/custom-fields",
+   "authorization": "Asset admin",
+   "validation": "label 1..100, unique per tenant; key slug unique and immutable",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-CF-RENAME",
+   "entity": "AssetCustomField",
+   "action": "update",
+   "surface": "?tab=settings (Custom Fields)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 209,
+   "currentBehaviour": "Persists on EVERY keystroke — one localStorage write and one audit row per character typed, so renaming a field floods Change History.",
+   "requiredBehaviour": "Debounced or explicit save; one audit entry per committed rename.",
+   "apiMethodPath": "PATCH /api/v1/assets/settings/custom-fields/{id}",
+   "authorization": "Asset admin",
+   "validation": "label non-empty and unique",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-CF-SET-TYPE",
+   "entity": "AssetCustomField",
+   "action": "update",
+   "surface": "?tab=settings (Custom Fields)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 220,
+   "currentBehaviour": "Persists the new type immediately. Choosing 'select' offers no options editor anywhere, so the type is unusable. Type changes are unguarded because no values exist yet.",
+   "requiredBehaviour": "Type change requires an options editor for 'select' and a migration decision once values exist.",
+   "apiMethodPath": "PATCH /api/v1/assets/settings/custom-fields/{id}",
+   "authorization": "Asset admin",
+   "validation": "type in enum; 'select' requires >=1 option",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-CF-DELETE",
+   "entity": "AssetCustomField",
+   "action": "delete",
+   "surface": "?tab=settings (Custom Fields)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 236,
+   "currentBehaviour": "Immediate unconditional removal from the array, no confirmation. Once values exist this would silently destroy them.",
+   "requiredBehaviour": "Archive rather than delete; refuse while values exist unless the admin confirms value deletion.",
+   "apiMethodPath": "POST /api/v1/assets/settings/custom-fields/{id}/archive",
+   "authorization": "Asset admin",
+   "validation": "Confirmation required when values exist",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-AGENT-LIST",
+   "entity": "AssetAgentSetting",
+   "action": "list",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 261,
+   "currentBehaviour": "Reads the three static ITAM agents from agentCatalog.ts:140 and overlays the disabled[] name array. The trigger label is derived by substring-matching 'Offboarding' in the agent's display name (line 267).",
+   "requiredBehaviour": "Server list of agent definitions with stored keys, triggers and per-tenant enablement.",
+   "apiMethodPath": "GET /api/v1/apps/ITAM/agents",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-AGENT-SEARCH",
+   "entity": "AssetAgentSetting",
+   "action": "list",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 338,
+   "currentBehaviour": "setState only; client substring match on the agent name.",
+   "requiredBehaviour": "Client filter is acceptable at this cardinality; keep.",
+   "apiMethodPath": "n/a (client)",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-AGENT-FILTER-TRIGGER",
+   "entity": "AssetAgentSetting",
+   "action": "list",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 346,
+   "currentBehaviour": "setState only; Automatic/Manual resolved by searching the derived label for the word 'automatically'.",
+   "requiredBehaviour": "Filter on the stored trigger enum.",
+   "apiMethodPath": "n/a (client)",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-AGENT-TOGGLE",
+   "entity": "AssetAgentSetting",
+   "action": "update",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 373,
+   "currentBehaviour": "Adds or removes the agent's DISPLAY NAME in assetSettings.agents.disabled in localStorage. Nothing outside this pane and its POS twin ever reads that array, so switching an agent off stops nothing and saves no credits.",
+   "requiredBehaviour": "Persist per-tenant enablement keyed by a stable agent key and honour it in the agent runner before dispatch.",
+   "apiMethodPath": "PATCH /api/v1/apps/ITAM/agents/{agentKey}",
+   "authorization": "Asset admin",
+   "validation": "agentKey must exist in the catalog",
+   "sideEffect": "Audit row; affects scheduled runs"
+  },
+  {
+   "id": "OP-ITAM-AGENT-PAUSE-ALL",
+   "entity": "AssetModuleSettings",
+   "action": "update",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 299,
+   "currentBehaviour": "Checkbox labelled 'Pause AI agents (all apps)' writes pauseAll inside ITAM settings only; the POS app keeps its own separate copy, and nothing reads either.",
+   "requiredBehaviour": "A genuinely tenant-wide pause flag stored once and enforced by the runner.",
+   "apiMethodPath": "PATCH /api/v1/tenant/agent-controls",
+   "authorization": "Tenant admin (it is tenant-wide)",
+   "sideEffect": "Audit row; halts scheduled runs"
+  },
+  {
+   "id": "OP-ITAM-AGENT-AUTORUN",
+   "entity": "AssetModuleSettings",
+   "action": "update",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 309,
+   "currentBehaviour": "Persists autoRunOnNew (default true). No create path anywhere consults it, so no agent ever runs on a new record.",
+   "requiredBehaviour": "Enqueue the configured agents on record creation when enabled.",
+   "apiMethodPath": "PATCH /api/v1/apps/ITAM/agent-controls",
+   "authorization": "Asset admin",
+   "sideEffect": "Audit row; triggers agent runs"
+  },
+  {
+   "id": "OP-ITAM-AGENT-AUTOPAUSE",
+   "entity": "AssetModuleSettings",
+   "action": "update",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 322,
+   "currentBehaviour": "Free-text input persisted verbatim as a string on every keystroke; 'off' is only placeholder text, so 'abc' is a valid saved value. Nothing enforces the threshold.",
+   "requiredBehaviour": "Integer credit threshold, NULL = off, enforced by the credit ledger before a run is dispatched.",
+   "apiMethodPath": "PATCH /api/v1/apps/ITAM/agent-controls",
+   "authorization": "Asset admin",
+   "validation": "Non-negative integer or null",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-AGENT-CREDITS-READ",
+   "entity": "AssetModuleSettings",
+   "action": "read",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 292,
+   "currentBehaviour": "Renders creditsUsed from the workspace blob as 'AI Credits this month', but the counter is a lifetime running total with no month boundary anywhere.",
+   "requiredBehaviour": "Period-scoped consumption from the credit ledger.",
+   "apiMethodPath": "GET /api/v1/billing/credits?period=current_month",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-AGENT-RUN",
+   "entity": "AssetAgentSetting",
+   "action": "execute",
+   "surface": "?tab=settings (AI Agents)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 268,
+   "currentBehaviour": "Missing — every manual agent is described as 'Runs only when someone clicks Run', but this pane has no Run control and neither does any asset surface.",
+   "requiredBehaviour": "Manual run against a selected scope, reserving credits and producing a reviewable run record.",
+   "apiMethodPath": "POST /api/v1/apps/ITAM/agents/{agentKey}/runs",
+   "authorization": "Asset admin",
+   "validation": "Agent enabled; credits available; idempotency key",
+   "sideEffect": "AI provider call; credit spend"
+  },
+  {
+   "id": "OP-ITAM-SCHED-LIST",
+   "entity": "AssetModuleSettings",
+   "action": "list",
+   "surface": "?tab=settings (Schedules)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 401,
+   "currentBehaviour": "A hardcoded empty state ('No workflow attached to Asset Management') with no data source and no create control; the pane takes no props and reads no state at all.",
+   "requiredBehaviour": "List schedules bound to this app with next/last run, or a genuine empty state with a working create path.",
+   "apiMethodPath": "GET /api/v1/apps/ITAM/schedules",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-SCHED-CREATE",
+   "entity": "AssetModuleSettings",
+   "action": "create",
+   "surface": "?tab=settings (Schedules)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 410,
+   "currentBehaviour": "Missing — the copy tells the user to install or build a workflow first but offers no link or button to do either.",
+   "requiredBehaviour": "Create a cron schedule for an ITAM agent or workflow, with timezone and overlap policy.",
+   "apiMethodPath": "POST /api/v1/apps/ITAM/schedules",
+   "authorization": "Asset admin",
+   "validation": "Valid cron expression; IANA timezone",
+   "sideEffect": "Registers a recurring job"
+  },
+  {
+   "id": "OP-ITAM-HIST-LIST",
+   "entity": "AuditEvent",
+   "action": "list",
+   "surface": "?tab=settings (Change History)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 422,
+   "currentBehaviour": "Filters the client-held audit array by action.startsWith('asset.') and renders action, resourceId and relative time. It mixes record CRUD (asset.created/updated/removed) with configuration changes while calling them all 'changes made here'. resourceId is often a raw UUID, and there is no actor column because the actor is always the literal 'owner'.",
+   "requiredBehaviour": "Server-side, append-only, paginated, with real actor, before/after diff and a resource label instead of a UUID; separate configuration changes from record changes.",
+   "apiMethodPath": "GET /api/v1/assets/change-history",
+   "authorization": "Asset admin",
+   "validation": "Cursor pagination; client cannot write or edit audit rows",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-HIST-SHOW-REVERTED",
+   "entity": "AuditEvent",
+   "action": "list",
+   "surface": "?tab=settings (Change History)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 437,
+   "currentBehaviour": "setState only — showReverted is never referenced by the render; ticking the box changes nothing on screen because no revert concept exists.",
+   "requiredBehaviour": "Filter on revertedAt once revert exists; until then remove the control.",
+   "apiMethodPath": "GET /api/v1/assets/change-history?includeReverted=true",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-HIST-RESET",
+   "entity": "AssetModuleSettings",
+   "action": "delete",
+   "surface": "?tab=settings (Change History)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 445,
+   "currentBehaviour": "resetAssetSettings() -> workspace.tsx:1807 replaces the entire assetSettings object with the seed, with no confirmation. It silently destroys the approval ladder, every custom field definition and all taxonomy edits including tag prefixes that existing tags were minted from. Assets keep values pointing at taxonomy entries that may no longer exist. It is enabled purely because asset.* audit rows exist, and the history itself is not cleared.",
+   "requiredBehaviour": "Explicit typed confirmation, a preview of what is discarded, refusal while records reference edited taxonomy values, and a restorable snapshot.",
+   "apiMethodPath": "POST /api/v1/assets/settings/reset",
+   "authorization": "Tenant owner only",
+   "validation": "Confirmation token; refuse when taxonomy entries are in use",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-HIST-UNDO",
+   "entity": "AuditEvent",
+   "action": "transition",
+   "surface": "?tab=settings (Change History)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 428,
+   "currentBehaviour": "Missing — two separate copy blocks promise that changes can be undone, and no row has an undo control.",
+   "requiredBehaviour": "Per-entry revert for configuration changes, writing a compensating entry rather than mutating history.",
+   "apiMethodPath": "POST /api/v1/assets/change-history/{id}/revert",
+   "authorization": "Asset admin",
+   "validation": "Only revertible kinds; refuse if superseded",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-TAX-SELECT",
+   "entity": "AssetTaxonomy",
+   "action": "read",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 556,
+   "currentBehaviour": "setActive() local state; the selected taxonomy is not in the URL. Switching taxonomies keeps the unsaved draft of the previous one, so one Save writes several taxonomies at once.",
+   "requiredBehaviour": "Taxonomy key in the URL; per-taxonomy dirty tracking.",
+   "apiMethodPath": "GET /api/v1/assets/taxonomies/{key}",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-TAX-LIST",
+   "entity": "AssetTaxonomyEntry",
+   "action": "list",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 522,
+   "currentBehaviour": "Reads draft[active] from the local copy of the settings blob; four of the nine taxonomies (models, warranty, numbering, notification) ship empty. Rows are keyed on `${value}-${index}`.",
+   "requiredBehaviour": "Server list per taxonomy with stable ids, sort order and in-use counts.",
+   "apiMethodPath": "GET /api/v1/assets/taxonomies/{key}/entries",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-ITAM-TAX-ADD-ENTRY",
+   "entity": "AssetTaxonomyEntry",
+   "action": "create",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 676,
+   "currentBehaviour": "Appends { value: '', label: 'New entry', tagPrefix: '' } to the draft. The value input is read-only for every row including this one, so the immutable key can never be filled in and saving produces an entry with an empty key — repeatable, giving duplicate empty keys.",
+   "requiredBehaviour": "New entries must accept a value on creation (editable until first save), validated for uniqueness and format; prefix required for asset types.",
+   "apiMethodPath": "POST /api/v1/assets/taxonomies/{key}/entries",
+   "authorization": "Asset admin",
+   "validation": "value matches ^[a-z0-9_]{1,50}$ and is unique in the taxonomy; label non-empty",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-TAX-EDIT-LABEL",
+   "entity": "AssetTaxonomyEntry",
+   "action": "update",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 609,
+   "currentBehaviour": "Local draft edit by array index; an empty label can be saved.",
+   "requiredBehaviour": "Rename by id with a non-empty check; safe by design since value is the stored key.",
+   "apiMethodPath": "PATCH /api/v1/assets/taxonomies/{key}/entries/{id}",
+   "authorization": "Asset admin",
+   "validation": "label 1..100",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-TAX-EDIT-PREFIX",
+   "entity": "AssetTaxonomyEntry",
+   "action": "update",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 621,
+   "currentBehaviour": "Local draft edit of the tag prefix, with no format check and no uniqueness check across types — two types can share a prefix, and because the sequence is per type the same tag number is then mintable twice. Editing it does not retag existing units.",
+   "requiredBehaviour": "Validated unique prefix per tenant, bound to a sequence row; existing tags remain unchanged and the change is audited.",
+   "apiMethodPath": "PATCH /api/v1/assets/taxonomies/asset_types/entries/{id}",
+   "authorization": "Asset admin",
+   "validation": "^[A-Z0-9]{2,6}-$ and unique per tenant",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-TAX-TOGGLE-CONFIG",
+   "entity": "AssetTaxonomyEntry",
+   "action": "update",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 636,
+   "currentBehaviour": "Checkbox flips hasConfig in the draft; configCount is display-only and is never recalculated, so an entry can read 'has config ⚙ 0' or keep a stale count of 3 after being switched off and on.",
+   "requiredBehaviour": "Derive the count from AssetTypeConfig rows; the flag should follow the data, not be set by hand.",
+   "apiMethodPath": "PATCH /api/v1/assets/taxonomies/asset_types/entries/{id}",
+   "authorization": "Asset admin",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-TAX-DELETE-ENTRY",
+   "entity": "AssetTaxonomyEntry",
+   "action": "delete",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 655,
+   "currentBehaviour": "Removes the entry from the draft by index with no usage check whatsoever, directly contradicting the note printed underneath it. Saving then orphans every asset holding that value: the register's type filter loses the option while the rows keep the dead key, and the reports fall back to printing the raw value.",
+   "requiredBehaviour": "Refuse deletion while any record references the value; otherwise archive it. Never orphan.",
+   "apiMethodPath": "DELETE /api/v1/assets/taxonomies/{key}/entries/{id}",
+   "authorization": "Asset admin",
+   "validation": "409 with the in-use count when referenced",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-TAX-SAVE",
+   "entity": "AssetTaxonomyEntry",
+   "action": "update",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 541,
+   "currentBehaviour": "updateAssetSettings({taxonomies: draft}) writes every taxonomy wholesale to localStorage and logs one generic asset.settings_updated row. No validation, no per-entry diff, no conflict detection, last writer wins across tabs.",
+   "requiredBehaviour": "Per-entry transactional save with validation, referential checks and an itemised audit diff.",
+   "apiMethodPath": "PUT /api/v1/assets/taxonomies/{key}/entries",
+   "authorization": "Asset admin",
+   "validation": "Unique non-empty values; in-use entries not removed; version conflict returns 409",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-ITAM-TAX-CONFIG-EDIT",
+   "entity": "AssetTypeConfig",
+   "action": "update",
+   "surface": "?tab=masters",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "sourceLine": 649,
+   "currentBehaviour": "Missing — the '⚙ 3' badge is static text with no click target, so whatever those three configurations are cannot be viewed or edited.",
+   "requiredBehaviour": "An editor for per-type configuration rows, once their meaning is confirmed.",
+   "apiMethodPath": "GET/PUT /api/v1/assets/taxonomies/asset_types/entries/{id}/configs",
+   "authorization": "Asset admin",
+   "sideEffect": "none"
+  }
+ ],
+ "surfaces": [
+  {
+   "route": "/app/asset-management",
+   "tab": "dashboard (default, no query)",
+   "title": "Asset Management — Dashboard",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:29",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated",
+    "empty (per-section 'Nothing to do' / 'Nothing expiring' / 'No departed employee is holding an asset')"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "denied",
+    "drill-through from any tile",
+    "two tiles ('With leavers', and any warranty figure on an asset with no warranty date) are structurally unreachable or silently excluded"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "assets (Asset Register)",
+   "title": "Asset Register",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:124",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated",
+    "empty ('No assets yet')",
+    "create dialog",
+    "inline stage edit",
+    "CSV export",
+    "CSV import",
+    "transient note line"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "denied",
+    "conflict",
+    "row detail",
+    "edit",
+    "assign/return/transfer",
+    "retire with reason",
+    "delete confirmation",
+    "pagination",
+    "sorting",
+    "custom fields on the form",
+    "import preview/validation errors"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "my_equipment (My Asset)",
+   "title": "My Asset",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:443",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "empty (always, since assignedTo is never populated)"
+   ],
+   "statesMissing": [
+    "populated (unreachable)",
+    "loading",
+    "error",
+    "assignment history",
+    "acknowledge/report/return actions"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "requests",
+   "title": "Asset requests",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:481",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated",
+    "empty ('No requests yet')",
+    "create dialog",
+    "approve/reject row actions",
+    "scope/type/status filters",
+    "search"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "denied (every viewer sees every request and both decision buttons)",
+    "request detail",
+    "approval trail",
+    "issue step",
+    "withdraw",
+    "rejection reason",
+    "multi-level routing"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "reports",
+   "title": "Reports",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx:701",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "Stock summary populated",
+    "global empty ('No assets to report on.')",
+    "group-by",
+    "CSV export"
+   ],
+   "statesMissing": [
+    "5 of 6 tabs are placeholder text (Asset ledger, Department usage, Warranty, Support notes, Audit log)",
+    "loading",
+    "error",
+    "date-range filter",
+    "real Excel output",
+    "report key in the URL"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "settings > Approval Levels (default section, not URL-addressable)",
+   "title": "Approval Levels",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:37",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "populated",
+    "dirty/save-enabled"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "validation",
+    "discard guard on navigation",
+    "any runtime enforcement — the saved ladder is read by nothing"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "settings > Custom Fields",
+   "title": "Custom Fields",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:178",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "populated",
+    "empty ('No custom fields')"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "validation",
+    "options editor for the 'select' type",
+    "delete confirmation",
+    "any surface that renders the defined fields, so no value can ever be captured"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "settings > AI Agents",
+   "title": "AI Agents",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:259",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "populated (3 static catalog agents)",
+    "search",
+    "trigger filter",
+    "toggle",
+    "credit readout"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "empty search result",
+    "Run control",
+    "run history",
+    "any enforcement of disabled/pauseAll/autoRun/autoPause"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "settings > Schedules",
+   "title": "Schedules",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:401",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "hardcoded empty"
+   ],
+   "statesMissing": [
+    "populated",
+    "loading",
+    "error",
+    "create",
+    "edit",
+    "delete",
+    "next/last run"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "settings > Change History",
+   "title": "Change History",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:419",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated from client audit rows",
+    "empty ('No customizations yet')",
+    "Reset to Default"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "actor column",
+    "before/after diff",
+    "pagination",
+    "undo (promised twice)",
+    "working 'Show reverted' filter",
+    "reset confirmation"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "masters (Master Taxonomies)",
+   "title": "Master Taxonomies",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx:516",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated",
+    "per-taxonomy empty ('No entries yet.')",
+    "dirty/save-enabled",
+    "add/edit/delete rows",
+    "back to settings"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "validation",
+    "usage counts",
+    "in-use deletion guard (the screen claims one exists)",
+    "editable value on new rows",
+    "per-taxonomy dirty isolation",
+    "4 of 9 taxonomies ship empty with no explanation of what belongs in them"
+   ]
+  },
+  {
+   "route": "/app/asset-management",
+   "tab": "any (uninstalled)",
+   "title": "Asset Management is not installed",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx:26",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "denied/not-entitled with a marketplace link"
+   ],
+   "statesMissing": [
+    "server-side enforcement — the gate is purely a client render over a localStorage array, so any API would still answer"
+   ]
+  }
+ ],
+ "falseSuccessCopy": [
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "line": 244,
+   "text": "No purchase receipts are waiting. Assets appear here once a PO is received.",
+   "why": "Presented as the result of checking purchasing. Nothing is queried — the string is hardcoded inside the onClick. No purchase order entity exists anywhere in the codebase, so no asset can ever 'appear here'."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "line": 195,
+   "text": "Imported {n} asset(s).",
+   "why": "Claims a successful import. Rows are only pushed into localStorage, nothing is validated against the taxonomy or stage vocabulary, and the importer's column order does not match this same screen's exporter, so a round-tripped file is silently mis-mapped while still reporting success."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "line": 508,
+   "text": "Request → approve → issue. An asset cannot be issued without a matching approved request.",
+   "why": "Stated as an enforced rule. The register's stage dropdown sets any asset to 'Issued' in one click with no request, no approval and no custodian (panes.tsx:307)."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "line": 556,
+   "text": "You can approve requests. Your request is sent for review like everyone else's — you can also decide other people's.",
+   "why": "Implies a review routing that grants the viewer approval rights. There is no permission check at all: every signed-in user sees Approve/Reject on every pending row, including their own, and one click closes the request."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "line": 452,
+   "text": "Everything issued to you, past and present. Only your own periods are shown — not who held the item before or after you.",
+   "why": "Claims a custody history with periods. Only a single current display-name string exists, and it is never written, so the list is permanently empty and no period was ever recorded."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "line": 472,
+   "text": "Your account isn't linked to an employee record, so no equipment can be issued to you. Ask an admin to link it.",
+   "why": "States a specific diagnosis and remedy. There is no employee record, no linking feature and no admin action to perform; the message is simply the empty state of a name-string comparison and would show even for a correctly configured user."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+   "line": 774,
+   "text": "Excel",
+   "why": "Offers an Excel export. The handler is exportCsv — the identical text/csv blob, saved with a .csv extension. No XLSX is generated."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 24,
+   "text": "Every change is saved in Change History and can be undone.",
+   "why": "Promises undo. No revert path, no compensating-entry mechanism and no undo control exists anywhere; Change History rows are read-only text."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 428,
+   "text": "Every change made here, with who made it and when — and how to undo it.",
+   "why": "Claims an actor and an undo route. The actor is the hardcoded literal 'owner' with role 'Org_admin' for every row (workspace.tsx:179-180), and there is no undo. It also lists record CRUD events under the heading 'changes made here'."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 443,
+   "text": "Show reverted",
+   "why": "A control implying reverted entries exist and can be revealed. The state it sets is never read by the render, so ticking it does nothing at all."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 46,
+   "text": "Every level applies in order — level 1 decides first, and the request is only approved once the last level agrees.",
+   "why": "Describes an enforced multi-level ladder. decideAssetRequest never reads approvalLevels; a single click by anyone sets the request to Approved regardless of how many levels are configured."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 688,
+   "text": "A saved Value is locked — records already store it — so edit the Label, or remove the entry (removal is refused while records still use it). Nothing is silently orphaned.",
+   "why": "Asserts a referential-integrity guarantee that does not exist. The delete button removes the entry unconditionally with no usage check, and assets keep the dead value — silently orphaned, which is precisely what the sentence denies."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 287,
+   "text": "Switch an agent off to stop it running — and stop it spending AI Credits.",
+   "why": "Claims a runtime and billing effect. The toggle only adds the agent's display name to an array that nothing outside this settings pane ever reads, so no run is prevented and no credit is saved."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 268,
+   "text": "Runs only when someone clicks Run",
+   "why": "Refers the user to a Run control that exists on no asset surface. The label is also derived by substring-matching the agent's name rather than from any stored trigger."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 293,
+   "text": "{creditsUsed} AI Credits this month",
+   "why": "Scopes the figure to the month. creditsUsed is a lifetime running total in the workspace blob with no period boundary or reset anywhere."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 307,
+   "text": "Pause AI agents (all apps)",
+   "why": "Claims tenant-wide scope. The checkbox writes into assetSettings.agents only; the POS app keeps a separate copy of the same flag, and neither is read at run time."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 446,
+   "text": "Reset to Default",
+   "why": "Presented as a benign restore. It replaces the whole settings object with no confirmation, destroying the approval ladder, every custom-field definition and all taxonomy edits — including tag prefixes that existing asset tags were minted from — while leaving those assets pointing at values that no longer exist."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+   "line": 53,
+   "text": "Track assets as individually tagged units through their full lifecycle.",
+   "why": "Claims full lifecycle tracking. Only a mutable stage label exists: no assignment, return, transfer, repair or retirement record is ever written, and the previous stage is overwritten and lost on every change."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+   "line": 58,
+   "text": "Trial · {trialDaysLeft} days left",
+   "why": "Implies a live countdown. TRIAL_DAYS is the constant 13 (workspace.tsx:67); the badge reads the same on day one and day thirty."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+   "line": 536,
+   "text": "Every dropdown in this app is configured here — no developer needed.",
+   "why": "Four of the nine taxonomies (models, warranty, numbering, notification) are wired to no dropdown at all, and three more (makes, mode_of_purchase, retirement_reasons) are read by no form, filter or report in the app."
+  }
+ ],
+ "openQuestions": [
+  "Stage semantics: what operationally distinguishes 'Allocated' from 'Issued', and what puts a unit into 'Awaiting check' (return inspection? periodic audit?). Which stages may hold a custodian, and which transitions are legal from which? The prototype allows every stage to follow every other.",
+  "Authoritative issue rule: the requests pane states an asset cannot be issued without a matching approved request, while the register lets anyone set 'Issued' directly. Which is the real rule, and is there a break-glass path for emergency issue?",
+  "Approval ladder semantics: within one level, must every listed approver agree or does any one suffice? Does a rejection at level 2 end the request or return it to level 1? Is there an SLA, escalation or delegation?",
+  "Approver identity: what does the seeded role 'Manager (unknown)' resolve to, and what does 'By Department head' resolve to given that no department exists on any record in the codebase?",
+  "Self-approval: may a requester approve their own request (the UI currently allows it and the copy appears to endorse it), and may an Asset admin approve unilaterally regardless of the ladder?",
+  "The 'Issued' request status has no control that sets it: who performs issue, is a specific unit chosen at that moment, and must that unit be In Stock and of the requested type? Must a request name an asset type at all?",
+  "Request withdrawal/cancellation by the requester is absent from both the UI and the status vocabulary — is it in scope, and what status value should it use?",
+  "Asset type 'config' (the ⚙ 3 badge, hasConfig/configCount): what are these configuration rows? Specification templates, accessory bundles, approval overrides? Nothing in the source says, and only a count is rendered.",
+  "Four taxonomies ship empty and are read by nothing: 'models', 'warranty', 'numbering', 'notification'. What entries and what additional columns do they carry? In particular, what are the numbering rules ('Numbering & Naming') — prefix only, or per-company/per-year sequences with a reset policy?",
+  "Should make, model and mode of purchase (Purchase/Lease/Rental) be captured on an asset? Their taxonomies are seeded but no form, filter or report references them. Lease/rental in particular would imply terms and end dates the model does not have.",
+  "'Department usage' report: no department attribute exists on any asset, assignment or user. Where does department come from — the custodian's HR record, the project, or the owning company?",
+  "'Asset ledger' report: is it a custody/event ledger or a financial one (cost, depreciation, book value)? The columns cannot be inferred from the source.",
+  "'Support notes' report and the Support taxonomies (Reasons, Notification): is there a distinct asset service/repair record, or should these link to tickets in the Support & Ticketing app? What does the 'Notification' taxonomy configure — recipients, channels, events?",
+  "Is asset cost, depreciation or book value in scope at all? There is no money field anywhere in this domain today, yet the Loop 29 gate speaks of 'financial history'. If yes: what depreciation method, and per company or per tenant?",
+  "'Receive from purchase': which purchasing source feeds it? Purchase & Payables exists only as a marketplace card, and no PO entity exists in the codebase.",
+  "How does a user account link to an employee record? The My Asset empty state instructs the user to ask an admin to link it, but no employee identity, link feature or admin screen exists.",
+  "Leaver detection currently depends on a '(leaver)' suffix inside a display name. What is the authoritative source of employment status, and what should the offboarding recovery flow actually do (auto-raise a Return request? block the exit checklist?).",
+  "Retirement with reason 'Sold' or 'Donated': are proceeds, buyer and disposal documents recorded, and does disposal post anywhere financially?",
+  "Custom fields: are they global or per asset type? Where do options for the 'select' type come from? Are they editable after values exist, and what happens to values when a field is deleted?",
+  "Change History: what exactly is revertible — configuration only, or record changes too — and at what granularity? What does 'reverted' mean for an entry that has since been superseded?",
+  "Taxonomy scope: are master taxonomies tenant-wide or per company? Assets are expected to be company-scoped, so a shared taxonomy with per-company tag sequences needs confirmation.",
+  "Agent controls: is 'Pause AI agents' genuinely tenant-wide as its label says (it is stored per app today, with a duplicate copy in POS), and is the auto-pause credit threshold per app or per tenant?",
+  "Should ITAM be installed by default? defaultInstalled is ['CRM','HR'], so every fresh workspace lands on the not-installed gate for this app.",
+  "The warranty alert window is the hardcoded constant 60 days. Should it be tenant-configurable, and per asset type?",
+  "Who may see other people's requests and the detail text they contain? Today every signed-in user sees every request in the tenant, including the free-text justification."
+ ]
+}

@@ -1,0 +1,2872 @@
+{
+  "base": "http://localhost:3100",
+  "results": [
+    {
+      "route": "/app/account",
+      "status": 200,
+      "finalUrl": "/app/account",
+      "textLength": 944,
+      "headings": [
+        "Account & plan",
+        "Profile",
+        "Appearance",
+        "Plan"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/admin/scheduled-jobs",
+      "status": 200,
+      "finalUrl": "/app/admin/scheduled-jobs",
+      "textLength": 878,
+      "headings": [
+        "Scheduled Jobs"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/agent-portal",
+      "status": 200,
+      "finalUrl": "/app/agent-portal",
+      "textLength": 12286,
+      "headings": [
+        "🚀Agent Portal",
+        "Support & Ticketing",
+        "Intelligent Document Processing",
+        "Project Management",
+        "Travel & Expense",
+        "CRM",
+        "HR & People Ops",
+        "Finance & Accounting",
+        "Inventory & Warehousing",
+        "Purchase & Payables",
+        "Payroll",
+        "Manufacturing",
+        "Contract Management",
+        "Asset Management",
+        "Sales & POS"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/approvals",
+      "status": 200,
+      "finalUrl": "/app/approvals",
+      "textLength": 1113,
+      "headings": [
+        "🛡Approvals",
+        "Awaiting review",
+        "Recently reviewed",
+        "Stats"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/asset-management",
+      "status": 200,
+      "finalUrl": "/app/asset-management",
+      "textLength": 1228,
+      "headings": [
+        "Asset Management"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/build/agent-studio",
+      "status": 200,
+      "finalUrl": "/app/build/agent-studio",
+      "textLength": 1169,
+      "headings": [
+        "Hand-tune every step. See it run.",
+        "Reason"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/build/vibe-studio",
+      "status": 200,
+      "finalUrl": "/app/build/vibe-studio",
+      "textLength": 1665,
+      "headings": [
+        "Describe it. Vibe Studio builds it.",
+        "Start from a capability"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/chat",
+      "status": 200,
+      "finalUrl": "/app/business/chat",
+      "textLength": 1160,
+      "headings": [
+        "AI chat",
+        "Start a conversation"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business",
+      "status": 200,
+      "finalUrl": "/app/business",
+      "textLength": 1546,
+      "headings": [
+        "Welcome back, audit",
+        "Quick access",
+        "Featured tools",
+        "Browse by category"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/client-portal",
+      "status": 200,
+      "finalUrl": "/app/client-portal",
+      "textLength": 1292,
+      "headings": [
+        "Client Portal RBAC",
+        "Tabs visible to partner users"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/compliance-center",
+      "status": 200,
+      "finalUrl": "/app/compliance-center",
+      "textLength": 1219,
+      "headings": [
+        "Compliance Center",
+        "Privacy posture",
+        "Processors & transfers"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm",
+      "status": 200,
+      "finalUrl": "/app/crm",
+      "textLength": 1350,
+      "headings": [
+        "CRM",
+        "Good afternoon, audit"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/governance",
+      "status": 200,
+      "finalUrl": "/app/governance?tab=audit",
+      "textLength": 1767,
+      "headings": [
+        "Audit Trail"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/guardrails",
+      "status": 200,
+      "finalUrl": "/app/guardrails",
+      "textLength": 1108,
+      "headings": [
+        "Guardrails"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr",
+      "status": 200,
+      "finalUrl": "/app/hr",
+      "textLength": 1539,
+      "headings": [
+        "HR & People Ops",
+        "Dashboard"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/inbox",
+      "status": 200,
+      "finalUrl": "/app/inbox",
+      "textLength": 1718,
+      "headings": [
+        "✉Inbox",
+        "👤Pending Approvals",
+        "🔔Notifications & @Mentions"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/integrations",
+      "status": 200,
+      "finalUrl": "/app/integrations",
+      "textLength": 4577,
+      "headings": [
+        "Integrations",
+        "Your connections0 total",
+        "Available connectors",
+        "Custom Connectors"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/marketplace",
+      "status": 200,
+      "finalUrl": "/app/marketplace",
+      "textLength": 3170,
+      "headings": [
+        "Marketplace"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/announcements",
+      "status": 200,
+      "finalUrl": "/app/me/announcements",
+      "textLength": 907,
+      "headings": [
+        "Announcements"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/attendance",
+      "status": 200,
+      "finalUrl": "/app/me/attendance",
+      "textLength": 1009,
+      "headings": [
+        "My Attendance",
+        "No employee profile linked"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/documents",
+      "status": 200,
+      "finalUrl": "/app/me/documents",
+      "textLength": 915,
+      "headings": [
+        "My Documents"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/leaves",
+      "status": 200,
+      "finalUrl": "/app/me/leaves",
+      "textLength": 994,
+      "headings": [
+        "My Leaves",
+        "No employee profile linked"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/onboarding",
+      "status": 200,
+      "finalUrl": "/app/me/onboarding",
+      "textLength": 996,
+      "headings": [
+        "My Onboarding",
+        "No employee profile linked"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me",
+      "status": 200,
+      "finalUrl": "/app/me",
+      "textLength": 941,
+      "headings": [
+        "No employee profile linked"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/payslips",
+      "status": 200,
+      "finalUrl": "/app/me/payslips",
+      "textLength": 992,
+      "headings": [
+        "My Payslips",
+        "No employee profile linked"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/profile",
+      "status": 200,
+      "finalUrl": "/app/me/profile",
+      "textLength": 996,
+      "headings": [
+        "My Profile",
+        "No employee profile linked"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/team-approvals",
+      "status": 200,
+      "finalUrl": "/app/me/team-approvals",
+      "textLength": 908,
+      "headings": [
+        "Team Approvals"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/me/timesheets",
+      "status": 200,
+      "finalUrl": "/app/me/timesheets",
+      "textLength": 991,
+      "headings": [
+        "My Timesheets",
+        "No employee profile linked"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app",
+      "status": 200,
+      "finalUrl": "/app",
+      "textLength": 3170,
+      "headings": [
+        "Good afternoon, audit",
+        "Add a second factor to your account",
+        "Get the most out of Apragya"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/prompt-lab",
+      "status": 200,
+      "finalUrl": "/app/prompt-lab",
+      "textLength": 850,
+      "headings": [
+        "Response"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/runners",
+      "status": 200,
+      "finalUrl": "/app/runners",
+      "textLength": 822,
+      "headings": [
+        "Tenant Runners"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/runs",
+      "status": 200,
+      "finalUrl": "/app/runs",
+      "textLength": 792,
+      "headings": [
+        "Nothing runs silently."
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos",
+      "status": 200,
+      "finalUrl": "/app/sales-pos",
+      "textLength": 2408,
+      "headings": [
+        "Sales & POS",
+        "Sales overview",
+        "Invoiced revenue",
+        "Order to cash",
+        "Sales — CY 2026",
+        "Payment due",
+        "AR aging",
+        "Payment status",
+        "Who owes the most"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/scheduled-jobs",
+      "status": 200,
+      "finalUrl": "/app/scheduled-jobs",
+      "textLength": 826,
+      "headings": [
+        "Scheduled Jobs"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/setup/companies",
+      "status": 200,
+      "finalUrl": "/app/setup/companies",
+      "textLength": 1026,
+      "headings": [
+        "Companies & consolidation"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/setup",
+      "status": 200,
+      "finalUrl": "/app/setup",
+      "textLength": 880,
+      "headings": [
+        "Setup"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing",
+      "textLength": 1026,
+      "headings": [
+        "Support & Ticketing"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense",
+      "status": 200,
+      "finalUrl": "/app/travel-expense",
+      "textLength": 1337,
+      "headings": [
+        "Travel & Expense",
+        "Reimbursement pipeline",
+        "Spend by category",
+        "Monthly trend"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/marketplace",
+      "status": 200,
+      "finalUrl": "/marketplace",
+      "textLength": 10382,
+      "headings": [
+        "50+ agents and apps. Plug and play.",
+        "Contract Analyzer",
+        "Invoice Capture",
+        "Lead Qualifier",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/",
+      "status": 200,
+      "finalUrl": "/",
+      "textLength": 13579,
+      "headings": [
+        "The AI operating system your business actually runs on",
+        "Outcomes, not another dashboard.",
+        "Three suites. One operating system.",
+        "Things you can build. All from a prompt.",
+        "Hand-tune every step. See it run.",
+        "15+ apps. All AI-native.",
+        "Visualize the workflow your industry runs on.",
+        "100+ integrations. Lives where your work lives.",
+        "50+ agents and apps. Plug and play.",
+        "Enterprise controls, built in.",
+        "Built different. Built for you.",
+        "Latest from our newsroom.",
+        "Start with a 14-day free trial, then free forever for up to 3 users.",
+        "Got questions? We've got answers.",
+        "Your workspace is 60 seconds away",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/studio",
+      "status": 200,
+      "finalUrl": "/studio",
+      "textLength": 1075,
+      "headings": [
+        "What should we get done, audit?",
+        "Start from a template",
+        "Agent Health",
+        "September 2026",
+        "Recent Activity"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=dashboard",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=dashboard",
+      "textLength": 1539,
+      "headings": [
+        "HR & People Ops",
+        "Dashboard"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=recruitment",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=recruitment",
+      "textLength": 1356,
+      "headings": [
+        "HR & People Ops",
+        "Recruitment"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=offers",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=offers",
+      "textLength": 1267,
+      "headings": [
+        "HR & People Ops",
+        "Offers & letters"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=onboarding",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=onboarding",
+      "textLength": 1339,
+      "headings": [
+        "HR & People Ops",
+        "Onboarding"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=employees",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=employees",
+      "textLength": 1371,
+      "headings": [
+        "HR & People Ops",
+        "Employees"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=lifecycle_changes",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=lifecycle_changes",
+      "textLength": 1272,
+      "headings": [
+        "HR & People Ops",
+        "Lifecycle changes"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=documents",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=documents",
+      "textLength": 1325,
+      "headings": [
+        "HR & People Ops",
+        "Documents"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=separation",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=separation",
+      "textLength": 1271,
+      "headings": [
+        "HR & People Ops",
+        "Separation"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=shifts",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=shifts",
+      "textLength": 1329,
+      "headings": [
+        "HR & People Ops",
+        "Shifts & Rosters"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=attendance",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=attendance",
+      "textLength": 1222,
+      "headings": [
+        "HR & People Ops",
+        "Attendance"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=attendance_calendar",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=attendance_calendar",
+      "textLength": 1843,
+      "headings": [
+        "HR & People Ops"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=attendance_admin",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=attendance_admin",
+      "textLength": 1399,
+      "headings": [
+        "HR & People Ops",
+        "Attendance admin"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=leaves",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=leaves",
+      "textLength": 1438,
+      "headings": [
+        "HR & People Ops",
+        "Leaves"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=team_approvals",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=team_approvals",
+      "textLength": 1136,
+      "headings": [
+        "HR & People Ops",
+        ""
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=overtime",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=overtime",
+      "textLength": 1366,
+      "headings": [
+        "HR & People Ops",
+        "Overtime"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=overtime_report",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=overtime_report",
+      "textLength": 1435,
+      "headings": [
+        "HR & People Ops",
+        "Overtime report"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=timesheets",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=timesheets",
+      "textLength": 1335,
+      "headings": [
+        "HR & People Ops",
+        "Timesheets"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=performance",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=performance",
+      "textLength": 1470,
+      "headings": [
+        "HR & People Ops",
+        "Performance"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=training",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=training",
+      "textLength": 1394,
+      "headings": [
+        "HR & People Ops",
+        "Training"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=skills",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=skills",
+      "textLength": 1407,
+      "headings": [
+        "HR & People Ops",
+        "Skills"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=care",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=care",
+      "textLength": 1272,
+      "headings": [
+        "HR & People Ops",
+        "Employee care"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=announcements",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=announcements",
+      "textLength": 1211,
+      "headings": [
+        "HR & People Ops",
+        "Announcements"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/hr?tab=settings",
+      "status": 200,
+      "finalUrl": "/app/hr?tab=settings",
+      "textLength": 1603,
+      "headings": [
+        "HR & People Ops",
+        "General"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=dashboard",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=dashboard",
+      "textLength": 1350,
+      "headings": [
+        "CRM",
+        "Good afternoon, audit"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=leads",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=leads",
+      "textLength": 1132,
+      "headings": [
+        "CRM"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=contacts",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=contacts",
+      "textLength": 1130,
+      "headings": [
+        "CRM",
+        "👥Contacts"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=companies",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=companies",
+      "textLength": 1056,
+      "headings": [
+        "CRM",
+        "🏢Accounts"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=deals",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=deals",
+      "textLength": 1315,
+      "headings": [
+        "CRM"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=calendar",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=calendar",
+      "textLength": 952,
+      "headings": [
+        "CRM",
+        "September 2026"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=activities",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=activities",
+      "textLength": 1000,
+      "headings": [
+        "CRM"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=sequences",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=sequences",
+      "textLength": 1059,
+      "headings": [
+        "CRM",
+        "Sequences"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=reports",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=reports",
+      "textLength": 1448,
+      "headings": [
+        "CRM"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/crm?tab=settings",
+      "status": 200,
+      "finalUrl": "/app/crm?tab=settings",
+      "textLength": 1296,
+      "headings": [
+        "CRM",
+        "Pipelines & stages"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=dashboard",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=dashboard",
+      "textLength": 1337,
+      "headings": [
+        "Travel & Expense",
+        "Reimbursement pipeline",
+        "Spend by category",
+        "Monthly trend"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=expense_reports",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=expense_reports",
+      "textLength": 1103,
+      "headings": [
+        "Travel & Expense",
+        "Expense reports"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=cards",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=cards",
+      "textLength": 1206,
+      "headings": [
+        "Travel & Expense",
+        "Corporate card statement",
+        "Transactions"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=reimbursements",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=reimbursements",
+      "textLength": 1278,
+      "headings": [
+        "Travel & Expense",
+        "Approved reports awaiting reimbursement",
+        "Reimbursement runs"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=travel",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=travel",
+      "textLength": 1090,
+      "headings": [
+        "Travel & Expense",
+        "Travel requests"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=agency_review",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=agency_review",
+      "textLength": 1151,
+      "headings": [
+        "Travel & Expense",
+        "Agency review"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=approval_inbox",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=approval_inbox",
+      "textLength": 1098,
+      "headings": [
+        "Travel & Expense",
+        "Approval Inbox"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=reports",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=reports",
+      "textLength": 1105,
+      "headings": [
+        "Travel & Expense",
+        "Spend Overview"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/travel-expense?tab=settings",
+      "status": 200,
+      "finalUrl": "/app/travel-expense?tab=settings",
+      "textLength": 2103,
+      "headings": [
+        "Travel & Expense",
+        "Expense policy"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/asset-management?tab=dashboard",
+      "status": 200,
+      "finalUrl": "/app/asset-management?tab=dashboard",
+      "textLength": 1228,
+      "headings": [
+        "Asset Management"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/asset-management?tab=assets",
+      "status": 200,
+      "finalUrl": "/app/asset-management?tab=assets",
+      "textLength": 1152,
+      "headings": [
+        "Asset Management",
+        "Asset Register"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/asset-management?tab=my_equipment",
+      "status": 200,
+      "finalUrl": "/app/asset-management?tab=my_equipment",
+      "textLength": 1000,
+      "headings": [
+        "Asset Management",
+        "My Asset"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/asset-management?tab=requests",
+      "status": 200,
+      "finalUrl": "/app/asset-management?tab=requests",
+      "textLength": 1201,
+      "headings": [
+        "Asset Management",
+        "Asset requests"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/asset-management?tab=reports",
+      "status": 200,
+      "finalUrl": "/app/asset-management?tab=reports",
+      "textLength": 909,
+      "headings": [
+        "Asset Management"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/asset-management?tab=settings",
+      "status": 200,
+      "finalUrl": "/app/asset-management?tab=settings",
+      "textLength": 1517,
+      "headings": [
+        "Asset Management"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=dashboard",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=dashboard",
+      "textLength": 1026,
+      "headings": [
+        "Support & Ticketing"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=tickets",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=tickets",
+      "textLength": 1295,
+      "headings": [
+        "Support & Ticketing",
+        "Tickets"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=knowledge_base",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=knowledge_base",
+      "textLength": 1147,
+      "headings": [
+        "Support & Ticketing",
+        "Knowledge Base"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=my_requests",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=my_requests",
+      "textLength": 991,
+      "headings": [
+        "Support & Ticketing",
+        "My support requests"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=sla_policies",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=sla_policies",
+      "textLength": 1059,
+      "headings": [
+        "Support & Ticketing",
+        "SLA Policies isn't on your plan"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=canned_responses",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=canned_responses",
+      "textLength": 1026,
+      "headings": [
+        "Support & Ticketing",
+        "Canned Responses"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=routing_rules",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=routing_rules",
+      "textLength": 1061,
+      "headings": [
+        "Support & Ticketing",
+        "Routing Rules isn't on your plan"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=reports",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=reports",
+      "textLength": 1248,
+      "headings": [
+        "Support & Ticketing",
+        "Support reports"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/support-ticketing?tab=settings",
+      "status": 200,
+      "finalUrl": "/app/support-ticketing?tab=settings",
+      "textLength": 1848,
+      "headings": [
+        "Support & Ticketing",
+        "Support settings"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=dashboard",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=dashboard",
+      "textLength": 2408,
+      "headings": [
+        "Sales & POS",
+        "Sales overview",
+        "Invoiced revenue",
+        "Order to cash",
+        "Sales — CY 2026",
+        "Payment due",
+        "AR aging",
+        "Payment status",
+        "Who owes the most"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=customers",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=customers",
+      "textLength": 1274,
+      "headings": [
+        "Sales & POS",
+        "Customers"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=rate_contracts",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=rate_contracts",
+      "textLength": 1453,
+      "headings": [
+        "Sales & POS",
+        "Rate contracts"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=quotations",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=quotations",
+      "textLength": 1322,
+      "headings": [
+        "Sales & POS"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=sales_orders",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=sales_orders",
+      "textLength": 1348,
+      "headings": [
+        "Sales & POS",
+        "Sales orders"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=delivery_notes",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=delivery_notes",
+      "textLength": 1331,
+      "headings": [
+        "Sales & POS",
+        "Delivery notes"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=sales_invoices",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=sales_invoices",
+      "textLength": 1415,
+      "headings": [
+        "Sales & POS",
+        "Sales invoices"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=pos",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=pos",
+      "textLength": 1568,
+      "headings": [
+        "Sales & POS",
+        "Open till"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=shift_dashboard",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=shift_dashboard",
+      "textLength": 2086,
+      "headings": [
+        "Sales & POS",
+        "Shift dashboard",
+        "Till takings",
+        "Cash mix",
+        "Cash variance by shift",
+        "Cashier bands",
+        "Takings by cashier",
+        "Live open shifts",
+        "Cashier scorecard"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=sales_returns",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=sales_returns",
+      "textLength": 1393,
+      "headings": [
+        "Sales & POS",
+        "Sales returns"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=credit_notes",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=credit_notes",
+      "textLength": 1416,
+      "headings": [
+        "Sales & POS",
+        "Credit notes"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=refunds",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=refunds",
+      "textLength": 1336,
+      "headings": [
+        "Sales & POS",
+        "Refunds"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=ar_aging",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=ar_aging",
+      "textLength": 1692,
+      "headings": [
+        "Sales & POS",
+        "Accounts receivable aging",
+        "Aging by bucket",
+        "By customer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=reports",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=reports",
+      "textLength": 1479,
+      "headings": [
+        "Sales & POS",
+        "Sales reports"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=subscriptions",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=subscriptions",
+      "textLength": 1354,
+      "headings": [
+        "Sales & POS",
+        "Subscriptions"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=match_settings",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=match_settings",
+      "textLength": 1977,
+      "headings": [
+        "Sales & POS",
+        "Match settings",
+        "3-way match tolerances",
+        "Required documents"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/sales-pos?tab=settings",
+      "status": 200,
+      "finalUrl": "/app/sales-pos?tab=settings",
+      "textLength": 2184,
+      "headings": [
+        "Sales & POS"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/pitch-pilot/inbox",
+      "status": 200,
+      "finalUrl": "/app/pitch-pilot/inbox",
+      "textLength": 1018,
+      "headings": [
+        "RFP Inbox"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/pitch-pilot/new",
+      "status": 200,
+      "finalUrl": "/app/pitch-pilot/new",
+      "textLength": 1261,
+      "headings": [
+        "New RFP"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/pitch-pilot/kb",
+      "status": 200,
+      "finalUrl": "/app/pitch-pilot/kb",
+      "textLength": 1084,
+      "headings": [
+        "Knowledge Base"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/pitch-pilot/templates",
+      "status": 200,
+      "finalUrl": "/app/pitch-pilot/templates",
+      "textLength": 1173,
+      "headings": [
+        "Templates"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/pitch-pilot/schema",
+      "status": 200,
+      "finalUrl": "/app/pitch-pilot/schema",
+      "textLength": 1215,
+      "headings": [
+        "Extraction Schema"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/pitch-pilot/brand",
+      "status": 200,
+      "finalUrl": "/app/pitch-pilot/brand",
+      "textLength": 1601,
+      "headings": [
+        "Brand Kit",
+        "Firm identity",
+        "Color palette",
+        "Contact strip",
+        "Sample data"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/pitch-pilot/analytics",
+      "status": 200,
+      "finalUrl": "/app/pitch-pilot/analytics",
+      "textLength": 950,
+      "headings": [
+        "Analytics"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/blog-post-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/blog-post-generator",
+      "textLength": 768,
+      "headings": [
+        "Blog Post Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/article-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/article-writer",
+      "textLength": 761,
+      "headings": [
+        "Article Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/essay-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/essay-writer",
+      "textLength": 761,
+      "headings": [
+        "Essay Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/creative-story-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/creative-story-writer",
+      "textLength": 760,
+      "headings": [
+        "Creative Story Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/email-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/email-writer",
+      "textLength": 758,
+      "headings": [
+        "Email Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/cover-letter-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/cover-letter-generator",
+      "textLength": 775,
+      "headings": [
+        "Cover Letter Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/resume-cv-builder",
+      "status": 200,
+      "finalUrl": "/app/business/tool/resume-cv-builder",
+      "textLength": 747,
+      "headings": [
+        "Resume/CV Builder"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/product-description-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/product-description-writer",
+      "textLength": 769,
+      "headings": [
+        "Product Description Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/press-release-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/press-release-writer",
+      "textLength": 769,
+      "headings": [
+        "Press Release Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/newsletter-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/newsletter-writer",
+      "textLength": 765,
+      "headings": [
+        "Newsletter Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/script-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/script-writer",
+      "textLength": 759,
+      "headings": [
+        "Script Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/poem-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/poem-generator",
+      "textLength": 757,
+      "headings": [
+        "Poem Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/social-media-post-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/social-media-post-generator",
+      "textLength": 772,
+      "headings": [
+        "Social Media Post Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/instagram-caption-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/instagram-caption-writer",
+      "textLength": 777,
+      "headings": [
+        "Instagram Caption Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/linkedin-post-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/linkedin-post-writer",
+      "textLength": 782,
+      "headings": [
+        "LinkedIn Post Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/thread-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/thread-writer",
+      "textLength": 773,
+      "headings": [
+        "Thread Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/hashtag-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/hashtag-generator",
+      "textLength": 772,
+      "headings": [
+        "Hashtag Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/youtube-title-description",
+      "status": 200,
+      "finalUrl": "/app/business/tool/youtube-title-description",
+      "textLength": 779,
+      "headings": [
+        "YouTube Title & Description"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/short-video-script-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/short-video-script-writer",
+      "textLength": 773,
+      "headings": [
+        "Short Video Script Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/social-ad-copy",
+      "status": 200,
+      "finalUrl": "/app/business/tool/social-ad-copy",
+      "textLength": 774,
+      "headings": [
+        "Social Ad Copy"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/content-calendar-planner",
+      "status": 200,
+      "finalUrl": "/app/business/tool/content-calendar-planner",
+      "textLength": 767,
+      "headings": [
+        "Content Calendar Planner"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/community-reply-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/community-reply-writer",
+      "textLength": 772,
+      "headings": [
+        "Community Reply Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/ad-copy-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/ad-copy-generator",
+      "textLength": 763,
+      "headings": [
+        "Ad Copy Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/landing-page-copywriter",
+      "status": 200,
+      "finalUrl": "/app/business/tool/landing-page-copywriter",
+      "textLength": 763,
+      "headings": [
+        "Landing Page Copywriter"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/seo-keyword-researcher",
+      "status": 200,
+      "finalUrl": "/app/business/tool/seo-keyword-researcher",
+      "textLength": 760,
+      "headings": [
+        "SEO Keyword Researcher"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/meta-description-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/meta-description-writer",
+      "textLength": 774,
+      "headings": [
+        "Meta Description Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/email-campaign-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/email-campaign-writer",
+      "textLength": 758,
+      "headings": [
+        "Email Campaign Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/cold-outreach-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/cold-outreach-writer",
+      "textLength": 762,
+      "headings": [
+        "Cold Outreach Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/value-proposition-builder",
+      "status": 200,
+      "finalUrl": "/app/business/tool/value-proposition-builder",
+      "textLength": 769,
+      "headings": [
+        "Value Proposition Builder"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/brand-voice-guide",
+      "status": 200,
+      "finalUrl": "/app/business/tool/brand-voice-guide",
+      "textLength": 766,
+      "headings": [
+        "Brand Voice Guide"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/case-study-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/case-study-writer",
+      "textLength": 762,
+      "headings": [
+        "Case Study Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/customer-persona-builder",
+      "status": 200,
+      "finalUrl": "/app/business/tool/customer-persona-builder",
+      "textLength": 770,
+      "headings": [
+        "Customer Persona Builder"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/a-b-variant-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/a-b-variant-writer",
+      "textLength": 761,
+      "headings": [
+        "A/B Variant Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/campaign-brief-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/campaign-brief-generator",
+      "textLength": 771,
+      "headings": [
+        "Campaign Brief Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/business-plan-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/business-plan-generator",
+      "textLength": 782,
+      "headings": [
+        "Business Plan Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/executive-summary-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/executive-summary-writer",
+      "textLength": 771,
+      "headings": [
+        "Executive Summary Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/swot-analysis-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/swot-analysis-generator",
+      "textLength": 767,
+      "headings": [
+        "SWOT Analysis Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/meeting-minutes-summarizer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/meeting-minutes-summarizer",
+      "textLength": 771,
+      "headings": [
+        "Meeting Minutes Summarizer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/project-proposal-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/project-proposal-writer",
+      "textLength": 771,
+      "headings": [
+        "Project Proposal Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/job-description-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/job-description-writer",
+      "textLength": 772,
+      "headings": [
+        "Job Description Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/interview-question-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/interview-question-generator",
+      "textLength": 774,
+      "headings": [
+        "Interview Question Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/performance-review-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/performance-review-writer",
+      "textLength": 770,
+      "headings": [
+        "Performance Review Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/policy-document-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/policy-document-writer",
+      "textLength": 771,
+      "headings": [
+        "Policy Document Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/invoice-description-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/invoice-description-writer",
+      "textLength": 773,
+      "headings": [
+        "Invoice Description Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/pitch-deck-outliner",
+      "status": 200,
+      "finalUrl": "/app/business/tool/pitch-deck-outliner",
+      "textLength": 769,
+      "headings": [
+        "Pitch Deck Outliner"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/contract-clause-explainer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/contract-clause-explainer",
+      "textLength": 776,
+      "headings": [
+        "Contract Clause Explainer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/ai-image-prompt-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/ai-image-prompt-generator",
+      "textLength": 775,
+      "headings": [
+        "AI Image Prompt Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/song-lyrics-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/song-lyrics-writer",
+      "textLength": 752,
+      "headings": [
+        "Song Lyrics Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/book-outline-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/book-outline-generator",
+      "textLength": 774,
+      "headings": [
+        "Book Outline Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/character-creator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/character-creator",
+      "textLength": 770,
+      "headings": [
+        "Character Creator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/worldbuilding-assistant",
+      "status": 200,
+      "finalUrl": "/app/business/tool/worldbuilding-assistant",
+      "textLength": 771,
+      "headings": [
+        "Worldbuilding Assistant"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/dialogue-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/dialogue-writer",
+      "textLength": 768,
+      "headings": [
+        "Dialogue Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/name-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/name-generator",
+      "textLength": 770,
+      "headings": [
+        "Name Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/writing-prompt-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/writing-prompt-generator",
+      "textLength": 773,
+      "headings": [
+        "Writing Prompt Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/code-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/code-generator",
+      "textLength": 756,
+      "headings": [
+        "Code Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/code-reviewer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/code-reviewer",
+      "textLength": 767,
+      "headings": [
+        "Code Reviewer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/code-explainer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/code-explainer",
+      "textLength": 772,
+      "headings": [
+        "Code Explainer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/code-converter",
+      "status": 200,
+      "finalUrl": "/app/business/tool/code-converter",
+      "textLength": 757,
+      "headings": [
+        "Code Converter"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/api-documentation-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/api-documentation-generator",
+      "textLength": 768,
+      "headings": [
+        "API Documentation Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/regex-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/regex-generator",
+      "textLength": 756,
+      "headings": [
+        "Regex Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/sql-query-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/sql-query-generator",
+      "textLength": 775,
+      "headings": [
+        "SQL Query Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/unit-test-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/unit-test-generator",
+      "textLength": 752,
+      "headings": [
+        "Unit Test Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/git-commit-message-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/git-commit-message-writer",
+      "textLength": 770,
+      "headings": [
+        "Git Commit Message Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/dockerfile-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/dockerfile-generator",
+      "textLength": 778,
+      "headings": [
+        "Dockerfile Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/readme-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/readme-generator",
+      "textLength": 764,
+      "headings": [
+        "README Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/ai-chat-assistant",
+      "status": 200,
+      "finalUrl": "/app/business/tool/ai-chat-assistant",
+      "textLength": 768,
+      "headings": [
+        "AI Chat Assistant"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/ai-agent-prompt-engineer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/ai-agent-prompt-engineer",
+      "textLength": 775,
+      "headings": [
+        "AI Agent Prompt Engineer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/text-summarizer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/text-summarizer",
+      "textLength": 766,
+      "headings": [
+        "Text Summarizer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/document-q-a",
+      "status": 200,
+      "finalUrl": "/app/business/tool/document-q-a",
+      "textLength": 769,
+      "headings": [
+        "Document Q&A"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/translator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/translator",
+      "textLength": 762,
+      "headings": [
+        "Translator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/grammar-style-fixer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/grammar-style-fixer",
+      "textLength": 764,
+      "headings": [
+        "Grammar & Style Fixer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/tone-rewriter",
+      "status": 200,
+      "finalUrl": "/app/business/tool/tone-rewriter",
+      "textLength": 763,
+      "headings": [
+        "Tone Rewriter"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/text-simplifier",
+      "status": 200,
+      "finalUrl": "/app/business/tool/text-simplifier",
+      "textLength": 768,
+      "headings": [
+        "Text Simplifier"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/agenda-builder",
+      "status": 200,
+      "finalUrl": "/app/business/tool/agenda-builder",
+      "textLength": 765,
+      "headings": [
+        "Agenda Builder"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/task-breakdown",
+      "status": 200,
+      "finalUrl": "/app/business/tool/task-breakdown",
+      "textLength": 769,
+      "headings": [
+        "Task Breakdown"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/checklist-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/checklist-generator",
+      "textLength": 767,
+      "headings": [
+        "Checklist Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/data-analyzer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/data-analyzer",
+      "textLength": 773,
+      "headings": [
+        "Data Analyzer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/spreadsheet-formula-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/spreadsheet-formula-writer",
+      "textLength": 780,
+      "headings": [
+        "Spreadsheet Formula Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/chart-recommender",
+      "status": 200,
+      "finalUrl": "/app/business/tool/chart-recommender",
+      "textLength": 778,
+      "headings": [
+        "Chart Recommender"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/report-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/report-writer",
+      "textLength": 766,
+      "headings": [
+        "Report Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/kpi-definition-builder",
+      "status": 200,
+      "finalUrl": "/app/business/tool/kpi-definition-builder",
+      "textLength": 777,
+      "headings": [
+        "KPI Definition Builder"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/survey-question-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/survey-question-generator",
+      "textLength": 784,
+      "headings": [
+        "Survey Question Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/dataset-describer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/dataset-describer",
+      "textLength": 777,
+      "headings": [
+        "Dataset Describer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/forecast-narrative-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/forecast-narrative-writer",
+      "textLength": 776,
+      "headings": [
+        "Forecast Narrative Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/pivot-table-planner",
+      "status": 200,
+      "finalUrl": "/app/business/tool/pivot-table-planner",
+      "textLength": 762,
+      "headings": [
+        "Pivot Table Planner"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/lesson-plan-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/lesson-plan-generator",
+      "textLength": 765,
+      "headings": [
+        "Lesson Plan Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/quiz-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/quiz-generator",
+      "textLength": 758,
+      "headings": [
+        "Quiz Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/flashcard-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/flashcard-generator",
+      "textLength": 756,
+      "headings": [
+        "Flashcard Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/study-guide-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/study-guide-writer",
+      "textLength": 767,
+      "headings": [
+        "Study Guide Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/concept-explainer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/concept-explainer",
+      "textLength": 756,
+      "headings": [
+        "Concept Explainer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/math-problem-solver",
+      "status": 200,
+      "finalUrl": "/app/business/tool/math-problem-solver",
+      "textLength": 751,
+      "headings": [
+        "Math Problem Solver"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/research-assistant",
+      "status": 200,
+      "finalUrl": "/app/business/tool/research-assistant",
+      "textLength": 760,
+      "headings": [
+        "Research Assistant"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/citation-formatter",
+      "status": 200,
+      "finalUrl": "/app/business/tool/citation-formatter",
+      "textLength": 754,
+      "headings": [
+        "Citation Formatter"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/curriculum-outliner",
+      "status": 200,
+      "finalUrl": "/app/business/tool/curriculum-outliner",
+      "textLength": 760,
+      "headings": [
+        "Curriculum Outliner"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/image-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/image-generator",
+      "textLength": 741,
+      "headings": [
+        "Image Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/logo-concept-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/logo-concept-generator",
+      "textLength": 761,
+      "headings": [
+        "Logo Concept Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/product-shot-prompt",
+      "status": 200,
+      "finalUrl": "/app/business/tool/product-shot-prompt",
+      "textLength": 761,
+      "headings": [
+        "Product Shot Prompt"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/illustration-prompt-builder",
+      "status": 200,
+      "finalUrl": "/app/business/tool/illustration-prompt-builder",
+      "textLength": 764,
+      "headings": [
+        "Illustration Prompt Builder"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/thumbnail-concept-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/thumbnail-concept-generator",
+      "textLength": 768,
+      "headings": [
+        "Thumbnail Concept Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/icon-set-prompt-builder",
+      "status": 200,
+      "finalUrl": "/app/business/tool/icon-set-prompt-builder",
+      "textLength": 748,
+      "headings": [
+        "Icon Set Prompt Builder"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/image-caption-writer",
+      "status": 200,
+      "finalUrl": "/app/business/tool/image-caption-writer",
+      "textLength": 757,
+      "headings": [
+        "Image Caption Writer"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/app/business/tool/alt-text-generator",
+      "status": 200,
+      "finalUrl": "/app/business/tool/alt-text-generator",
+      "textLength": 755,
+      "headings": [
+        "Alt Text Generator"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio",
+      "status": 200,
+      "finalUrl": "/vibe-studio",
+      "textLength": 3627,
+      "headings": [
+        "Describe your idea. Ship it in the browser.",
+        "12 things, one Studio.",
+        "Prompt-driven, not code-driven.",
+        "Not a sandbox. Production-ready.",
+        "Three personas. One Studio.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/agent-studio",
+      "status": 200,
+      "finalUrl": "/agent-studio",
+      "textLength": 3391,
+      "headings": [
+        "Hand-tune every step. See it run.",
+        "Six capabilities, one canvas.",
+        "Nothing runs silently.",
+        "Two builders, two personas.",
+        "Try Agent Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/business-suite",
+      "status": 200,
+      "finalUrl": "/business-suite",
+      "textLength": 2913,
+      "headings": [
+        "100+ AI tools. One tenant. One credit pool.",
+        "Something for every team.",
+        "One pool. One bill.",
+        "Every plan includes Business Suite.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/enterprise-apps",
+      "status": 200,
+      "finalUrl": "/enterprise-apps",
+      "textLength": 3288,
+      "headings": [
+        "15+ apps. Every one AI-native.",
+        "The apps your business runs on.",
+        "Install. Configure. Run.",
+        "All apps ship with a free plan.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/prompt-lab",
+      "status": 200,
+      "finalUrl": "/prompt-lab",
+      "textLength": 1989,
+      "headings": [
+        "Iterate on prompts. Ship the ones that work.",
+        "Try it fast. Ship it clean.",
+        "Anyone shipping real agents.",
+        "Prompt Lab is included with every plan.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/trust",
+      "status": 200,
+      "finalUrl": "/trust",
+      "textLength": 3009,
+      "headings": [
+        "Enterprise controls, built in.",
+        "Control plane. Runtime. Audit.",
+        "Not an add-on. The runtime.",
+        "Talk to sales about your compliance requirements.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/integrations",
+      "status": 200,
+      "finalUrl": "/integrations",
+      "textLength": 2765,
+      "headings": [
+        "100+ connectors. Lives where your work lives.",
+        "Eight families of connectors.",
+        "Reach your internal systems.",
+        "Tell us what you need.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/web-app-builder",
+      "status": 200,
+      "finalUrl": "/vibe-studio/web-app-builder",
+      "textLength": 2042,
+      "headings": [
+        "Describe the app. Ship it in the browser.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/mobile-app-builder",
+      "status": 200,
+      "finalUrl": "/vibe-studio/mobile-app-builder",
+      "textLength": 1841,
+      "headings": [
+        "Describe the app. Ship it to phones.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/web-rpa",
+      "status": 200,
+      "finalUrl": "/vibe-studio/web-rpa",
+      "textLength": 1806,
+      "headings": [
+        "Automate the tools that have no API.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/business-solution-agents",
+      "status": 200,
+      "finalUrl": "/vibe-studio/business-solution-agents",
+      "textLength": 1818,
+      "headings": [
+        "Full data apps, from a description.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/chat-with-docs",
+      "status": 200,
+      "finalUrl": "/vibe-studio/chat-with-docs",
+      "textLength": 1815,
+      "headings": [
+        "Ask your documents, get cited answers.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/document-builder",
+      "status": 200,
+      "finalUrl": "/vibe-studio/document-builder",
+      "textLength": 1767,
+      "headings": [
+        "Runbooks, specs, and PDFs that format themselves.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/spreadsheet-builder",
+      "status": 200,
+      "finalUrl": "/vibe-studio/spreadsheet-builder",
+      "textLength": 1741,
+      "headings": [
+        "Live tables with formulas, plus an .xlsx.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/presentation-builder",
+      "status": 200,
+      "finalUrl": "/vibe-studio/presentation-builder",
+      "textLength": 1674,
+      "headings": [
+        "Decks, from a prompt to a .pptx.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/vibe-studio/website-builder",
+      "status": 200,
+      "finalUrl": "/vibe-studio/website-builder",
+      "textLength": 1722,
+      "headings": [
+        "Multi-page marketing sites, generated.",
+        "Three shapes we see all the time.",
+        "Inside your tenant. Governed like everything else.",
+        "Try Vibe Studio free.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/about",
+      "status": 200,
+      "finalUrl": "/about",
+      "textLength": 2019,
+      "headings": [
+        "Built in Chennai, for the agent era.",
+        "ERP was built for forms. Work moved to agents.",
+        "Where we stand.",
+        "Talk to the team.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/partners",
+      "status": 200,
+      "finalUrl": "/partners",
+      "textLength": 1730,
+      "headings": [
+        "Build with us, sell with us.",
+        "Three ways to partner.",
+        "A platform to build on, not around.",
+        "Start a partner conversation.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/docs",
+      "status": 200,
+      "finalUrl": "/docs",
+      "textLength": 1698,
+      "headings": [
+        "Setup, guides, how-tos.",
+        "The first hour.",
+        "Go deeper.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/blog",
+      "status": 200,
+      "finalUrl": "/blog",
+      "textLength": 1322,
+      "headings": [
+        "Engineering and product notes.",
+        "From the newsroom.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/help-center",
+      "status": 200,
+      "finalUrl": "/help-center",
+      "textLength": 1480,
+      "headings": [
+        "How-to articles + answers.",
+        "Common questions.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/contact-sales",
+      "status": 200,
+      "finalUrl": "/contact-sales",
+      "textLength": 1420,
+      "headings": [
+        "Talk to a person.",
+        "A conversation, not a funnel.",
+        "Start free, talk later.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/contact-support",
+      "status": 200,
+      "finalUrl": "/contact-support",
+      "textLength": 1200,
+      "headings": [
+        "Open a ticket — SLA-tracked.",
+        "What each plan gets.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/solutions",
+      "status": 200,
+      "finalUrl": "/solutions",
+      "textLength": 854,
+      "headings": [
+        "Solutions",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/compare",
+      "status": 200,
+      "finalUrl": "/compare",
+      "textLength": 838,
+      "headings": [
+        "Compare",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/free",
+      "status": 200,
+      "finalUrl": "/free",
+      "textLength": 1243,
+      "headings": [
+        "Free forever for up to 3 users.",
+        "More than a demo.",
+        "Create your workspace.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/legal/privacy",
+      "status": 200,
+      "finalUrl": "/legal/privacy",
+      "textLength": 1303,
+      "headings": [
+        "Privacy Policy",
+        "The short version.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/legal/terms",
+      "status": 200,
+      "finalUrl": "/legal/terms",
+      "textLength": 1253,
+      "headings": [
+        "Terms of Service",
+        "The short version.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    },
+    {
+      "route": "/legal/cookies",
+      "status": 200,
+      "finalUrl": "/legal/cookies",
+      "textLength": 1036,
+      "headings": [
+        "Cookie Policy",
+        "The short version.",
+        "Platform",
+        "Vibe Studio skills",
+        "Company"
+      ],
+      "pass": true
+    }
+  ],
+  "errors": [],
+  "interactionChecks": [
+    "CRM create two different statuses",
+    "CRM status-filter exclusion",
+    "CRM search exclusion",
+    "shared dialog opens and Escape closes",
+    "mobile CRM screenshot",
+    "mobile menu navigates to Inbox and closes"
+  ],
+  "notes": "Route smoke coverage is not all interactions. Demo auth/storage; no server or external integration verified."
+}

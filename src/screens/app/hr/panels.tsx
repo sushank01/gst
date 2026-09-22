@@ -1,5 +1,8 @@
 'use client'
 
+import { RecordList } from '../../../components/RecordList'
+import { recordsCsv, downloadCsv } from '../../../lib/csv'
+
 import { useEffect, useState } from 'react'
 import { Link } from '../../../lib/router'
 import { SubTabs } from '../../../components/AppSideChrome'
@@ -250,6 +253,8 @@ function UnderlineTabs({
  */
 export function HrPagePanel({ page }: { page: HrPage }) {
   const [subTab, setSubTab] = useState(page.subTabs?.[0]?.label ?? '')
+  const [query, setQuery] = useState('')
+  const [view, setView] = useState<'list' | 'grid'>('list')
   const [chip, setChip] = useState(page.chips?.[0] ?? '')
   const [mode, setMode] = useState(page.modeTabs?.[0]?.label ?? '')
   const [dialogOpen, setDialogOpen] = useState<HrModal | null>(null)
@@ -293,7 +298,7 @@ export function HrPagePanel({ page }: { page: HrPage }) {
       : undefined
 
   const recordKey = `hr.${page.id}${activeSubTab ? `.${activeSubTab.label}` : ''}`
-  const records = appRecords[recordKey] ?? []
+  const records = (appRecords[recordKey] ?? []).filter((record) => [record.title, ...Object.values(record.fields)].join(' ').toLowerCase().includes(query.trim().toLowerCase()))
 
   /*
    * Every action on an HR page creates something. Where the page ships a field
@@ -319,19 +324,7 @@ export function HrPagePanel({ page }: { page: HrPage }) {
   const exportRows = appRecords[exportKey] ?? []
 
   const exportCsv = () => {
-    const records = exportRows
-    const columns = Array.from(new Set(records.flatMap((item) => Object.keys(item.fields))))
-    const escape = (value: string) => `"${value.replace(/"/g, '""')}"`
-    const csv = [
-      ['Name', ...columns].map(escape).join(','),
-      ...records.map((item) => [item.title, ...columns.map((column) => item.fields[column] ?? '')].map(escape).join(',')),
-    ].join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${exportKey}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(exportKey, recordsCsv(exportRows))
   }
 
   const hasToolbar = page.search || page.filters || page.dateRange || page.viewToggle || page.count || page.action
@@ -515,7 +508,7 @@ export function HrPagePanel({ page }: { page: HrPage }) {
       {hasToolbar && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2.5">
-            {page.search && <SearchBox placeholder={page.search} />}
+            {page.search && <SearchBox placeholder={page.search} value={query} onChange={setQuery} />}
             {page.filters?.map((filter) => (
               <Select key={filter} label={filter} />
             ))}
@@ -551,7 +544,7 @@ export function HrPagePanel({ page }: { page: HrPage }) {
               )}
               {page.viewToggle && (
                 <span className="ml-auto">
-                  <ViewToggle />
+                  <ViewToggle view={view} onChange={setView} />
                 </span>
               )}
             </div>
@@ -573,25 +566,7 @@ export function HrPagePanel({ page }: { page: HrPage }) {
       )}
 
       {!page.notice && records.length > 0 && (
-        <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
-          {records.map((record) => (
-            <li key={record.id} className="flex flex-wrap items-center gap-4 px-6 py-3.5 text-[14px]">
-              <span className="min-w-[10rem] flex-1 font-medium">{record.title}</span>
-              <span className="min-w-0 flex-[2] truncate text-[13px] text-fg-muted">
-                {Object.entries(record.fields)
-                  .filter(([label]) => label !== 'Name')
-                  .map(([label, value]) => `${label}: ${value}`)
-                  .join(' · ')}
-              </span>
-              <button
-                onClick={() => removeAppRecord(recordKey, record.id)}
-                className="text-[13px] text-fg-muted transition hover:text-bad"
-              >
-                Delete
-              </button>
-            </li>
-          ))}
-        </ul>
+        <RecordList records={records} onDelete={(id) => removeAppRecord(recordKey, id)} grid={view === 'grid'} />
       )}
 
       {!page.notice && records.length === 0 && (
@@ -615,14 +590,13 @@ export function HrPagePanel({ page }: { page: HrPage }) {
   )
 }
 
-function ViewToggle() {
-  const [view, setView] = useState<'list' | 'grid'>('list')
+function ViewToggle({ view, onChange }: { view: 'list' | 'grid'; onChange: (value: 'list' | 'grid') => void }) {
   return (
     <div className="flex overflow-hidden rounded-xl border border-line">
       {(['list', 'grid'] as const).map((option) => (
         <button
           key={option}
-          onClick={() => setView(option)}
+          onClick={() => onChange(option)}
           aria-pressed={view === option}
           aria-label={`${option} view`}
           className={`px-2.5 py-2 text-[13px] transition ${

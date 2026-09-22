@@ -14,7 +14,7 @@ import {
   travelNotificationEvents,
 } from '../../../lib/travelExpenseData'
 import { useWorkspace, type TeSettings } from '../../../lib/workspace'
-import { Label, Panel, inputClass } from './shell'
+import { Label, Panel, inputClass } from '../../../components/EnterpriseUi'
 
 const allSettings = settingsNav.flatMap((group) => group.items)
 

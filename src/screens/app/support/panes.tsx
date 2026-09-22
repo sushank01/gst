@@ -7,7 +7,7 @@ import { Icon } from '../../../components/Icon'
 import { useAuth } from '../../../lib/auth'
 import { articleStates, reportRanges, supportReportTabs, ticketQueues } from '../../../lib/supportData'
 import { useWorkspace, type Ticket } from '../../../lib/workspace'
-import { Dialog, EmptyBlock, Label, inputClass } from '../travel/shell'
+import { Dialog, EmptyBlock, Label, inputClass } from '../../../components/EnterpriseUi'
 
 const priorityTone: Record<string, string> = {
   Urgent: 'tone-rose',
@@ -463,7 +463,10 @@ export function KnowledgeBasePane() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
-      const rows = String(reader.result).trim().split(/\r?\n/).slice(1)
+      // `result` is string | ArrayBuffer; treating a buffer as text would
+      // silently import the literal string "[object ArrayBuffer]".
+      const text = typeof reader.result === 'string' ? reader.result : ''
+      const rows = text.trim().split(/\r?\n/).slice(1)
       let added = 0
       rows.forEach((row) => {
         const [title, cat, body] = row.split(',')
@@ -850,7 +853,9 @@ export function SupportReportsPane() {
   const [range, setRange] = useState<string>('Last 30 days')
 
   const days = range === 'Last 7 days' ? 7 : range === 'Last 90 days' ? 90 : range === 'Last 12 months' ? 365 : 30
-  const cutoff = Date.now() - days * 86_400_000
+  // The instant is captured once; the window still moves with `days`.
+  const [now] = useState(() => Date.now())
+  const cutoff = now - days * 86_400_000
   const inRange = tickets.filter((ticket) => new Date(ticket.createdAt).getTime() >= cutoff)
 
   const rows = ticketPriorities

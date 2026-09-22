@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from '../lib/router'
 import { Button, Field, Logo } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { ApiClientError } from '../lib/api'
 import { useWorkspace } from '../lib/workspace'
 import { industries, teamSizes } from '../lib/content'
 import { marketApps } from '../lib/appData'
@@ -24,11 +25,12 @@ export default function Onboarding() {
   /* The two apps a new Apragya tenant starts with, pre-selected but changeable. */
   const [apps, setApps] = useState<string[]>(['CRM', 'HR'])
   const [error, setError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   const toggleApp = (name: string) =>
     setApps((prev) => (prev.includes(name) ? prev.filter((app) => app !== name) : [...prev, name]))
 
-  function next() {
+  async function next() {
     if (step === 0 && !workspaceName.trim()) {
       setError('Give your workspace a name.')
       return
@@ -44,15 +46,26 @@ export default function Onboarding() {
       return
     }
 
-    // Picking apps here is the same action as installing them from the marketplace.
-    apps.forEach(install)
-    completeOnboarding({
-      workspaceName: workspaceName.trim(),
-      industry,
-      teamSize,
-      apps: marketApps.filter((app) => apps.includes(app.code)).map((app) => app.name),
-    })
-    navigate('/app', { replace: true })
+    // Creating the workspace is a server transaction; only navigate once it
+    // has actually committed, so a failure cannot leave a half-made tenant
+    // behind a wizard that says it finished.
+    setSubmitting(true)
+    try {
+      await completeOnboarding({
+        workspaceName: workspaceName.trim(),
+        industry,
+        teamSize,
+        apps: marketApps.filter((app) => apps.includes(app.code)).map((app) => app.name),
+      })
+      // App installation is still browser-local state (Loop 12 moves it into
+      // the same transaction as the tenant).
+      apps.forEach(install)
+      navigate('/app', { replace: true })
+    } catch (error) {
+      setError(error instanceof ApiClientError ? error.message : 'We could not create your workspace. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -198,7 +211,7 @@ export default function Onboarding() {
             >
               ← Back
             </Button>
-            <Button type="button" onClick={next}>
+            <Button type="button" onClick={next} loading={submitting} disabled={submitting}>
               {step === steps.length - 1 ? 'Open my workspace' : 'Continue'}
             </Button>
           </div>

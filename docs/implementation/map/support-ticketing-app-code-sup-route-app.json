@@ -1,0 +1,4320 @@
+{
+ "domain": "Support & Ticketing (app code SUP, route /app/support-ticketing)",
+ "entities": [
+  {
+   "name": "Ticket",
+   "sourceType": "Ticket",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:433-448",
+   "purpose": "One customer support request. Only persisted support record with real CRUD in the prototype; every KPI, report, escalation sweep and CSAT queue counts it.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "New",
+    "Open",
+    "In Progress",
+    "Waiting on Customer",
+    "Waiting on Third Party",
+    "Resolved",
+    "Closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() minted in the browser (workspace.tsx:1598). Server must mint; treat client id as an idempotency hint only."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING today. All tenants share one localStorage key 'apragya.workspace'. Every index and query must be (tenant_id, ...)."
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING. Workspace has Company[] legal entities but tickets are not scoped to one. See openQuestions."
+    },
+    {
+     "name": "reference",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "`SUP-${(tickets.length+1).padStart(4,'0')}` (workspace.tsx:1601). Not collision-safe, reuses numbers after deletion, breaks past 9999. Needs per-tenant sequence + UNIQUE(tenant_id, reference)."
+    },
+    {
+     "name": "subject",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Trimmed; create button disabled while blank (panes.tsx:414). No max length enforced. Propose CHECK length 1..300."
+    },
+    {
+     "name": "description",
+     "tsType": "NEW string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "MISSING. A ticket has no body. MyRequestsPane stuffs the whole free-text request into `subject` (panes.tsx:740)."
+    },
+    {
+     "name": "requester",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Free-text display string. TicketsPane defaults to literal 'Unknown requester' when blank (panes.tsx:419); MyRequestsPane writes session email (panes.tsx:741). Relationship-as-string."
+    },
+    {
+     "name": "requesterContactId",
+     "tsType": "NEW string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING FK to a contact/customer record. Tiers pane says 'Set a customer's tier on their contact record' (settings.tsx:927-932) but no such record is reachable from support."
+    },
+    {
+     "name": "requesterEmail",
+     "tsType": "NEW string | null",
+     "sqlType": "citext",
+     "nullable": true,
+     "notes": "MISSING as a distinct column. 'My requests' matching is `ticket.requester === session.user.email` (panes.tsx:707), so any ticket created from the agent side with a display name never appears for its requester."
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "uuid (FK ticket_status_definition.id)",
+     "nullable": false,
+     "notes": "Stored as the status LABEL, not an id (workspace.tsx:438). Renaming or deleting a status in Settings orphans every ticket carrying the old label. Propose status_id FK + denormalised status_slug."
+    },
+    {
+     "name": "priority",
+     "tsType": "string",
+     "sqlType": "uuid (FK ticket_priority_definition.id)",
+     "nullable": false,
+     "notes": "Stored as LABEL. priorityTone lookup (panes.tsx:12-17) only knows Urgent/High/Medium/Low, so a custom priority renders with `undefined` in its className."
+    },
+    {
+     "name": "category",
+     "tsType": "string",
+     "sqlType": "uuid (FK ticket_category_definition.id)",
+     "nullable": false,
+     "notes": "Stored as LABEL. MyRequestsPane hardcodes 'Other' (panes.tsx:744) which exists in no default category list — the ticket is uncategorisable by the category filter."
+    },
+    {
+     "name": "source",
+     "tsType": "string",
+     "sqlType": "uuid (FK ticket_channel_definition.id)",
+     "nullable": false,
+     "notes": "Stored as LABEL. MyRequestsPane hardcodes 'Portal' (panes.tsx:745) but the configured channel label is 'Partner Portal', so the source select can never match a self-service ticket."
+    },
+    {
+     "name": "typeId",
+     "tsType": "NEW string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING. supportSettings.types (Question/Problem/Incident/Task/Feature Request) is fully editable but no ticket ever carries a type. Orphan taxonomy."
+    },
+    {
+     "name": "tags",
+     "tsType": "string[]",
+     "sqlType": "text[] (or ticket_tag join table)",
+     "nullable": false,
+     "notes": "Comma-split, trimmed, empties dropped (panes.tsx:421-424). No vocabulary, no normalisation, case-insensitive substring match on filter (panes.tsx:167)."
+    },
+    {
+     "name": "assignee",
+     "tsType": "string | null",
+     "sqlType": "uuid (FK user.id)",
+     "nullable": true,
+     "notes": "Stores session.user.fullName (panes.tsx:139, 302). 'My tickets' queue compares that string. Two agents with the same display name are the same assignee."
+    },
+    {
+     "name": "teamId",
+     "tsType": "NEW string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING. Shift handoffs copy speaks of 'a team's live tickets' (settings.tsx:1100) with no team column anywhere."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "new Date().toISOString() (workspace.tsx:1602). Reports slice(0,10) it for date-range compare (settings.tsx:797) — a naive lexical UTC compare, not tenant-timezone."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "MISSING. updateTicket never stamps one (workspace.tsx:1618-1637)."
+    },
+    {
+     "name": "resolvedAt",
+     "tsType": "string | undefined",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "Set on first transition to Resolved OR Closed and never cleared (workspace.tsx:1627-1631) — a reopened-then-resolved ticket keeps its original resolution time."
+    },
+    {
+     "name": "closedAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING; Resolved and Closed currently share resolvedAt."
+    },
+    {
+     "name": "firstResponseAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING. The SLA report prints a 'First-response met' column (panes.tsx:920) computed from !slaBreached — no first-response timestamp exists anywhere."
+    },
+    {
+     "name": "slaBreached",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Default false (workspace.tsx:1603). Flipped manually by an agent button (panes.tsx:309) or by the manual 'Run detector' sweep (settings.tsx:1064). No clock."
+    },
+    {
+     "name": "slaPolicyId",
+     "tsType": "NEW string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING. SLA Policies surface is plan-gated and unimplemented."
+    },
+    {
+     "name": "firstResponseDueAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "resolutionDueAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING. Detector derives a due time ad hoc from createdAt + defaultPriorities hours (settings.tsx:1045-1052)."
+    },
+    {
+     "name": "slaPausedSeconds",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING. Status behaviour 'waiting' is documented as 'Waiting — SLA paused' (supportData.ts:104) but nothing pauses anything."
+    },
+    {
+     "name": "csat",
+     "tsType": "number | null",
+     "sqlType": "smallint",
+     "nullable": true,
+     "notes": "Always null in practice: NO control anywhere writes it (verified by grep). Dashboard Avg CSAT is permanently 'N/A' and the CSAT review queue permanently empty. Scale ambiguous — see openQuestions."
+    },
+    {
+     "name": "csatRespondedAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "reopenCount",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING. A 'Reopen Rate' report tab exists (supportData.ts:60) with no data to compute it."
+    },
+    {
+     "name": "serviceTier",
+     "tsType": "NEW string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "MISSING. Bronze/Silver/Gold/Platinum exist only as a settings table (supportData.ts:152)."
+    },
+    {
+     "name": "sourceMessageId",
+     "tsType": "NEW string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "MISSING. Needed for email threading/dedup promised by the inbox-accounts copy."
+    },
+    {
+     "name": "deletedAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING. There is no ticket delete control at all today."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "TicketStatusDefinition",
+     "via": "status label string",
+     "gap": "Label not id. Deleting/renaming a status in Settings → Ticket fields silently orphans tickets; the Dashboard's open/closed split reads behaviour by matching labels (panes.tsx:102-104)."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "TicketPriorityDefinition",
+     "via": "priority label string",
+     "gap": "Label not id; SLA hours are then looked up by label against a STATIC import, not the tenant's edited priorities (settings.tsx:1045)."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "TicketCategoryDefinition",
+     "via": "category label string",
+     "gap": "Label not id; MyRequests writes 'Other', absent from the default set."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "TicketChannelDefinition",
+     "via": "source label string",
+     "gap": "Label not id; MyRequests writes 'Portal' which matches no channel label."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "User (assignee)",
+     "via": "fullName display string",
+     "gap": "No user id. 'Assign to me' stores a name (panes.tsx:302)."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Contact/Customer (requester)",
+     "via": "free-text name or email string",
+     "gap": "No contact record exists in this domain; service tier is supposed to live there."
+    },
+    {
+     "kind": "hasMany",
+     "target": "TicketMessage",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No thread, no replies, no internal notes anywhere in the prototype."
+    },
+    {
+     "kind": "hasMany",
+     "target": "TicketStatusEvent",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Transitions only mutate the row; no history, so response-time/reopen reports cannot be computed."
+    },
+    {
+     "kind": "hasMany",
+     "target": "CsatResponse",
+     "via": "scalar csat column",
+     "gap": "One nullable number instead of a response record; no token, comment, or timestamp."
+    }
+   ]
+  },
+  {
+   "name": "TicketStatusDefinition",
+   "sourceType": "FieldRow (SupportSettings.statuses)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:89, defaults 108-116",
+   "purpose": "Per-tenant ticket workflow states. Drives the Tickets status chips, the per-ticket status select and the Dashboard's definition of open vs resolved.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "active",
+    "waiting",
+    "closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Seed rows use human slugs ('new','waiting_on_customer'); new rows use crypto.randomUUID() (settings.tsx:116)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Required (save disabled when blank, settings.tsx:270). This is what tickets store."
+    },
+    {
+     "name": "slug",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Auto-derived from label as lowercase [^a-z0-9]+ → '_' until edited (settings.tsx:218); never re-derived when editing. No uniqueness check — duplicate slugs are accepted."
+    },
+    {
+     "name": "color",
+     "tsType": "string | undefined",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "One of sky|violet|amber|emerald|slate|rose|orange (supportData.ts:92-100). NOT editable in the dialog — new statuses are always colourless."
+    },
+    {
+     "name": "behaviour",
+     "tsType": "string | undefined",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "active | waiting | closed (supportData.ts:102-106). 'waiting' is labelled 'SLA paused' but pauses nothing. Propose NOT NULL DEFAULT 'active' + CHECK."
+    },
+    {
+     "name": "position",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING. The row renders a grab handle '⠿' (settings.tsx:156-158) that is aria-hidden with NO drag handler — reordering is purely visual."
+    },
+    {
+     "name": "isSystem",
+     "tsType": "NEW boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "MISSING. Every seeded status, including Closed, can be deleted with one click and no confirmation (settings.tsx:192)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Ticket",
+     "via": "label string",
+     "gap": "No FK, no restrict-on-delete, no relabel migration."
+    }
+   ]
+  },
+  {
+   "name": "TicketCategoryDefinition",
+   "sourceType": "FieldRow (SupportSettings.categories)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:118-126",
+   "purpose": "Ticket classification. Copy claims it 'drives routing rules, KB tagging and reports' (settings.tsx:63).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Seeds: general, billing, technical, feature_request, bug, account, onboarding."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "e.g. 'General Inquiry', 'Billing & Payments'."
+    },
+    {
+     "name": "slug",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "UNIQUE(tenant_id, slug) proposed; not enforced today."
+    },
+    {
+     "name": "position",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING; drag handle is decorative."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Ticket",
+     "via": "label string",
+     "gap": "No FK. Also claimed to drive routing rules and KB tagging — neither exists."
+    }
+   ]
+  },
+  {
+   "name": "TicketPriorityDefinition",
+   "sourceType": "FieldRow (SupportSettings.priorities)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:128-133",
+   "purpose": "Urgency levels, each carrying the SLA target hours it implies.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Seeds urgent/high/medium/low."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Urgent | High | Medium | Low by default."
+    },
+    {
+     "name": "slug",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "color",
+     "tsType": "string | undefined",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "rose/orange/amber/slate; not editable in the dialog."
+    },
+    {
+     "name": "slaHours",
+     "tsType": "number | undefined",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "4 / 8 / 24 / 72. Editable (min=1, no max, Number() so 'e' or negative typed values are accepted as NaN/negatives — settings.tsx:251-257). CRITICAL: the escalation detector reads the STATIC defaultPriorities import, not this edited value (settings.tsx:245-247), so editing SLA hours changes nothing operationally."
+    },
+    {
+     "name": "position",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Ticket",
+     "via": "label string",
+     "gap": "No FK."
+    },
+    {
+     "kind": "hasMany",
+     "target": "SlaPolicyTarget",
+     "via": "NOT IMPLEMENTED",
+     "gap": "slaHours is a flat per-priority number; a real policy needs first-response vs resolution targets per tier and per calendar."
+    }
+   ]
+  },
+  {
+   "name": "TicketTypeDefinition",
+   "sourceType": "FieldRow (SupportSettings.types)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:135-141",
+   "purpose": "Question / Problem / Incident / Task / Feature Request.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Note the seed id collision workaround: 'type_feature_request' exists because 'feature_request' is already a category id — ids are not namespaced per taxonomy."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "slug",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'feature_request' slug duplicates the category slug."
+    },
+    {
+     "name": "position",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Fully editable taxonomy that nothing consumes — no ticket field, no filter, no report."
+    }
+   ]
+  },
+  {
+   "name": "TicketChannelDefinition",
+   "sourceType": "FieldRow (SupportSettings.channels)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:143-150",
+   "purpose": "Intake paths a ticket can arrive through; feeds the Tickets source select and the New ticket dialog.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "web, web_widget, email, portal, phone, chat."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'Web Portal','Web Widget','Email','Partner Portal','Phone','Live Chat'."
+    },
+    {
+     "name": "slug",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "isPlatformPath",
+     "tsType": "NEW boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "MISSING. Copy says 'Platform intake paths (email, widget, portal) are always available' (settings.tsx:69) yet all six rows are deletable."
+    },
+    {
+     "name": "position",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Ticket",
+     "via": "label string",
+     "gap": "No FK; legacy tickets keep a deleted channel's label."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "InboundChannel / InboxAccount",
+     "via": "NOT IMPLEMENTED",
+     "gap": "A configured IMAP inbox or SMS webhook is not linked to the channel row it would create tickets on."
+    }
+   ]
+  },
+  {
+   "name": "KbArticle",
+   "sourceType": "KbArticle",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:450-457",
+   "purpose": "Knowledge-base help article for agents and customers; also the population the 'Index articles' meter measures.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "draft",
+    "published",
+    "archived"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() (workspace.tsx:1642)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "title",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Trimmed; required by the disabled-state on Create (panes.tsx:632)."
+    },
+    {
+     "name": "category",
+     "tsType": "string",
+     "sqlType": "uuid (FK kb_category.id)",
+     "nullable": false,
+     "notes": "Stores the category NAME string. CSV import falls back to kbCategories[0] or the literal 'Uncategorised' (panes.tsx:474), which is not in the category list, so those articles are unreachable by the category select."
+    },
+    {
+     "name": "state",
+     "tsType": "'draft'|'published'|'archived'",
+     "sqlType": "text + CHECK (or enum kb_article_state)",
+     "nullable": false,
+     "notes": "Set only at creation (panes.tsx:637); there is NO edit/publish/archive control, so a draft can never become published through the UI."
+    },
+    {
+     "name": "body",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Plain textarea, no markup/sanitisation contract. Searched with a lowercase substring match on `title + ' ' + body` (panes.tsx:457-458)."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "Set at create; never updated (nothing updates an article)."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "authorId",
+     "tsType": "NEW string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "publishedAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "slug",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING; needed for the portal/widget Help tab deep links."
+    },
+    {
+     "name": "locale",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING. Tiers & search copy is explicitly about a German customer and an English article (settings.tsx:176)."
+    },
+    {
+     "name": "visibility",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING. Widget 'Show the Help tab (search published KB articles)' and the portal 'Help / KB' tab both imply public vs internal, which no column expresses."
+    },
+    {
+     "name": "version",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "deletedAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING — Delete is an unconfirmed hard removal (panes.tsx:565)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "KbCategory",
+     "via": "category name string",
+     "gap": "Name not id; renaming a category orphans its articles; import can invent 'Uncategorised' out of band."
+    },
+    {
+     "kind": "hasMany",
+     "target": "KbSearchIndexEntry",
+     "via": "SupportSettings.indexedArticles: string[]",
+     "gap": "Index membership is a bare array of article ids on a settings blob, not a row with an embedding, model and content hash."
+    },
+    {
+     "kind": "manyToMany",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "'ST KB Article Suggester' agent and the reply flow both need article↔ticket links that do not exist."
+    }
+   ]
+  },
+  {
+   "name": "KbCategory",
+   "sourceType": "NEW (currently kbCategories: string[])",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:125, 782, 1665-1669",
+   "purpose": "Folder for KB articles. Today a plain string array seeded with ['Getting started','Billing','Troubleshooting'].",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING — the category IS its name today."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "addKbCategory dedupes with a case-SENSITIVE Array.includes (workspace.tsx:1668), so 'Billing' and 'billing' both persist."
+    },
+    {
+     "name": "slug",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "position",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "deletedAt",
+     "tsType": "NEW string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "MISSING — there is no delete/rename control for a KB category at all."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "KbArticle",
+     "via": "name string",
+     "gap": "Whole entity is a display-name string."
+    }
+   ]
+  },
+  {
+   "name": "CannedResponse",
+   "sourceType": "CannedResponse",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:459",
+   "purpose": "Quick-reply template for ticket responses.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() (workspace.tsx:1677)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "title",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Required; trimmed. Also used as the audit resourceId (workspace.tsx:1681) — a title, not an id."
+    },
+    {
+     "name": "body",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Trimmed. No variable/merge-field syntax defined despite being a reply template."
+    },
+    {
+     "name": "shortcut",
+     "tsType": "NEW string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "categoryId",
+     "tsType": "NEW string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "createdBy",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "MISSING — there is no edit control."
+    },
+    {
+     "name": "visibility",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING (team vs tenant-wide)."
+    },
+    {
+     "name": "usageCount",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "TicketMessage",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Dead-end entity: nothing can insert a canned response into anything, because there is no reply composer."
+    }
+   ]
+  },
+  {
+   "name": "SupportSettings",
+   "sourceType": "SupportSettings",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:395-430",
+   "purpose": "The single blob every one of the 14 settings tabs writes into. Should decompose into taxonomy tables + a tenant settings row + rule tables.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING; PK of the proposed support_settings row."
+    },
+    {
+     "name": "statuses/categories/priorities/types/channels",
+     "tsType": "FieldRow[]",
+     "sqlType": "→ five taxonomy tables",
+     "nullable": false,
+     "notes": "Must not stay JSON: tickets reference them and reports group by them."
+    },
+    {
+     "name": "widget",
+     "tsType": "object (9 keys)",
+     "sqlType": "→ support_widget_settings row",
+     "nullable": false,
+     "notes": "See SupportWidgetSettings."
+    },
+    {
+     "name": "csat",
+     "tsType": "object (6 keys)",
+     "sqlType": "→ support_csat_settings row",
+     "nullable": false,
+     "notes": "See SupportCsatSettings."
+    },
+    {
+     "name": "escalationRules/inboxAccounts/inboundChannels/businessHours/autoResponses/shiftHandoffs/reportSchedules",
+     "tsType": "SupportRule[] ×7",
+     "sqlType": "→ seven typed tables",
+     "nullable": false,
+     "notes": "All seven share one {id,name,detail,enabled} shape with two free-text fields; none is machine-readable and none has an executor."
+    },
+    {
+     "name": "tierPolicies",
+     "tsType": "Record<string,string>",
+     "sqlType": "→ service_tier_policy table",
+     "nullable": false,
+     "notes": "Tier name → SLA policy NAME. Always {} because no control writes it (verified by grep)."
+    },
+    {
+     "name": "indexedArticles",
+     "tsType": "string[]",
+     "sqlType": "→ kb_search_index table",
+     "nullable": false,
+     "notes": "Article ids only."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Lives in one browser-wide localStorage key with every other app's state."
+    }
+   ]
+  },
+  {
+   "name": "SupportWidgetSettings",
+   "sourceType": "SupportSettings['widget']",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:401-411, defaults 790-800",
+   "purpose": "Embeddable website support box configuration.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "enabled",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Default false. Toggling persists but serves nothing — no widget script exists in this repo."
+    },
+    {
+     "name": "panelTitle",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default 'How can we help?'. No length limit or required check."
+    },
+    {
+     "name": "launcherText",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default 'Support'."
+    },
+    {
+     "name": "subtitle",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default 'We usually reply within a few hours.'"
+    },
+    {
+     "name": "confirmation",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default \"Thanks — we've got your message and emailed you a copy.\" — asserts an email that nothing sends."
+    },
+    {
+     "name": "accent",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Hex from <input type=color>, but the paired free-text box accepts anything (settings.tsx:356-360). Propose CHECK ~ '^#[0-9a-fA-F]{6}$'."
+    },
+    {
+     "name": "position",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Bottom right | Bottom left | Top right | Top left (supportData.ts:157)."
+    },
+    {
+     "name": "showHelpTab",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Implies public KB search; no article visibility column exists to support it."
+    },
+    {
+     "name": "requireEmail",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "No intake endpoint enforces it."
+    },
+    {
+     "name": "tenantKey",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING. The install snippet hardcodes data-tenant=\"acme\" for every tenant (settings.tsx:68)."
+    },
+    {
+     "name": "allowedOrigins",
+     "tsType": "NEW string[]",
+     "sqlType": "text[]",
+     "nullable": false,
+     "notes": "MISSING; public intake needs origin allowlist + rate limit."
+    },
+    {
+     "name": "defaultCategoryId / defaultPriorityId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING; a widget ticket has no defined classification."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "TicketChannelDefinition",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Widget tickets should land on the 'Web Widget' channel; nothing links them."
+    }
+   ]
+  },
+  {
+   "name": "SupportCsatSettings",
+   "sourceType": "SupportSettings['csat']",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:412-419, defaults 801-808",
+   "purpose": "When and how the post-resolution satisfaction survey is sent, plus the pre-breach warning threshold (which is filed here rather than with SLA).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "sendOnResolve",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Default true. No sender exists."
+    },
+    {
+     "name": "waitHours",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "Default 1, min=0, no max; Number() accepts '' → NaN."
+    },
+    {
+     "name": "skipOlderDays",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "Default 14, min=1. Doubles as the auto-close window in EscalationActions (settings.tsx:1057) — an undeclared coupling."
+    },
+    {
+     "name": "lowScore",
+     "tsType": "number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "Default 3, input min=1 max=5 → implies a 1–5 scale, contradicting the thumbs-up/down preview."
+    },
+    {
+     "name": "slaWarnPercent",
+     "tsType": "number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "Default 75, min=1 max=100. Nothing computes elapsed SLA percent, so no warning can fire."
+    },
+    {
+     "name": "portalUrl",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default ''. No URL validation; used in no link."
+    },
+    {
+     "name": "scale",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING and genuinely ambiguous — see openQuestions."
+    },
+    {
+     "name": "tokenTtlHours / fromAddress / templateId",
+     "tsType": "NEW",
+     "sqlType": "integer / citext / uuid",
+     "nullable": true,
+     "notes": "MISSING. The panel promises a signed, expiring, single-use link (settings.tsx:601-603) with no token model behind it."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "CsatResponse",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No survey request or response record."
+    }
+   ]
+  },
+  {
+   "name": "EscalationRule",
+   "sourceType": "SupportRule",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:392, 420; UI settings.tsx:1096-1105",
+   "purpose": "Fire an action when a ticket crosses an SLA boundary (before / on / after breach).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() (settings.tsx:709)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Free text, required."
+    },
+    {
+     "name": "detail",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Free text, optional, stored as prose — not parseable into a condition."
+    },
+    {
+     "name": "enabled",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Always written true; NO UI toggles it after creation."
+    },
+    {
+     "name": "triggerPoint",
+     "tsType": "NEW 'before'|'on'|'after'",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "MISSING despite being the stated semantics."
+    },
+    {
+     "name": "offsetMinutes / conditions / actions / notifyUserIds / position",
+     "tsType": "NEW",
+     "sqlType": "integer / jsonb / jsonb / uuid[] / integer",
+     "nullable": true,
+     "notes": "All MISSING. A rule today cannot be evaluated by anything."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SlaPolicy",
+     "via": "NOT IMPLEMENTED",
+     "gap": "SLA Policies is plan-gated and unbuilt, so an escalation rule references nothing."
+    }
+   ]
+  },
+  {
+   "name": "InboxAccount",
+   "sourceType": "SupportRule",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:421; UI settings.tsx:1106-1114",
+   "purpose": "IMAP mailbox polled for inbound support email; new mail creates tickets, replies append to the matching thread.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id/name/detail/enabled",
+     "tsType": "SupportRule",
+     "sqlType": "uuid/text/text/boolean",
+     "nullable": false,
+     "notes": "Only free text today."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "protocol / host / port / username / useTls / folder",
+     "tsType": "NEW",
+     "sqlType": "text / text / integer / text / boolean / text",
+     "nullable": true,
+     "notes": "All MISSING. Exact provider/credential contract must be decided, not invented — see openQuestions."
+    },
+    {
+     "name": "secretRef",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "MISSING. Note the existing Connection type deliberately stores only a 4-char hint (workspace.tsx:133-140) — follow that precedent, encrypted at rest under a server env key."
+    },
+    {
+     "name": "pollSeconds",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "MISSING. Copy states every 3 minutes (settings.tsx:1110)."
+    },
+    {
+     "name": "defaultCategoryId / defaultPriorityId / channelId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "lastPolledAt / lastError / status",
+     "tsType": "NEW",
+     "sqlType": "timestamptz / text / text",
+     "nullable": true,
+     "notes": "MISSING; nothing can show connection health."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "InboundMessage",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No raw-message store, so dedup and thread mapping are impossible."
+    },
+    {
+     "kind": "hasMany",
+     "target": "ParseFailure",
+     "via": "NOT IMPLEMENTED",
+     "gap": "The Parse failures tab renders a hardcoded all-clear."
+    }
+   ]
+  },
+  {
+   "name": "InboundChannel",
+   "sourceType": "SupportRule",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:422; UI settings.tsx:1115-1123",
+   "purpose": "SMS / WhatsApp / chat intake; each channel is said to expose a webhook a connector POSTs to.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id/name/detail/enabled",
+     "tsType": "SupportRule",
+     "sqlType": "uuid/text/text/boolean",
+     "nullable": false,
+     "notes": "Free text only."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "channelType",
+     "tsType": "NEW string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "MISSING (sms | whatsapp | chat named in copy)."
+    },
+    {
+     "name": "providerKey / webhookPath / webhookSecretRef / signatureScheme",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "MISSING. Do not invent a provider contract — see openQuestions."
+    },
+    {
+     "name": "ticketChannelId / lastEventAt / active",
+     "tsType": "NEW",
+     "sqlType": "uuid / timestamptz / boolean",
+     "nullable": true,
+     "notes": "MISSING."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "TicketChannelDefinition",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No link between a configured inbound channel and the channel taxonomy row tickets would carry."
+    }
+   ]
+  },
+  {
+   "name": "BusinessHoursSchedule",
+   "sourceType": "SupportRule",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:423; UI settings.tsx:1124-1133",
+   "purpose": "Shared working calendars that SLA policies and auto-responses are said to point at; a holiday is added once here.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id/name/detail/enabled",
+     "tsType": "SupportRule",
+     "sqlType": "uuid/text/text/boolean",
+     "nullable": false,
+     "notes": "Free text only — no hours, no timezone."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "timezone",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING (IANA id)."
+    },
+    {
+     "name": "weeklyWindows",
+     "tsType": "NEW object[]",
+     "sqlType": "jsonb or business_hours_window rows",
+     "nullable": false,
+     "notes": "MISSING (weekday, openTime, closeTime)."
+    },
+    {
+     "name": "holidays",
+     "tsType": "NEW string[]",
+     "sqlType": "date[] or business_hours_holiday rows",
+     "nullable": false,
+     "notes": "MISSING — dates, so `date` not timestamptz."
+    },
+    {
+     "name": "isDefault",
+     "tsType": "NEW boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "MISSING. Empty state says policies 'fall back to 24/7 calendar time' (settings.tsx:1130)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SlaPolicy",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Nothing points at a schedule; no SLA clock exists to consume it."
+    }
+   ]
+  },
+  {
+   "name": "AutoResponseRule",
+   "sourceType": "SupportRule",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:424; UI settings.tsx:1134-1143",
+   "purpose": "Acknowledge a ticket the moment it arrives; first match wins, one acknowledgement per ticket.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id/name/detail/enabled",
+     "tsType": "SupportRule",
+     "sqlType": "uuid/text/text/boolean",
+     "nullable": false,
+     "notes": "Free text only."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "position",
+     "tsType": "NEW number",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "MISSING — 'checked in priority order' with no order column."
+    },
+    {
+     "name": "matchConditions",
+     "tsType": "NEW object",
+     "sqlType": "jsonb",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "templateBody / templateSubject",
+     "tsType": "NEW string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "MISSING — a rule has no message to send."
+    },
+    {
+     "name": "oncePerTicket / skipAutoresponders / skipBounces",
+     "tsType": "NEW boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "MISSING; all three are promised in copy as loop protection."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "BusinessHoursSchedule",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Business-hours copy claims auto-responses point at a calendar; no column."
+    }
+   ]
+  },
+  {
+   "name": "ShiftHandoffRule",
+   "sourceType": "SupportRule",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:425; UI settings.tsx:1144-1153",
+   "purpose": "Move a team's live tickets to the next shift at a set time, clearing the assignee.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id/name/detail/enabled",
+     "tsType": "SupportRule",
+     "sqlType": "uuid/text/text/boolean",
+     "nullable": false,
+     "notes": "Free text only."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "fromTeamId / toTeamId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING — there is no team entity in the prototype at all."
+    },
+    {
+     "name": "runAtLocalTime / timezone",
+     "tsType": "NEW",
+     "sqlType": "time / text",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "clearAssignee / skipClosedStates",
+     "tsType": "NEW boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "MISSING; both behaviours are asserted in copy."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Team",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Team entity does not exist; tickets have no team column."
+    }
+   ]
+  },
+  {
+   "name": "ReportSchedule",
+   "sourceType": "SupportRule",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:426; UI settings.tsx:864-910",
+   "purpose": "Email a support report on a cadence.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() (settings.tsx:876)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Auto-composed as `${report} — weekly` from the export picker; not editable and not unique."
+    },
+    {
+     "name": "detail",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Auto-composed as `${format} every Monday`. 'Every Monday' is hardcoded — cadence is not choosable."
+    },
+    {
+     "name": "enabled",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Always true; no toggle."
+    },
+    {
+     "name": "reportKey",
+     "tsType": "NEW string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "MISSING. Report vocabulary: Ticket summary | SLA compliance | CSAT detail | Agent activity | Volume by channel (supportData.ts:154)."
+    },
+    {
+     "name": "format",
+     "tsType": "NEW string",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "MISSING as a column. Vocabulary CSV | Excel (supportData.ts:155)."
+    },
+    {
+     "name": "cronExpression / timezone / nextRunAt / lastRunAt / lastStatus",
+     "tsType": "NEW",
+     "sqlType": "text / text / timestamptz / timestamptz / text",
+     "nullable": true,
+     "notes": "MISSING."
+    },
+    {
+     "name": "recipients",
+     "tsType": "NEW string[]",
+     "sqlType": "citext[] or schedule_recipient rows",
+     "nullable": false,
+     "notes": "MISSING — the pane promises 'Each recipient gets their own copy' with no recipient field in the form."
+    },
+    {
+     "name": "filters",
+     "tsType": "NEW object",
+     "sqlType": "jsonb",
+     "nullable": true,
+     "notes": "MISSING; the From/To dates chosen for the manual download are not carried onto the schedule."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No executor, no mail transport."
+    }
+   ]
+  },
+  {
+   "name": "ServiceTierPolicy",
+   "sourceType": "SupportSettings['tierPolicies'] (Record<string,string>)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:428, 816; UI settings.tsx:915-971",
+   "purpose": "Maps a customer service tier to the SLA policy that applies to it.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Bronze",
+    "Silver",
+    "Gold",
+    "Platinum"
+   ],
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "tier",
+     "tsType": "string (map key)",
+     "sqlType": "text + CHECK (or FK service_tier.id)",
+     "nullable": false,
+     "notes": "Bronze | Silver | Gold | Platinum (supportData.ts:152). Hardcoded list — tiers are not tenant-editable."
+    },
+    {
+     "name": "policyName",
+     "tsType": "string (map value)",
+     "sqlType": "uuid (FK sla_policy.id)",
+     "nullable": true,
+     "notes": "A POLICY NAME STRING, matched by name: 'create a policy called \"Platinum\" and the platinum tier uses it' (settings.tsx:927-932). Always '' in practice — no control writes tierPolicies."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SlaPolicy",
+     "via": "policy display name string",
+     "gap": "Explicit name-matching by design in the prototype. Must become a FK; a renamed or deleted policy currently silently downgrades a Platinum customer to 'Standard SLA' with no signal."
+    },
+    {
+     "kind": "hasMany",
+     "target": "Contact/Customer",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No contact record carries a tier, so no ticket can resolve one."
+    }
+   ]
+  },
+  {
+   "name": "KbSearchIndexEntry",
+   "sourceType": "SupportSettings['indexedArticles'] (string[])",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:429, 817; UI settings.tsx:915-1003",
+   "purpose": "Which published articles are searchable 'by meaning' (semantic/vector index) alongside keyword search.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING — today the entry IS an article id in an array."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "MISSING."
+    },
+    {
+     "name": "articleId",
+     "tsType": "string",
+     "sqlType": "uuid (FK kb_article.id)",
+     "nullable": false,
+     "notes": "The only real datum. Stale ids are filtered out at read time rather than cleaned up (settings.tsx:917)."
+    },
+    {
+     "name": "chunkNo / content / embedding / model / dimensions",
+     "tsType": "NEW",
+     "sqlType": "integer / text / vector(n) (pgvector) / text / integer",
+     "nullable": true,
+     "notes": "All MISSING. 'Index articles' computes no embedding."
+    },
+    {
+     "name": "contentHash / indexedAt / locale",
+     "tsType": "NEW",
+     "sqlType": "text / timestamptz / text",
+     "nullable": true,
+     "notes": "MISSING; without a hash the meter cannot know an indexed article has since changed."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "KbArticle",
+     "via": "article id (in a JSON array)",
+     "gap": "Only published articles count (settings.tsx:917); unpublishing an article leaves a dangling id."
+    }
+   ]
+  },
+  {
+   "name": "SlaPolicy",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:26-29 (gatedSections), SupportTicketing.tsx:54,91",
+   "purpose": "Per-tier, per-priority first-response and resolution targets on a business calendar. The ?tab=sla_policies surface renders a PlanGate lock card instead.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / name",
+     "tsType": "NEW",
+     "sqlType": "uuid / uuid / text",
+     "nullable": false,
+     "notes": "`name` must be UNIQUE per tenant because tierPolicies matches by name today."
+    },
+    {
+     "name": "tierId / businessHoursId / active / isDefault",
+     "tsType": "NEW",
+     "sqlType": "uuid / uuid / boolean / boolean",
+     "nullable": true,
+     "notes": "Default policy is the implicit 'Standard SLA' label shown in the tiers table."
+    },
+    {
+     "name": "targets (per priority)",
+     "tsType": "NEW",
+     "sqlType": "→ sla_policy_target rows",
+     "nullable": false,
+     "notes": "priority_id, first_response_minutes integer, resolution_minutes integer. Today only a flat slaHours per priority exists."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Entire feature is gated by a hardcoded map, not by any entitlement record."
+    }
+   ]
+  },
+  {
+   "name": "SlaInstance",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1040-1075 (manual sweep stands in for it)",
+   "purpose": "The live clock on one ticket: due times, pause/resume across 'waiting' statuses, breach and warning stamps.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "running",
+    "paused",
+    "met",
+    "breached"
+   ],
+   "fields": [
+    {
+     "name": "id / tenantId / ticketId / policyId / kind",
+     "tsType": "NEW",
+     "sqlType": "uuid ×4 / text",
+     "nullable": false,
+     "notes": "kind: first_response | resolution."
+    },
+    {
+     "name": "startedAt / dueAt / pausedAt / totalPausedSeconds / satisfiedAt / breachedAt / warnedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz ×5 / integer / timestamptz",
+     "nullable": true,
+     "notes": "warnedAt is what csat.slaWarnPercent would drive (settings.tsx:541-552)."
+    },
+    {
+     "name": "state",
+     "tsType": "NEW",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Today collapsed into a single manually-toggled boolean on the ticket."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Ticket.slaBreached is set by hand or by a button-triggered sweep; there is no scheduler."
+    }
+   ]
+  },
+  {
+   "name": "RoutingRule",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:17, 27 (gatedSections)",
+   "purpose": "Assign incoming tickets to a team/agent by category, channel, tier or keyword. The ?tab=routing_rules surface renders a PlanGate lock card.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / name / position / active",
+     "tsType": "NEW",
+     "sqlType": "uuid / uuid / text / integer / boolean",
+     "nullable": false,
+     "notes": "Nothing exists today."
+    },
+    {
+     "name": "conditions / assignTeamId / assignUserId / strategy",
+     "tsType": "NEW",
+     "sqlType": "jsonb / uuid / uuid / text",
+     "nullable": true,
+     "notes": "'the incoming team's own assignment strategy' is named in the shift-handoff copy (settings.tsx:1150) — round-robin vs load-based is unspecified."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "TicketCategoryDefinition",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Categories copy claims it 'drives routing rules' that do not exist."
+    }
+   ]
+  },
+  {
+   "name": "TicketMessage",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx (absent — no detail view)",
+   "purpose": "One entry in a ticket thread: a customer message, a public agent reply, or an internal note.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "public_inbound",
+    "public_outbound",
+    "internal_note",
+    "system"
+   ],
+   "fields": [
+    {
+     "name": "id / tenantId / ticketId",
+     "tsType": "NEW",
+     "sqlType": "uuid ×3",
+     "nullable": false,
+     "notes": "Entirely absent. There is no ticket detail route — the row only expands to three controls."
+    },
+    {
+     "name": "authorUserId / authorContactId / authorDisplay",
+     "tsType": "NEW",
+     "sqlType": "uuid / uuid / text",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "visibility",
+     "tsType": "NEW",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "public | internal. Internal notes must never leave the tenant."
+    },
+    {
+     "name": "body / bodyHtml / channelId / sentAt / deliveredAt / failedReason",
+     "tsType": "NEW",
+     "sqlType": "text / text / uuid / timestamptz / timestamptz / text",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "externalMessageId / inReplyTo",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Needed for the email threading the inbox copy promises."
+    },
+    {
+     "name": "cannedResponseId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "Gives CannedResponse its only consumer."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Highest-impact missing entity: six of the nine bundled SUP agents (Thread Summarizer, Response Suggester, Sentiment Tracker, Resolution Drafter, Duplicate Detector, CSAT Predictor) operate on a thread that does not exist."
+    },
+    {
+     "kind": "hasMany",
+     "target": "TicketAttachment",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No file handling anywhere in support."
+    }
+   ]
+  },
+  {
+   "name": "TicketStatusEvent",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:1618-1637 (updateTicket mutates in place)",
+   "purpose": "Append-only transition history: who moved a ticket from which status to which, when, and why.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / ticketId / atUtc",
+     "tsType": "NEW",
+     "sqlType": "uuid ×3 / timestamptz",
+     "nullable": false,
+     "notes": "Today only a generic audit row is appended with the ticket's UUID and no before/after (workspace.tsx:1635)."
+    },
+    {
+     "name": "fromStatusId / toStatusId / actorUserId / reason / isReopen",
+     "tsType": "NEW",
+     "sqlType": "uuid / uuid / uuid / text / boolean",
+     "nullable": true,
+     "notes": "Without this the Response Times, Reopen Rate and Volume Heatmap report tabs can never be computed."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "The report pane itself admits the gap: 'needs ticket history this rebuild does not simulate yet' (panes.tsx:955)."
+    }
+   ]
+  },
+  {
+   "name": "CsatResponse",
+   "sourceType": "NEW (Ticket.csat scalar today)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:566-603",
+   "purpose": "One customer satisfaction answer against one resolved ticket, captured from a signed single-use link.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / ticketId",
+     "tsType": "NEW",
+     "sqlType": "uuid ×3",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "token / tokenExpiresAt / usedAt",
+     "tsType": "NEW",
+     "sqlType": "text / timestamptz / timestamptz",
+     "nullable": true,
+     "notes": "Panel promises 'signed, expires, and works once — a second submission can't overwrite the first' (settings.tsx:601-603). UNIQUE(ticket_id) enforces the once-only claim."
+    },
+    {
+     "name": "rating",
+     "tsType": "NEW number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "Scale unresolved: settings input is 1..5 but the customer preview is thumbs up/down. See openQuestions."
+    },
+    {
+     "name": "comment / sentAt / respondedAt / channel",
+     "tsType": "NEW",
+     "sqlType": "text / timestamptz / timestamptz / text",
+     "nullable": true,
+     "notes": "'Plus an optional comment box' (settings.tsx:600)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Ticket.csat can only ever be null — no control writes it — so Avg CSAT, the CSAT report tab and the low-score review queue are all permanently empty by construction."
+    }
+   ]
+  },
+  {
+   "name": "CsatReview",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:743-782",
+   "purpose": "The follow-up record for a low score or NPS detractor: who looked at it and what was done.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / ticketId / csatResponseId",
+     "tsType": "NEW",
+     "sqlType": "uuid ×4",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "reviewedBy / reviewedAt / actionTaken / notes",
+     "tsType": "NEW",
+     "sqlType": "uuid / timestamptz / text / text",
+     "nullable": true,
+     "notes": "Copy: 'Each stays here until someone records what was done' (settings.tsx:735) — nothing records anything; there is no action control on a row."
+    },
+    {
+     "name": "isReviewed",
+     "tsType": "NEW boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "The 'Show reviewed' checkbox (settings.tsx:757-763) sets React state that is never read by the filter — a literal no-op control."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CsatResponse",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Queue is derived on the fly from tickets whose csat <= lowScore."
+    }
+   ]
+  },
+  {
+   "name": "NpsResponse",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts:62; settings.tsx:734-736",
+   "purpose": "Net Promoter Score answer; detractors 0–6 are stated to join the CSAT review queue.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "detractor (0-6)",
+    "passive (7-8)",
+    "promoter (9-10)"
+   ],
+   "fields": [
+    {
+     "name": "id / tenantId / contactId / ticketId",
+     "tsType": "NEW",
+     "sqlType": "uuid ×4",
+     "nullable": true,
+     "notes": "Whether NPS is per-ticket or per-relationship is not inferable — see openQuestions."
+    },
+    {
+     "name": "score / comment / surveyedAt / respondedAt",
+     "tsType": "NEW",
+     "sqlType": "smallint (CHECK 0..10) / text / timestamptz / timestamptz",
+     "nullable": true,
+     "notes": "No model, no capture surface, no send cadence exists. Only a report tab label and one sentence of copy."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Contact/Customer",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Referenced in review-queue copy with zero supporting code."
+    }
+   ]
+  },
+  {
+   "name": "ParseFailure",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:728-741",
+   "purpose": "An inbound message that could not become a ticket, kept so it can be fixed and retried.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "open",
+    "retried",
+    "discarded"
+   ],
+   "fields": [
+    {
+     "name": "id / tenantId / inboxAccountId / inboundChannelId",
+     "tsType": "NEW",
+     "sqlType": "uuid ×4",
+     "nullable": true,
+     "notes": "The pane is a hardcoded all-clear paragraph; no store, no row shape, no retry action."
+    },
+    {
+     "name": "receivedAt / rawMessage / fromAddress / subject / reason / errorDetail / retriedAt / createdTicketId",
+     "tsType": "NEW",
+     "sqlType": "timestamptz / text (or object-store key) / citext / text / text / text / timestamptz / uuid",
+     "nullable": true,
+     "notes": "Copy promises 'the original message is kept so nothing is lost' — nothing is kept."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "InboxAccount",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No retry operation exists despite 'Fix the cause, then retry'."
+    }
+   ]
+  },
+  {
+   "name": "InboundMessage",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1110 (copy only)",
+   "purpose": "Raw inbound email/SMS/chat payload, deduped and mapped onto a ticket thread.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / sourceAccountId / externalMessageId",
+     "tsType": "NEW",
+     "sqlType": "uuid ×3 / text",
+     "nullable": false,
+     "notes": "UNIQUE(tenant_id, external_message_id) is the dedup key the 'replies append to the matching thread' claim requires."
+    },
+    {
+     "name": "inReplyTo / references / fromAddress / toAddress / subject / body / receivedAt / ticketId / messageId",
+     "tsType": "NEW",
+     "sqlType": "text / text[] / citext / citext / text / text / timestamptz / uuid / uuid",
+     "nullable": true,
+     "notes": "Threading key unspecified — see openQuestions."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No intake path exists at all."
+    }
+   ]
+  },
+  {
+   "name": "SavedTicketView",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:175-181",
+   "purpose": "A named, reusable ticket filter ('+ Save current filter').",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / ownerUserId / name",
+     "tsType": "NEW",
+     "sqlType": "uuid ×3 / text",
+     "nullable": false,
+     "notes": "Today the button only setStates a display string like 'All tickets · Open · Email'; there is no name prompt and nothing persists."
+    },
+    {
+     "name": "filters",
+     "tsType": "NEW object",
+     "sqlType": "jsonb",
+     "nullable": false,
+     "notes": "queue, statusId, channelId, tags[], query."
+    },
+    {
+     "name": "isShared / position / createdAt",
+     "tsType": "NEW",
+     "sqlType": "boolean / integer / timestamptz",
+     "nullable": false,
+     "notes": "MISSING."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "NOT IMPLEMENTED",
+     "gap": "Refreshing the page loses the 'saved' view immediately."
+    }
+   ]
+  },
+  {
+   "name": "SupportTeam",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1150; panes.tsx:63 (leaderboard tab)",
+   "purpose": "Group of agents used for routing, shift handoffs and the agent leaderboard report.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id / tenantId / name / assignmentStrategy / businessHoursId",
+     "tsType": "NEW",
+     "sqlType": "uuid / uuid / text / text / uuid",
+     "nullable": true,
+     "notes": "Strategy vocabulary is not inferable from source."
+    },
+    {
+     "name": "members",
+     "tsType": "NEW",
+     "sqlType": "→ support_team_member rows (team_id, user_id, role)",
+     "nullable": false,
+     "notes": "MISSING. Assignment is a display-name string on the ticket."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Ticket",
+     "via": "NOT IMPLEMENTED",
+     "gap": "No team column on a ticket; 'Unassigned' queue is the only routing state that exists."
+    }
+   ]
+  },
+  {
+   "name": "SupportAuditEvent",
+   "sourceType": "AuditEvent",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:161-186",
+   "purpose": "Append-only tenant action log; support writes six action codes into it.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "support.ticket_created",
+    "support.ticket_updated",
+    "support.article_created",
+    "support.article_removed",
+    "support.canned_created",
+    "support.canned_removed",
+    "support.settings_updated"
+   ],
+   "fields": [
+    {
+     "name": "id / at",
+     "tsType": "string",
+     "sqlType": "uuid / timestamptz",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "user",
+     "tsType": "'owner' | ''",
+     "sqlType": "uuid (FK user.id)",
+     "nullable": true,
+     "notes": "Hardcoded literal 'owner' — the acting identity is never recorded."
+    },
+    {
+     "name": "role",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Hardcoded 'Org_admin' for every support event (workspace.tsx:180) regardless of who acted."
+    },
+    {
+     "name": "action / resource / resourceId",
+     "tsType": "string",
+     "sqlType": "text ×3",
+     "nullable": false,
+     "notes": "resourceId is inconsistent: ticket_created logs the reference (SUP-0001), ticket_updated logs the UUID, article_created logs the TITLE, canned_created logs the TITLE, article/canned_removed log the id."
+    },
+    {
+     "name": "status",
+     "tsType": "'Success' | 'Failed'",
+     "sqlType": "text + CHECK",
+     "nullable": false,
+     "notes": "Always 'Success' — no failure path exists."
+    },
+    {
+     "name": "ip",
+     "tsType": "string",
+     "sqlType": "inet",
+     "nullable": true,
+     "notes": "Always '' client-side."
+    },
+    {
+     "name": "tenantId / beforeJson / afterJson / requestId",
+     "tsType": "NEW",
+     "sqlType": "uuid / jsonb / jsonb / text",
+     "nullable": true,
+     "notes": "MISSING. Audit is also capped at 500 rows and dropped (workspace.tsx:1128) — not append-only in practice."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Ticket",
+     "via": "resourceId string (mixed reference/uuid/title)",
+     "gap": "Polymorphic text column with inconsistent key choice; cannot be joined."
+    }
+   ]
+  }
+ ],
+ "operations": [
+  {
+   "id": "OP-SUP-APP-INSTALL-GATE",
+   "entity": "Tenant/AppInstallation",
+   "action": "read",
+   "surface": "/app/support-ticketing (all tabs)",
+   "sourceFile": "src/screens/app/support/SupportTicketing.tsx",
+   "sourceLine": 40,
+   "currentBehaviour": "Reads useWorkspace().installed (localStorage array) and renders a 'not installed' panel with a marketplace link if 'SUP' is absent. Client-only; nothing server-side is gated.",
+   "requiredBehaviour": "Server resolves the tenant's app installation and subscription; unauthorised or uninstalled returns 403/404 from the API, not just a hidden UI.",
+   "apiMethodPath": "GET /api/v1/tenants/{tenantId}/apps/SUP",
+   "authorization": "any member of the tenant",
+   "validation": "tenant context from session cookie, never from a query param",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-NAV-SELECT",
+   "entity": "n/a (navigation)",
+   "action": "read",
+   "surface": "/app/support-ticketing?tab=<section>",
+   "sourceFile": "src/screens/app/support/SupportTicketing.tsx",
+   "sourceLine": 56,
+   "currentBehaviour": "setParams({tab:id}) → router.push; dashboard clears the query. Unknown ?tab values silently fall back to the dashboard.",
+   "requiredBehaviour": "Same routing, but an unknown tab should 404 or redirect explicitly, and each section must be permission-filtered server-side.",
+   "apiMethodPath": "n/a",
+   "authorization": "support_agent | support_admin",
+   "validation": "tab ∈ supportNav ids",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-NAV-GROUP-TOGGLE",
+   "entity": "n/a (UI state)",
+   "action": "read",
+   "surface": "/app/support-ticketing left rail",
+   "sourceFile": "src/components/NavGroup.tsx",
+   "sourceLine": 22,
+   "currentBehaviour": "setState only — collapse state is per-mount and lost on every navigation.",
+   "requiredBehaviour": "Optional per-user UI preference; acceptable as localStorage.",
+   "apiMethodPath": "n/a",
+   "authorization": "n/a",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-DASH-KPI",
+   "entity": "Ticket",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 99,
+   "currentBehaviour": "Loads the entire tickets array into the browser and computes Total/Open/Resolved+%/SLA Breached/Avg CSAT in JS. 'Closed' is derived from statuses whose behaviour==='closed'. Avg CSAT is always 'N/A' because no code writes csat.",
+   "requiredBehaviour": "Server-side aggregate over the tenant's tickets with date scoping; do not ship the ticket table to the client.",
+   "apiMethodPath": "GET /api/v1/support/reports/dashboard",
+   "authorization": "support_agent (own tenant)",
+   "validation": "none needed",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-DASH-BREAKDOWN",
+   "entity": "Ticket",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 123,
+   "currentBehaviour": "tally() groups the in-memory array by status/priority/category label and sorts desc; bar width is value/max. Renders 'No data' when empty.",
+   "requiredBehaviour": "GROUP BY status_id/priority_id/category_id server-side, returning labels resolved from the taxonomy tables.",
+   "apiMethodPath": "GET /api/v1/support/reports/breakdown?by=status|priority|category",
+   "authorization": "support_agent",
+   "validation": "by ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-LIST",
+   "entity": "Ticket",
+   "action": "list",
+   "surface": "?tab=tickets",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 159,
+   "currentBehaviour": "useMemo filter over the full in-memory array. No pagination, no sorting (despite the blurb claiming 'sorted by SLA pressure' — the order is simply newest-created-first because addTicket prepends).",
+   "requiredBehaviour": "Paginated, sorted, filtered server query with a stable cursor; sort by SLA due/pressure must be real.",
+   "apiMethodPath": "GET /api/v1/support/tickets?queue&status&channel&tag&q&cursor&limit&sort",
+   "authorization": "support_agent; end_user sees only own",
+   "validation": "limit<=100; unknown filter keys rejected",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-QUEUE-FILTER",
+   "entity": "Ticket",
+   "action": "list",
+   "surface": "?tab=tickets",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 199,
+   "currentBehaviour": "setState. 'My tickets' compares ticket.assignee to session fullName string; 'Unassigned' tests falsy assignee.",
+   "requiredBehaviour": "queue=mine resolves to assignee_user_id = current user id; queue=unassigned to assignee_user_id IS NULL.",
+   "apiMethodPath": "GET /api/v1/support/tickets?queue=all|mine|unassigned",
+   "authorization": "support_agent",
+   "validation": "queue ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-STATUS-FILTER",
+   "entity": "Ticket",
+   "action": "list",
+   "surface": "?tab=tickets",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 212,
+   "currentBehaviour": "setState; chips are built from supportSettings.statuses labels plus 'All', so the chip strip changes when an admin edits ticket fields.",
+   "requiredBehaviour": "Filter by status_id (multi-select), with labels resolved from the taxonomy.",
+   "apiMethodPath": "GET /api/v1/support/tickets?statusId=",
+   "authorization": "support_agent",
+   "validation": "statusId exists in tenant taxonomy",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-SOURCE-FILTER",
+   "entity": "Ticket",
+   "action": "list",
+   "surface": "?tab=tickets",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 224,
+   "currentBehaviour": "setState; exact string equality against ticket.source. Self-service tickets written as 'Portal' match no option because the channel label is 'Partner Portal'.",
+   "requiredBehaviour": "Filter by channel_id.",
+   "apiMethodPath": "GET /api/v1/support/tickets?channelId=",
+   "authorization": "support_agent",
+   "validation": "channelId exists",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-TAG-FILTER",
+   "entity": "Ticket",
+   "action": "list",
+   "surface": "?tab=tickets",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 235,
+   "currentBehaviour": "setState; case-insensitive substring match against any tag. Placeholder says 'Filter by tag(s)...' but only one needle is used — a comma-separated entry matches nothing.",
+   "requiredBehaviour": "Parse multiple tags, AND/OR semantics declared; index tags.",
+   "apiMethodPath": "GET /api/v1/support/tickets?tag=a&tag=b",
+   "authorization": "support_agent",
+   "validation": "max 10 tags",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-SEARCH",
+   "entity": "Ticket",
+   "action": "list",
+   "surface": "?tab=tickets",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 248,
+   "currentBehaviour": "setState on every keystroke; lowercase substring over `reference + subject + requester` only. Ticket body is not searched (no body exists).",
+   "requiredBehaviour": "Debounced server search across reference, subject, description and thread messages (Postgres FTS / trigram).",
+   "apiMethodPath": "GET /api/v1/support/tickets?q=",
+   "authorization": "support_agent",
+   "validation": "q length <= 200",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-VIEW-SAVE",
+   "entity": "SavedTicketView",
+   "action": "create",
+   "surface": "?tab=tickets → '+ Save current filter'",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 176,
+   "currentBehaviour": "setSaved(string) only — renders 'Saved view: All tickets · Open · Email' under the button. Nothing is named, nothing persists, nothing can be re-applied, and it is gone on refresh.",
+   "requiredBehaviour": "Prompt for a name, persist the filter set for the user (optionally shared), list saved views as chips and re-apply on click.",
+   "apiMethodPath": "POST /api/v1/support/ticket-views",
+   "authorization": "support_agent (own); support_admin for shared",
+   "validation": "name required, unique per owner; filter keys validated",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-EXPAND",
+   "entity": "Ticket",
+   "action": "read",
+   "surface": "?tab=tickets (row)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 262,
+   "currentBehaviour": "setExpanded toggles an inline panel showing three controls plus 'category · opened <date>' formatted with toLocaleString('en-GB') — a hardcoded locale.",
+   "requiredBehaviour": "A real ticket detail route (/app/support-ticketing/tickets/{reference}) with thread, properties, SLA panel and activity; dates in tenant locale/timezone.",
+   "apiMethodPath": "GET /api/v1/support/tickets/{id}",
+   "authorization": "support_agent; requester sees own without internal notes",
+   "validation": "id is a uuid in tenant",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-CREATE",
+   "entity": "Ticket",
+   "action": "create",
+   "surface": "?tab=tickets → New ticket dialog",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 415,
+   "currentBehaviour": "addTicket() writes a Ticket into the localStorage blob via useWorkspace(): client-minted uuid, reference from array length, status hardcoded 'New', slaBreached false, csat null, plus one audit row. Requester falls back to the literal 'Unknown requester'. Dialog closes; no toast, no error path.",
+   "requiredBehaviour": "Server-validated insert inside a transaction: reference from a per-tenant sequence, status defaulted to the tenant's first 'active' status, SLA instances opened from the resolved policy, auto-response evaluated, routing applied, audit row with the real actor.",
+   "apiMethodPath": "POST /api/v1/support/tickets",
+   "authorization": "support_agent | support_admin",
+   "validation": "subject 1..300 required; priority/category/channel must exist in tenant taxonomy; requester email format when provided; tags <= 20, each <= 40 chars; Idempotency-Key honoured",
+   "sideEffect": "auto-response email to requester (once the sender exists)"
+  },
+  {
+   "id": "OP-SUP-TICKET-TRANSITION",
+   "entity": "Ticket",
+   "action": "transition",
+   "surface": "?tab=tickets (expanded row) → Status select",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 289,
+   "currentBehaviour": "updateTicket(id,{status}) on change — writes the new label into the localStorage blob and stamps resolvedAt on the FIRST move to Resolved/Closed only. No transition rules, no confirmation, no reason, no reopen bookkeeping, no SLA effect (a 'waiting' status pauses nothing).",
+   "requiredBehaviour": "Guarded transition writing a TicketStatusEvent, pausing/resuming the SLA clock on 'waiting' behaviour, clearing/stamping resolvedAt and closedAt per behaviour, incrementing reopenCount, and enqueuing the CSAT survey when the target behaviour is closed and csat.sendOnResolve is on.",
+   "apiMethodPath": "POST /api/v1/support/tickets/{id}/transition",
+   "authorization": "support_agent assigned or support_admin",
+   "validation": "target status exists and is reachable; optimistic concurrency via version/If-Match",
+   "sideEffect": "queues CSAT survey email; may fire escalation rules"
+  },
+  {
+   "id": "OP-SUP-TICKET-ASSIGN-SELF",
+   "entity": "Ticket",
+   "action": "update",
+   "surface": "?tab=tickets (expanded row) → 'Assign to me'",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 302,
+   "currentBehaviour": "updateTicket(id,{assignee: session fullName}) — stores a display name. There is no way to assign anyone else, no agent picker, no team.",
+   "requiredBehaviour": "Set assignee_user_id (self or, for admins, any agent), record an assignment event and notify.",
+   "apiMethodPath": "POST /api/v1/support/tickets/{id}/assign",
+   "authorization": "support_agent (self); support_admin (any)",
+   "validation": "assignee is an active agent in the tenant",
+   "sideEffect": "assignment notification"
+  },
+  {
+   "id": "OP-SUP-TICKET-UNASSIGN",
+   "entity": "Ticket",
+   "action": "update",
+   "surface": "?tab=tickets (expanded row) → 'Unassign (name)'",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 302,
+   "currentBehaviour": "Same handler, sets assignee null. Any user can unassign anyone because the button is the toggle of the same control.",
+   "requiredBehaviour": "Separate unassign with authorization (self or admin) and an event row.",
+   "apiMethodPath": "POST /api/v1/support/tickets/{id}/unassign",
+   "authorization": "assignee or support_admin",
+   "validation": "ticket not in a closed behaviour, or explicitly allowed",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-SLA-FLAG",
+   "entity": "Ticket / SlaInstance",
+   "action": "update",
+   "surface": "?tab=tickets (expanded row) → 'Mark SLA breached' / 'Clear SLA breach'",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 309,
+   "currentBehaviour": "updateTicket(id,{slaBreached: !slaBreached}) — an agent can declare or un-declare their own SLA breach by hand, and this directly moves the Dashboard KPI and the SLA compliance report.",
+   "requiredBehaviour": "Breach must be derived from the SLA clock, never hand-set. At most allow an admin to record a justified exemption/waiver as a separate auditable record.",
+   "apiMethodPath": "POST /api/v1/support/tickets/{id}/sla-waiver",
+   "authorization": "support_admin only",
+   "validation": "reason required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-TICKET-REPLY",
+   "entity": "TicketMessage",
+   "action": "create",
+   "surface": "?tab=tickets (missing)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 262,
+   "currentBehaviour": "DOES NOT EXIST. There is no reply box, no thread, no message list anywhere in the support screens.",
+   "requiredBehaviour": "Public reply composer with canned-response insertion, attachments, KB article linking; sends outbound on the ticket's channel and stamps firstResponseAt.",
+   "apiMethodPath": "POST /api/v1/support/tickets/{id}/messages",
+   "authorization": "support_agent",
+   "validation": "body required; visibility ∈ {public,internal}",
+   "sideEffect": "outbound email/SMS to the requester"
+  },
+  {
+   "id": "OP-SUP-TICKET-NOTE",
+   "entity": "TicketMessage (internal)",
+   "action": "create",
+   "surface": "?tab=tickets (missing)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 262,
+   "currentBehaviour": "DOES NOT EXIST.",
+   "requiredBehaviour": "Internal note never rendered to requester or portal; separate authorization from public replies.",
+   "apiMethodPath": "POST /api/v1/support/tickets/{id}/messages (visibility=internal)",
+   "authorization": "support_agent",
+   "validation": "body required",
+   "sideEffect": "optional @mention notification"
+  },
+  {
+   "id": "OP-SUP-TICKET-EDIT-PROPERTIES",
+   "entity": "Ticket",
+   "action": "update",
+   "surface": "?tab=tickets (missing)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 262,
+   "currentBehaviour": "DOES NOT EXIST — priority, category, source, tags, requester and type cannot be changed after creation. Only status, assignee and the SLA flag are editable.",
+   "requiredBehaviour": "Patch endpoint for ticket properties with field-level audit and SLA recalculation when priority/tier changes.",
+   "apiMethodPath": "PATCH /api/v1/support/tickets/{id}",
+   "authorization": "support_agent",
+   "validation": "each referenced taxonomy id exists; reject unknown fields",
+   "sideEffect": "may re-open/re-target SLA instances"
+  },
+  {
+   "id": "OP-SUP-TICKET-DELETE",
+   "entity": "Ticket",
+   "action": "delete",
+   "surface": "?tab=tickets (missing)",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1618,
+   "currentBehaviour": "DOES NOT EXIST. No delete/merge/spam control; tickets are immortal.",
+   "requiredBehaviour": "Soft delete / merge-into with retention rules; note that reference generation from array length would break on any deletion.",
+   "apiMethodPath": "DELETE /api/v1/support/tickets/{id}",
+   "authorization": "support_admin",
+   "validation": "reason required; blocked while legal hold applies",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-KB-LIST",
+   "entity": "KbArticle",
+   "action": "list",
+   "surface": "?tab=knowledge_base",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 451,
+   "currentBehaviour": "Client filter over the whole array by category name, state chip and the applied search string. No pagination, no sort control (insertion order, newest first).",
+   "requiredBehaviour": "Server list with pagination, category/state/locale filters and a sort.",
+   "apiMethodPath": "GET /api/v1/support/kb/articles",
+   "authorization": "support_agent; public read restricted to published+public",
+   "validation": "state ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-KB-SEARCH",
+   "entity": "KbArticle",
+   "action": "read",
+   "surface": "?tab=knowledge_base → search box / Search button / Enter",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 520,
+   "currentBehaviour": "setApplied(search) then a lowercase substring match on title+body. The placeholder reads 'Describe the problem in any language...' — there is no semantic, multilingual or ranked search of any kind.",
+   "requiredBehaviour": "Hybrid search: keyword (FTS) plus vector similarity over the KB index, locale-aware, ranked, with snippet highlighting.",
+   "apiMethodPath": "GET /api/v1/support/kb/search?q=&locale=",
+   "authorization": "support_agent; public variant for widget/portal restricted to published+public",
+   "validation": "q 1..500",
+   "sideEffect": "embedding call to the configured model provider"
+  },
+  {
+   "id": "OP-SUP-KB-CATEGORY-FILTER",
+   "entity": "KbArticle",
+   "action": "list",
+   "surface": "?tab=knowledge_base → Category select",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 529,
+   "currentBehaviour": "setState; exact match on the category name string. Articles imported as 'Uncategorised' are unreachable.",
+   "requiredBehaviour": "Filter by category_id.",
+   "apiMethodPath": "GET /api/v1/support/kb/articles?categoryId=",
+   "authorization": "support_agent",
+   "validation": "categoryId exists",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-KB-STATE-FILTER",
+   "entity": "KbArticle",
+   "action": "list",
+   "surface": "?tab=knowledge_base → All/draft/published/archived chips",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 539,
+   "currentBehaviour": "setState; exact match on state.",
+   "requiredBehaviour": "Same, server-side.",
+   "apiMethodPath": "GET /api/v1/support/kb/articles?state=",
+   "authorization": "support_agent",
+   "validation": "state ∈ {draft,published,archived}",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-KB-CREATE",
+   "entity": "KbArticle",
+   "action": "create",
+   "surface": "?tab=knowledge_base → New Article dialog",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 633,
+   "currentBehaviour": "addKbArticle() writes to the localStorage blob with a client uuid and updatedAt=now, plus an audit row whose resourceId is the article TITLE. State is chosen once here and can never change afterwards.",
+   "requiredBehaviour": "Server insert with author, slug, locale, visibility and version 1; publishing is a separate audited transition.",
+   "apiMethodPath": "POST /api/v1/support/kb/articles",
+   "authorization": "support_agent (draft); support_admin (publish)",
+   "validation": "title 1..200 required; category must exist; body size cap; slug unique per tenant+locale",
+   "sideEffect": "queues re-index when published"
+  },
+  {
+   "id": "OP-SUP-KB-UPDATE",
+   "entity": "KbArticle",
+   "action": "update",
+   "surface": "?tab=knowledge_base (missing)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 556,
+   "currentBehaviour": "DOES NOT EXIST — the row has only a Delete button. An article's title, body, category and state are frozen at creation, so a draft can never be published through the UI.",
+   "requiredBehaviour": "Edit with versioning; publish/unpublish/archive transitions that re-index and invalidate caches.",
+   "apiMethodPath": "PATCH /api/v1/support/kb/articles/{id}",
+   "authorization": "support_agent; publish requires support_admin",
+   "validation": "If-Match version; body sanitised",
+   "sideEffect": "re-index"
+  },
+  {
+   "id": "OP-SUP-KB-DELETE",
+   "entity": "KbArticle",
+   "action": "delete",
+   "surface": "?tab=knowledge_base → Delete",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 565,
+   "currentBehaviour": "removeKbArticle(id) — immediate hard removal from the array with NO confirmation dialog, plus an audit row. Any stale id left in indexedArticles is simply ignored later.",
+   "requiredBehaviour": "Confirmation, soft delete, index cleanup in the same transaction.",
+   "apiMethodPath": "DELETE /api/v1/support/kb/articles/{id}",
+   "authorization": "support_admin",
+   "validation": "confirm token; blocked if referenced by an open ticket reply draft",
+   "sideEffect": "removes index entries"
+  },
+  {
+   "id": "OP-SUP-KB-IMPORT-CSV",
+   "entity": "KbArticle",
+   "action": "import",
+   "surface": "?tab=knowledge_base → Import CSV",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 461,
+   "currentBehaviour": "FileReader.readAsText, drops the first line unconditionally, splits each remaining line on ',' into [title,cat,body] and calls addKbArticle per row as a draft; strips a leading/trailing quote from the title only. Ignores the repo's own quoted CSV parser in src/lib/csv.ts, so any body or title containing a comma, quote or newline is silently mangled. Reports 'Imported N articles as drafts.' with no error path and no dry run.",
+   "requiredBehaviour": "Server-side import using the existing quoted parser: validate the header, map columns explicitly, validate each row, report per-row errors, run in one transaction with a preview/dry-run and a size limit.",
+   "apiMethodPath": "POST /api/v1/support/kb/articles/import",
+   "authorization": "support_admin",
+   "validation": "content-type, max file size, header must match, category resolved or rejected (never invented as 'Uncategorised'), row cap",
+   "sideEffect": "bulk insert; re-index if imported as published"
+  },
+  {
+   "id": "OP-SUP-KBCAT-CREATE",
+   "entity": "KbCategory",
+   "action": "create",
+   "surface": "?tab=knowledge_base → New Category dialog",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 667,
+   "currentBehaviour": "addKbCategory(name) appends the raw string to kbCategories unless an exact (case-sensitive) duplicate exists. No audit row is written for this one, unlike every other support mutation.",
+   "requiredBehaviour": "Insert a category row with slug and position; case-insensitive uniqueness; audited.",
+   "apiMethodPath": "POST /api/v1/support/kb/categories",
+   "authorization": "support_admin",
+   "validation": "name 1..80, unique per tenant case-insensitively",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-KBCAT-UPDATE-DELETE",
+   "entity": "KbCategory",
+   "action": "delete",
+   "surface": "?tab=knowledge_base (missing)",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1665,
+   "currentBehaviour": "DOES NOT EXIST — a KB category can be created but never renamed or removed.",
+   "requiredBehaviour": "Rename (with article re-pointing via FK) and delete with a reassign-or-block rule.",
+   "apiMethodPath": "PATCH/DELETE /api/v1/support/kb/categories/{id}",
+   "authorization": "support_admin",
+   "validation": "delete blocked while articles reference it unless a target category is supplied",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REQ-LIST",
+   "entity": "Ticket",
+   "action": "list",
+   "surface": "?tab=my_requests",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 707,
+   "currentBehaviour": "Client filter tickets.requester === session.user.email. Any agent-created ticket for the same person recorded by name (or as 'Unknown requester') never appears here.",
+   "requiredBehaviour": "Server query scoped to the caller's contact identity, returning only requester-visible fields and public messages.",
+   "apiMethodPath": "GET /api/v1/support/my/tickets",
+   "authorization": "authenticated end_user / portal_user",
+   "validation": "never accept a requester id from the client",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REQ-CREATE",
+   "entity": "Ticket",
+   "action": "create",
+   "surface": "?tab=my_requests → New request dialog",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 738,
+   "currentBehaviour": "addTicket() with the free-text answer as `subject`, requester=session email, status 'New', priority 'Medium', category hardcoded 'Other' (not in the tenant's category list), source hardcoded 'Portal' (not a configured channel label), no tags, unassigned.",
+   "requiredBehaviour": "Self-service intake using configured defaults: description in its own column, default category/priority/channel resolved from settings, routing and auto-response applied, acknowledgement shown with the ticket reference.",
+   "apiMethodPath": "POST /api/v1/support/my/tickets",
+   "authorization": "authenticated end_user",
+   "validation": "description required 1..5000; rate limit per user; category/priority forced server-side",
+   "sideEffect": "auto-response acknowledgement email"
+  },
+  {
+   "id": "OP-SUP-CANNED-LIST",
+   "entity": "CannedResponse",
+   "action": "list",
+   "surface": "?tab=canned_responses",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 781,
+   "currentBehaviour": "Renders the whole array; no search, no filter, no pagination; body is shown in full on every row.",
+   "requiredBehaviour": "Paginated list with search and category filter.",
+   "apiMethodPath": "GET /api/v1/support/canned-responses",
+   "authorization": "support_agent",
+   "validation": "limit<=100",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CANNED-CREATE",
+   "entity": "CannedResponse",
+   "action": "create",
+   "surface": "?tab=canned_responses → New Response dialog",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 831,
+   "currentBehaviour": "addCannedResponse({title,body}) into localStorage; audit resourceId is the title. Body may be empty (only title is required).",
+   "requiredBehaviour": "Persist with owner, shortcut, category, visibility and merge-field validation.",
+   "apiMethodPath": "POST /api/v1/support/canned-responses",
+   "authorization": "support_agent",
+   "validation": "title 1..120 unique per tenant; body required; merge fields must resolve",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CANNED-DELETE",
+   "entity": "CannedResponse",
+   "action": "delete",
+   "surface": "?tab=canned_responses → Delete",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 791,
+   "currentBehaviour": "removeCannedResponse(id) — immediate, unconfirmed hard delete plus an audit row.",
+   "requiredBehaviour": "Confirmation + soft delete.",
+   "apiMethodPath": "DELETE /api/v1/support/canned-responses/{id}",
+   "authorization": "owner or support_admin",
+   "validation": "confirm token",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CANNED-UPDATE",
+   "entity": "CannedResponse",
+   "action": "update",
+   "surface": "?tab=canned_responses (missing)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 783,
+   "currentBehaviour": "DOES NOT EXIST — no edit control.",
+   "requiredBehaviour": "Edit title/body/shortcut with audit.",
+   "apiMethodPath": "PATCH /api/v1/support/canned-responses/{id}",
+   "authorization": "owner or support_admin",
+   "validation": "as create",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CANNED-INSERT",
+   "entity": "TicketMessage",
+   "action": "execute",
+   "surface": "(missing)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 762,
+   "currentBehaviour": "DOES NOT EXIST. Canned responses cannot be applied to anything because there is no reply composer — the entity is a dead end.",
+   "requiredBehaviour": "Insert into a reply with merge fields resolved from the ticket/requester, incrementing usage count.",
+   "apiMethodPath": "n/a (client compose + POST message)",
+   "authorization": "support_agent",
+   "validation": "merge fields resolvable",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-TAB",
+   "entity": "n/a",
+   "action": "read",
+   "surface": "?tab=reports",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 888,
+   "currentBehaviour": "setState across seven tabs: sla, response, reopen, csat, nps, leaderboard, heatmap. Six of them render a sentence instead of a report.",
+   "requiredBehaviour": "Each tab a real server-computed report.",
+   "apiMethodPath": "GET /api/v1/support/reports/{key}",
+   "authorization": "support_admin | manager",
+   "validation": "key ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-RANGE",
+   "entity": "Ticket",
+   "action": "read",
+   "surface": "?tab=reports → range select",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 904,
+   "currentBehaviour": "setState; days mapped 7/30/90/365 and cutoff = Date.now() - days*86_400_000. 'Last 12 months' is literally 365 days and the arithmetic ignores DST and the tenant timezone. Filter is on createdAt only.",
+   "requiredBehaviour": "Calendar-correct ranges in the tenant timezone, with an explicit dimension (created vs resolved).",
+   "apiMethodPath": "GET /api/v1/support/reports/{key}?from=&to=&tz=",
+   "authorization": "support_admin",
+   "validation": "from<=to; max span",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-SLA",
+   "entity": "Ticket",
+   "action": "read",
+   "surface": "?tab=reports (SLA Compliance)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 856,
+   "currentBehaviour": "Only real report. Groups in-range tickets by priority label; 'First-response met' = count of !slaBreached (there is NO first-response data at all); 'Resolution met' = count with status Resolved/Closed compared by hardcoded string literals rather than the configured 'closed' behaviour. Priorities with zero tickets are dropped, and the Total row sums only the displayed rows.",
+   "requiredBehaviour": "Compute from SlaInstance rows: first-response met/breached and resolution met/breached per priority and tier, on business-hours clocks.",
+   "apiMethodPath": "GET /api/v1/support/reports/sla",
+   "authorization": "support_admin",
+   "validation": "range required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-RESPONSE",
+   "entity": "TicketStatusEvent / TicketMessage",
+   "action": "read",
+   "surface": "?tab=reports (Response Times)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 955,
+   "currentBehaviour": "Renders 'Response Times needs ticket history this rebuild does not simulate yet.' (honest placeholder) or 'No tickets in last 30 days.'",
+   "requiredBehaviour": "Median/p90 first response and resolution time from message and transition history.",
+   "apiMethodPath": "GET /api/v1/support/reports/response-times",
+   "authorization": "support_admin",
+   "validation": "range required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-REOPEN",
+   "entity": "TicketStatusEvent",
+   "action": "read",
+   "surface": "?tab=reports (Reopen Rate)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 955,
+   "currentBehaviour": "Placeholder sentence.",
+   "requiredBehaviour": "Reopens / resolutions over the window; definition of a reopen must be fixed (see openQuestions).",
+   "apiMethodPath": "GET /api/v1/support/reports/reopen-rate",
+   "authorization": "support_admin",
+   "validation": "range required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-CSAT",
+   "entity": "CsatResponse",
+   "action": "read",
+   "surface": "?tab=reports (CSAT)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 955,
+   "currentBehaviour": "Placeholder sentence; there is no CSAT data source in any case.",
+   "requiredBehaviour": "Response rate, average score, distribution and comments, filterable by agent/team.",
+   "apiMethodPath": "GET /api/v1/support/reports/csat",
+   "authorization": "support_admin",
+   "validation": "range required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-NPS",
+   "entity": "NpsResponse",
+   "action": "read",
+   "surface": "?tab=reports (NPS)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 955,
+   "currentBehaviour": "Placeholder sentence; no NPS model exists at all.",
+   "requiredBehaviour": "NPS from survey responses once the survey programme is defined.",
+   "apiMethodPath": "GET /api/v1/support/reports/nps",
+   "authorization": "support_admin",
+   "validation": "range required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-LEADERBOARD",
+   "entity": "SupportTeam / User",
+   "action": "read",
+   "surface": "?tab=reports (Agent Leaderboard)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 955,
+   "currentBehaviour": "Placeholder sentence. Could not be computed anyway — assignee is a display-name string and there is no agent roster.",
+   "requiredBehaviour": "Per-agent resolved count, first-response time, CSAT and SLA attainment.",
+   "apiMethodPath": "GET /api/v1/support/reports/agent-leaderboard",
+   "authorization": "support_admin | manager",
+   "validation": "range required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-REPORT-HEATMAP",
+   "entity": "Ticket",
+   "action": "read",
+   "surface": "?tab=reports (Volume Heatmap)",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 955,
+   "currentBehaviour": "Placeholder sentence.",
+   "requiredBehaviour": "Created-per-hour-per-weekday grid in the tenant timezone.",
+   "apiMethodPath": "GET /api/v1/support/reports/volume-heatmap",
+   "authorization": "support_admin",
+   "validation": "range required; tz required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-PLANGATE-SLA",
+   "entity": "SlaPolicy",
+   "action": "list",
+   "surface": "?tab=sla_policies",
+   "sourceFile": "src/screens/app/support/SupportTicketing.tsx",
+   "sourceLine": 91,
+   "currentBehaviour": "gatedSections['sla_policies'] is a hardcoded constant in supportData.ts, so the PlanGate lock card renders for every tenant regardless of plan. No SLA policy list, create or edit exists behind it.",
+   "requiredBehaviour": "Entitlement checked against the tenant's real subscription, and a working SLA policy CRUD surface behind it.",
+   "apiMethodPath": "GET /api/v1/support/sla-policies",
+   "authorization": "support_admin + entitlement 'support.sla'",
+   "validation": "entitlement resolved server-side",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-PLANGATE-ROUTING",
+   "entity": "RoutingRule",
+   "action": "list",
+   "surface": "?tab=routing_rules",
+   "sourceFile": "src/screens/app/support/SupportTicketing.tsx",
+   "sourceLine": 91,
+   "currentBehaviour": "Same hardcoded PlanGate; no routing rule model or evaluator exists.",
+   "requiredBehaviour": "Entitlement-checked routing rule CRUD plus an evaluator invoked on ticket create and on inbound message.",
+   "apiMethodPath": "GET /api/v1/support/routing-rules",
+   "authorization": "support_admin + entitlement 'support.routing'",
+   "validation": "entitlement resolved server-side",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-PLANGATE-BACK",
+   "entity": "n/a",
+   "action": "read",
+   "surface": "?tab=sla_policies | ?tab=routing_rules → 'Back to dashboard'",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 33,
+   "currentBehaviour": "Calls select('dashboard') → clears the query string.",
+   "requiredBehaviour": "Unchanged.",
+   "apiMethodPath": "n/a",
+   "authorization": "n/a",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-PLANGATE-UPGRADE",
+   "entity": "Subscription",
+   "action": "read",
+   "surface": "gated tabs → 'Upgrade plan'",
+   "sourceFile": "src/screens/app/support/panes.tsx",
+   "sourceLine": 36,
+   "currentBehaviour": "Navigates to /app/account. No plan context, no return path, no record of intent.",
+   "requiredBehaviour": "Deep link to the plan-change flow carrying the requested entitlement.",
+   "apiMethodPath": "n/a (navigates)",
+   "authorization": "org_admin to actually change a plan",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-SETTINGS-TAB",
+   "entity": "n/a",
+   "action": "read",
+   "surface": "?tab=settings (14-tab strip)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 1172,
+   "currentBehaviour": "setState only — the settings sub-tab is NOT in the URL, so no settings pane is linkable, bookmarkable or restorable after refresh (unlike the Reports tabs, which are also state-only).",
+   "requiredBehaviour": "Put the sub-tab in the query string and permission-filter the strip by role.",
+   "apiMethodPath": "n/a",
+   "authorization": "support_admin",
+   "validation": "tab ∈ supportSettingsTabs",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-FIELD-SUBTAB",
+   "entity": "n/a",
+   "action": "read",
+   "surface": "?tab=settings → Ticket fields (Statuses/Categories/Priorities/Types/Channels)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 96,
+   "currentBehaviour": "setState across the five taxonomies.",
+   "requiredBehaviour": "Unchanged, but each taxonomy list loads from its own endpoint.",
+   "apiMethodPath": "GET /api/v1/support/field-options?kind=",
+   "authorization": "support_admin",
+   "validation": "kind ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-FIELD-CREATE",
+   "entity": "TicketStatusDefinition | TicketCategoryDefinition | TicketPriorityDefinition | TicketTypeDefinition | TicketChannelDefinition",
+   "action": "create",
+   "surface": "?tab=settings → Ticket fields → '+ Add statuse/categorie/prioritie/type/channel'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 268,
+   "currentBehaviour": "persist([...rows, draft]) writes the whole array straight back into supportSettings via updateSupportSettings — no draft/save separation, saved on dialog confirm. New rows always get behaviour 'active' and slaHours 24 seeded even for taxonomies that use neither, and never get a colour. No uniqueness check on label or slug. (Button labels 'Add statuse'/'Add categorie' are transcribed live-app typos.)",
+   "requiredBehaviour": "Typed insert per taxonomy with uniqueness, colour choice where the list is colour-coded, and position appended.",
+   "apiMethodPath": "POST /api/v1/support/field-options",
+   "authorization": "support_admin",
+   "validation": "label 1..60 required; slug ^[a-z0-9_]+$ unique per tenant+kind; slaHours integer 1..8760 for priorities; behaviour ∈ {active,waiting,closed} for statuses",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-FIELD-SLUG-AUTOGEN",
+   "entity": "Ticket field definitions",
+   "action": "create",
+   "surface": "?tab=settings → Ticket fields → Label input",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 213,
+   "currentBehaviour": "While creating, the slug follows the label as lowercase with [^a-z0-9]+ → '_'; while editing, the slug is frozen. A label of only non-alphanumerics produces an empty or all-underscore slug and is accepted.",
+   "requiredBehaviour": "Same UX, but server enforces slug shape, trims leading/trailing underscores and guarantees uniqueness with a numeric suffix.",
+   "apiMethodPath": "n/a (client) + server normalisation",
+   "authorization": "support_admin",
+   "validation": "resulting slug non-empty",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-FIELD-UPDATE",
+   "entity": "Ticket field definitions",
+   "action": "update",
+   "surface": "?tab=settings → Ticket fields → ✎",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 268,
+   "currentBehaviour": "Replaces the row in the array by id. Renaming a status/category/priority/channel label does NOT migrate the tickets that stored the old label — they become orphans that no filter matches and that the dashboard counts as neither open nor closed.",
+   "requiredBehaviour": "With FK ids a rename is safe; the endpoint must still reject changing a slug that inbound integrations rely on, and must not allow changing behaviour on the last 'closed' status.",
+   "apiMethodPath": "PATCH /api/v1/support/field-options/{id}",
+   "authorization": "support_admin",
+   "validation": "as create; at least one status with behaviour='closed' and one 'active' must remain",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-FIELD-DELETE",
+   "entity": "Ticket field definitions",
+   "action": "delete",
+   "surface": "?tab=settings → Ticket fields → 🗑",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 192,
+   "currentBehaviour": "persist(rows.filter(...)) — one click, NO confirmation, and no check for tickets using the value. Deleting every 'closed'-behaviour status silently makes every ticket count as Open on the dashboard; deleting a priority strands its SLA hours.",
+   "requiredBehaviour": "Block deletion while tickets reference the option (or require an explicit reassignment target); confirm; soft delete with an 'archived' flag so history still renders.",
+   "apiMethodPath": "DELETE /api/v1/support/field-options/{id}?reassignTo=",
+   "authorization": "support_admin",
+   "validation": "409 when in use and no reassignTo; cannot delete the last active/closed status",
+   "sideEffect": "bulk re-point of tickets when reassignTo is given"
+  },
+  {
+   "id": "OP-SUP-FIELD-REORDER",
+   "entity": "Ticket field definitions",
+   "action": "update",
+   "surface": "?tab=settings → Ticket fields → ⠿ grab handle",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 156,
+   "currentBehaviour": "NO-OP. The '⠿' glyph is aria-hidden with cursor-grab styling and no drag handler, no key handler and no position field — the affordance is purely cosmetic.",
+   "requiredBehaviour": "Real drag-and-drop (and keyboard reorder) persisting a position column, since the order drives chip order and select order on the Tickets surface.",
+   "apiMethodPath": "POST /api/v1/support/field-options/reorder",
+   "authorization": "support_admin",
+   "validation": "ids must be the complete set for that kind",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-WIDGET-EDIT",
+   "entity": "SupportWidgetSettings",
+   "action": "update",
+   "surface": "?tab=settings → Web widget (all 9 inputs)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 304,
+   "currentBehaviour": "Every field edits a local draft via useSettings('widget'); the live Preview card re-renders from the draft. Dirty is a JSON.stringify comparison. The draft is seeded once at mount, so a change made elsewhere is silently overwritten on save.",
+   "requiredBehaviour": "Same editing UX with server-side validation and optimistic-concurrency on save.",
+   "apiMethodPath": "n/a (local draft)",
+   "authorization": "support_admin",
+   "validation": "accent hex; position ∈ enum; text length caps",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-WIDGET-SAVE",
+   "entity": "SupportWidgetSettings",
+   "action": "update",
+   "surface": "?tab=settings → Web widget → 'Save widget settings'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 396,
+   "currentBehaviour": "updateSupportSettings({widget: draft}) merges into the localStorage blob and writes a generic support.settings_updated audit row. Button disabled while not dirty. No success toast, no error state — and nothing consumes the saved settings because no widget script or intake endpoint exists.",
+   "requiredBehaviour": "PUT the widget config; serve a real widget bundle and a public intake endpoint that honours enabled/requireEmail/showHelpTab and the origin allowlist.",
+   "apiMethodPath": "PUT /api/v1/support/settings/widget",
+   "authorization": "support_admin",
+   "validation": "accent ^#[0-9a-fA-F]{6}$; position ∈ enum; panelTitle/launcherText/subtitle/confirmation <= 200 chars; portal/allowed origins are valid https URLs",
+   "sideEffect": "publishes a new public widget configuration"
+  },
+  {
+   "id": "OP-SUP-WIDGET-COPY-SNIPPET",
+   "entity": "SupportWidgetSettings",
+   "action": "read",
+   "surface": "?tab=settings → Web widget → 'Copy snippet'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 443,
+   "currentBehaviour": "navigator.clipboard.writeText of a CONSTANT string that hardcodes data-tenant=\"acme\" and points at https://apragya.ai/api/v1/public/support-widget.js, which does not exist in this codebase. Button label flips to 'Copied'; a clipboard failure silently resets it with no message.",
+   "requiredBehaviour": "Generate the snippet from the tenant's real public key and the deployed widget URL; show an explicit failure message when the clipboard API is unavailable.",
+   "apiMethodPath": "GET /api/v1/support/settings/widget/snippet",
+   "authorization": "support_admin",
+   "validation": "n/a",
+   "sideEffect": "writes to the OS clipboard"
+  },
+  {
+   "id": "OP-SUP-WIDGET-INTAKE",
+   "entity": "Ticket",
+   "action": "create",
+   "surface": "public widget (missing)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 316,
+   "currentBehaviour": "DOES NOT EXIST. The pane configures a visitor-facing intake ('open a ticket without an account') for which there is no script, no endpoint and no rate limiting.",
+   "requiredBehaviour": "Public, origin-checked, rate-limited, captcha-or-equivalent-protected intake creating a ticket on the Web Widget channel and returning the configured confirmation text.",
+   "apiMethodPath": "POST /api/v1/public/support/widget/tickets",
+   "authorization": "anonymous, origin-allowlisted",
+   "validation": "email required when requireEmail; body length caps; spam/rate limits; no tenant id from the payload alone",
+   "sideEffect": "creates a ticket; sends the acknowledgement email the confirmation copy promises"
+  },
+  {
+   "id": "OP-SUP-CSAT-EDIT",
+   "entity": "SupportCsatSettings",
+   "action": "update",
+   "surface": "?tab=settings → CSAT survey (6 inputs)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 484,
+   "currentBehaviour": "Local draft via useSettings('csat'). Numeric inputs use Number(e.target.value), so clearing a box yields NaN in the draft and would persist NaN (serialised as null by JSON.stringify) on save. Only HTML min/max guard the ranges.",
+   "requiredBehaviour": "Validated numeric editing with explicit bounds and no NaN path.",
+   "apiMethodPath": "n/a (local draft)",
+   "authorization": "support_admin",
+   "validation": "waitHours 0..720; skipOlderDays 1..365; lowScore within the scale; slaWarnPercent 1..100",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CSAT-SAVE",
+   "entity": "SupportCsatSettings",
+   "action": "update",
+   "surface": "?tab=settings → CSAT survey → 'Save CSAT settings'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 581,
+   "currentBehaviour": "updateSupportSettings({csat: draft}) into localStorage + a generic audit row. Nothing consumes sendOnResolve, waitHours or slaWarnPercent; skipOlderDays is consumed only by the manual auto-close button.",
+   "requiredBehaviour": "Persist and actually drive the survey scheduler and the pre-breach warning job.",
+   "apiMethodPath": "PUT /api/v1/support/settings/csat",
+   "authorization": "support_admin",
+   "validation": "as above; portalUrl must be a valid https URL when non-empty",
+   "sideEffect": "reschedules pending surveys"
+  },
+  {
+   "id": "OP-SUP-CSAT-SEND-PENDING",
+   "entity": "CsatResponse",
+   "action": "execute",
+   "surface": "?tab=settings → CSAT survey → 'Send pending surveys now'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 571,
+   "currentBehaviour": "setNote() ONLY. Counts tickets with status==='Resolved' (literal, so Closed tickets are ignored) and csat===null, then prints 'N surveys queued...'. Nothing is queued, no email is sent, no record is written. Because csat is never writable, the count is simply every resolved ticket, every time.",
+   "requiredBehaviour": "Enqueue real survey sends for eligible tickets (respecting waitHours, skipOlderDays and per-ticket once-only), return the enqueued count and show failures.",
+   "apiMethodPath": "POST /api/v1/support/csat/send-pending",
+   "authorization": "support_admin",
+   "validation": "idempotent per ticket; batch cap",
+   "sideEffect": "sends survey emails via the (undecided) mail provider"
+  },
+  {
+   "id": "OP-SUP-ESCALATION-CREATE",
+   "entity": "EscalationRule",
+   "action": "create",
+   "surface": "?tab=settings → Escalation rules → '+ Add rule'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 706,
+   "currentBehaviour": "Generic RuleListPane: pushes {id: uuid, name, detail, enabled:true} into supportSettings.escalationRules. Two free-text fields; nothing is parsed, scheduled or evaluated, ever.",
+   "requiredBehaviour": "Structured rule (trigger point, offset, conditions, actions, order) evaluated by a scheduler against live SLA instances.",
+   "apiMethodPath": "POST /api/v1/support/escalation-rules",
+   "authorization": "support_admin",
+   "validation": "name required; triggerPoint ∈ enum; at least one action; conditions schema-validated",
+   "sideEffect": "none at create; notifications when it later fires"
+  },
+  {
+   "id": "OP-SUP-ESCALATION-DELETE",
+   "entity": "EscalationRule",
+   "action": "delete",
+   "surface": "?tab=settings → Escalation rules → Delete",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 663,
+   "currentBehaviour": "Filters the rule out of the array immediately; no confirmation.",
+   "requiredBehaviour": "Confirm + soft delete, audited.",
+   "apiMethodPath": "DELETE /api/v1/support/escalation-rules/{id}",
+   "authorization": "support_admin",
+   "validation": "confirm token",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-ESCALATION-TOGGLE",
+   "entity": "EscalationRule",
+   "action": "update",
+   "surface": "?tab=settings → Escalation rules (missing)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 709,
+   "currentBehaviour": "DOES NOT EXIST for any of the seven rule lists: `enabled` is written true at creation and there is no switch to turn a rule off. Same for edit — a rule can only be created or deleted.",
+   "requiredBehaviour": "Enable/disable switch and an edit form for every rule type.",
+   "apiMethodPath": "PATCH /api/v1/support/{ruleType}/{id}",
+   "authorization": "support_admin",
+   "validation": "as create",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-ESCALATION-RUN-DETECTOR",
+   "entity": "Ticket / SlaInstance",
+   "action": "execute",
+   "surface": "?tab=settings → Escalation rules → 'Run detector'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 1064,
+   "currentBehaviour": "REAL local effect: loops tickets that are not already breached, whose status is not the literal 'Resolved'/'Closed', and whose hours-since-createdAt exceeds the priority's SLA hours, then calls updateTicket({slaBreached:true}) for each — one localStorage write and one audit row per ticket. CRITICAL: slaFor() reads the STATIC defaultPriorities import, so a tenant that edited SLA hours in Settings is still measured against 4/8/24/72, and a custom priority silently falls back to 24h. Also measures from createdAt with no business hours and no pause for 'waiting' statuses.",
+   "requiredBehaviour": "A scheduled job evaluating SlaInstance due times on the tenant's business calendar, honouring pauses, writing breach events and firing escalation rules. Manual run remains as an admin diagnostic only.",
+   "apiMethodPath": "POST /api/v1/support/sla/evaluate",
+   "authorization": "support_admin (manual); system scheduler otherwise",
+   "validation": "idempotent; batch-bounded",
+   "sideEffect": "breach notifications"
+  },
+  {
+   "id": "OP-SUP-ESCALATION-RUN-AUTOCLOSE",
+   "entity": "Ticket",
+   "action": "execute",
+   "surface": "?tab=settings → Escalation rules → 'Run auto-close'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 1077,
+   "currentBehaviour": "REAL local effect: closes every ticket with status==='Resolved' whose resolvedAt is older than csat.skipOlderDays*24 hours, via updateTicket({status:'Closed'}) per ticket. Uses the CSAT 'skip older than' setting as the auto-close window — an undocumented coupling — and hardcodes the target status string 'Closed' rather than resolving a status with behaviour 'closed'.",
+   "requiredBehaviour": "Scheduled auto-close with its own configurable window, resolving the target status from the taxonomy, writing transition events and skipping tickets awaiting a CSAT response if that is the intent.",
+   "apiMethodPath": "POST /api/v1/support/tickets/auto-close",
+   "authorization": "support_admin (manual); system scheduler otherwise",
+   "validation": "window setting must exist; batch-bounded; idempotent",
+   "sideEffect": "closure notification to requesters"
+  },
+  {
+   "id": "OP-SUP-INBOX-CREATE",
+   "entity": "InboxAccount",
+   "action": "create",
+   "surface": "?tab=settings → Inbox accounts → '+ Add inbox'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 706,
+   "currentBehaviour": "Same generic two-field rule dialog — name + detail. No host, port, credentials, folder or TLS field exists, so nothing could connect even if a poller existed. The pane's own notice admits managed inbound email is not configured.",
+   "requiredBehaviour": "Real mailbox connection form with encrypted credential storage, a 'Test connection' action, poll cadence and health readout.",
+   "apiMethodPath": "POST /api/v1/support/inbox-accounts",
+   "authorization": "support_admin",
+   "validation": "host/port/protocol required; credentials never returned; connection test must pass before activation",
+   "sideEffect": "connects to an external mail server"
+  },
+  {
+   "id": "OP-SUP-INBOX-DELETE",
+   "entity": "InboxAccount",
+   "action": "delete",
+   "surface": "?tab=settings → Inbox accounts → Delete",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 663,
+   "currentBehaviour": "Unconfirmed array filter.",
+   "requiredBehaviour": "Confirm; stop the poller; retain parse failures and inbound history.",
+   "apiMethodPath": "DELETE /api/v1/support/inbox-accounts/{id}",
+   "authorization": "support_admin",
+   "validation": "confirm token",
+   "sideEffect": "stops polling"
+  },
+  {
+   "id": "OP-SUP-INBOX-POLL",
+   "entity": "InboundMessage / Ticket",
+   "action": "execute",
+   "surface": "(missing)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 1110,
+   "currentBehaviour": "DOES NOT EXIST. The blurb states inboxes are 'polled every 3 minutes - new emails create tickets, replies append to the matching thread'; there is no poller, no dedup, no threading and no thread to append to.",
+   "requiredBehaviour": "Scheduled poll → store raw message → dedup on external message id → thread-match → create ticket or append message → route → auto-respond; failures land in ParseFailure.",
+   "apiMethodPath": "internal job (executor)",
+   "authorization": "system",
+   "validation": "dedup unique key; size/attachment caps",
+   "sideEffect": "reads an external mailbox; may send auto-responses"
+  },
+  {
+   "id": "OP-SUP-CHANNEL-CREATE",
+   "entity": "InboundChannel",
+   "action": "create",
+   "surface": "?tab=settings → Inbound channels → '+ Add channel'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 706,
+   "currentBehaviour": "Generic name + detail row. No webhook URL is generated, no secret is minted, no provider is selected — despite the copy 'Each channel exposes a webhook that the connector POSTs to'.",
+   "requiredBehaviour": "Create a channel, mint a webhook path and signing secret, show the URL once, and expose delivery logs.",
+   "apiMethodPath": "POST /api/v1/support/inbound-channels",
+   "authorization": "support_admin",
+   "validation": "channelType ∈ enum; provider must be a configured connector",
+   "sideEffect": "provisions a public webhook endpoint"
+  },
+  {
+   "id": "OP-SUP-CHANNEL-DELETE",
+   "entity": "InboundChannel",
+   "action": "delete",
+   "surface": "?tab=settings → Inbound channels → Delete",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 663,
+   "currentBehaviour": "Unconfirmed array filter.",
+   "requiredBehaviour": "Confirm; revoke the webhook secret; keep history.",
+   "apiMethodPath": "DELETE /api/v1/support/inbound-channels/{id}",
+   "authorization": "support_admin",
+   "validation": "confirm token",
+   "sideEffect": "revokes the endpoint"
+  },
+  {
+   "id": "OP-SUP-CHANNEL-WEBHOOK-RECEIVE",
+   "entity": "InboundMessage / Ticket",
+   "action": "create",
+   "surface": "(missing)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 1119,
+   "currentBehaviour": "DOES NOT EXIST — no route handler of any kind exists in this repo (there is no src/app/api directory).",
+   "requiredBehaviour": "Signed, replay-protected webhook that resolves the tenant from the endpoint (never from the payload) and creates or appends a ticket.",
+   "apiMethodPath": "POST /api/v1/public/support/channels/{endpointId}",
+   "authorization": "signature-verified, anonymous",
+   "validation": "signature + timestamp window; payload schema; dedup key",
+   "sideEffect": "creates tickets from external messages"
+  },
+  {
+   "id": "OP-SUP-PARSE-FAILURES-LIST",
+   "entity": "ParseFailure",
+   "action": "list",
+   "surface": "?tab=settings → Parse failures",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 728,
+   "currentBehaviour": "Renders a HARDCODED paragraph: 'Nothing has failed to parse. Inbound mail is landing cleanly.' There is no query, no store and no inbound mail at all — the reassurance is unconditional.",
+   "requiredBehaviour": "List real failures with reason, raw message preview and a retry action; empty state only when the query truly returns none.",
+   "apiMethodPath": "GET /api/v1/support/parse-failures",
+   "authorization": "support_admin",
+   "validation": "pagination",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-PARSE-FAILURE-RETRY",
+   "entity": "ParseFailure",
+   "action": "execute",
+   "surface": "?tab=settings → Parse failures (missing)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 731,
+   "currentBehaviour": "DOES NOT EXIST although the blurb says 'Fix the cause, then retry — the original message is kept so nothing is lost.'",
+   "requiredBehaviour": "Re-run the parser over the stored raw message and link the resulting ticket.",
+   "apiMethodPath": "POST /api/v1/support/parse-failures/{id}/retry",
+   "authorization": "support_admin",
+   "validation": "idempotent; max retry count",
+   "sideEffect": "may create a ticket"
+  },
+  {
+   "id": "OP-SUP-BUSINESSHOURS-CREATE",
+   "entity": "BusinessHoursSchedule",
+   "action": "create",
+   "surface": "?tab=settings → Business hours → '+ New schedule'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 706,
+   "currentBehaviour": "Generic name + detail row. No timezone, no weekday windows, no holiday list — the pane cannot express a calendar despite promising 'Add a public holiday here once instead of to every policy separately'.",
+   "requiredBehaviour": "Timezone + per-weekday windows + holiday dates, reusable by SLA policies and auto-responses.",
+   "apiMethodPath": "POST /api/v1/support/business-hours",
+   "authorization": "support_admin",
+   "validation": "IANA timezone; windows non-overlapping; holiday dates valid",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-BUSINESSHOURS-DELETE",
+   "entity": "BusinessHoursSchedule",
+   "action": "delete",
+   "surface": "?tab=settings → Business hours → Delete",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 663,
+   "currentBehaviour": "Unconfirmed array filter.",
+   "requiredBehaviour": "Block while an SLA policy references it.",
+   "apiMethodPath": "DELETE /api/v1/support/business-hours/{id}",
+   "authorization": "support_admin",
+   "validation": "409 when referenced",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-AUTORESPONSE-CREATE",
+   "entity": "AutoResponseRule",
+   "action": "create",
+   "surface": "?tab=settings → Auto-responses → '+ New rule'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 706,
+   "currentBehaviour": "Generic name + detail row. No conditions, no message body, no ordering — yet the copy asserts first-match-wins ordering, one acknowledgement per ticket and automatic loop protection.",
+   "requiredBehaviour": "Ordered rules with structured conditions and a template, evaluated exactly once per ticket on creation, with auto-submitted/bounce detection.",
+   "apiMethodPath": "POST /api/v1/support/auto-responses",
+   "authorization": "support_admin",
+   "validation": "template required; order unique; conditions schema-validated",
+   "sideEffect": "sends acknowledgement email when it later fires"
+  },
+  {
+   "id": "OP-SUP-AUTORESPONSE-DELETE",
+   "entity": "AutoResponseRule",
+   "action": "delete",
+   "surface": "?tab=settings → Auto-responses → Delete",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 663,
+   "currentBehaviour": "Unconfirmed array filter.",
+   "requiredBehaviour": "Confirm; audited.",
+   "apiMethodPath": "DELETE /api/v1/support/auto-responses/{id}",
+   "authorization": "support_admin",
+   "validation": "confirm token",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-SHIFTHANDOFF-CREATE",
+   "entity": "ShiftHandoffRule",
+   "action": "create",
+   "surface": "?tab=settings → Shift handoffs → '+ New rule'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 706,
+   "currentBehaviour": "Generic name + detail row. There is no team entity, no time field and no scheduler, so 'move a team's live tickets to the next shift' cannot occur.",
+   "requiredBehaviour": "From-team, to-team, local run time, clear-assignee and skip-closed flags, executed by the scheduler and writing transition/assignment events.",
+   "apiMethodPath": "POST /api/v1/support/shift-handoffs",
+   "authorization": "support_admin",
+   "validation": "teams exist; time valid; timezone required",
+   "sideEffect": "bulk reassignment when it fires"
+  },
+  {
+   "id": "OP-SUP-SHIFTHANDOFF-DELETE",
+   "entity": "ShiftHandoffRule",
+   "action": "delete",
+   "surface": "?tab=settings → Shift handoffs → Delete",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 663,
+   "currentBehaviour": "Unconfirmed array filter.",
+   "requiredBehaviour": "Confirm; audited.",
+   "apiMethodPath": "DELETE /api/v1/support/shift-handoffs/{id}",
+   "authorization": "support_admin",
+   "validation": "confirm token",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CSATREVIEW-LIST",
+   "entity": "CsatResponse / CsatReview",
+   "action": "list",
+   "surface": "?tab=settings → CSAT review",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 745,
+   "currentBehaviour": "Client filter tickets.csat !== null && csat <= lowScore. Because no control ever writes csat, the list is permanently empty and the pane always renders 'Nothing needs review. Every low score has been followed up.' NPS detractors are named in the copy but have no data source.",
+   "requiredBehaviour": "Query real CSAT responses at or below the threshold plus NPS detractors, showing rating, comment, agent and ticket, with an unreviewed/reviewed split.",
+   "apiMethodPath": "GET /api/v1/support/csat/review-queue?reviewed=",
+   "authorization": "support_admin | manager",
+   "validation": "pagination",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CSATREVIEW-SHOWREVIEWED",
+   "entity": "CsatReview",
+   "action": "list",
+   "surface": "?tab=settings → CSAT review → 'Show reviewed'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 761,
+   "currentBehaviour": "NO-OP. setShowReviewed updates state that the `low` filter never reads — ticking the box changes nothing on screen.",
+   "requiredBehaviour": "Include reviewed entries in the query when checked.",
+   "apiMethodPath": "GET /api/v1/support/csat/review-queue?reviewed=true",
+   "authorization": "support_admin",
+   "validation": "boolean",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-CSATREVIEW-RECORD",
+   "entity": "CsatReview",
+   "action": "create",
+   "surface": "?tab=settings → CSAT review (missing)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 751,
+   "currentBehaviour": "DOES NOT EXIST. The copy says each low score 'stays here until someone records what was done' — a row has no action control at all.",
+   "requiredBehaviour": "Record reviewer, action taken and notes; mark the entry reviewed.",
+   "apiMethodPath": "POST /api/v1/support/csat/{responseId}/review",
+   "authorization": "support_admin | manager",
+   "validation": "actionTaken required",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-EXPORT-REPORT-SELECT",
+   "entity": "ReportSchedule",
+   "action": "read",
+   "surface": "?tab=settings → Report exports → Report select",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 824,
+   "currentBehaviour": "setState over ['Ticket summary','SLA compliance','CSAT detail','Agent activity','Volume by channel']. The choice affects ONLY the download filename — the exported columns are always the ticket columns.",
+   "requiredBehaviour": "Each report key produces its own column set and query.",
+   "apiMethodPath": "GET /api/v1/support/exports?report=",
+   "authorization": "support_admin",
+   "validation": "report ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-EXPORT-FORMAT-SELECT",
+   "entity": "ReportSchedule",
+   "action": "read",
+   "surface": "?tab=settings → Report exports → Format select",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 835,
+   "currentBehaviour": "setState over ['CSV','Excel']. Selecting Excel changes NOTHING — the download is always text/csv with a .csv extension.",
+   "requiredBehaviour": "Real XLSX generation for the Excel option, or remove the option.",
+   "apiMethodPath": "GET /api/v1/support/exports?format=csv|xlsx",
+   "authorization": "support_admin",
+   "validation": "format ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-EXPORT-RANGE",
+   "entity": "Ticket",
+   "action": "read",
+   "surface": "?tab=settings → Report exports → From/To date inputs",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 847,
+   "currentBehaviour": "setState; the filter does a lexical string compare of createdAt.slice(0,10) against the date inputs, i.e. UTC calendar days, with no tenant timezone and no from<=to validation (an inverted range silently exports nothing).",
+   "requiredBehaviour": "Timezone-aware inclusive range with validation and an explicit date dimension.",
+   "apiMethodPath": "GET /api/v1/support/exports?from=&to=&tz=",
+   "authorization": "support_admin",
+   "validation": "from <= to; both ISO dates; max span",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-EXPORT-DOWNLOAD",
+   "entity": "Ticket",
+   "action": "export",
+   "surface": "?tab=settings → Report exports → Download",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 795,
+   "currentBehaviour": "Builds a CSV string in the browser from the in-memory tickets and triggers a Blob download. Hand-rolled quoting: only `subject` is wrapped in quotes and embedded quotes are NOT escaped, so a subject containing a double quote corrupts the file; no formula-injection guard, unlike the project's own csvCell() helper in src/lib/csv.ts. Exports at most what is in localStorage, with no server involvement and no audit of the export.",
+   "requiredBehaviour": "Server-generated export using the safe CSV helper (or a real XLSX writer), streamed for large sets, audited as a data-export event, and scoped to the caller's tenant.",
+   "apiMethodPath": "POST /api/v1/support/exports",
+   "authorization": "support_admin",
+   "validation": "report/format/range validated; row cap or async job above it",
+   "sideEffect": "produces a downloadable file; must be recorded in the audit trail"
+  },
+  {
+   "id": "OP-SUP-EXPORT-SCHEDULE-CREATE",
+   "entity": "ReportSchedule",
+   "action": "create",
+   "surface": "?tab=settings → Report exports → '+ New schedule'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 870,
+   "currentBehaviour": "One click appends {id, name:`${report} — weekly`, detail:`${format} every Monday`, enabled:true} to reportSchedules. No dialog, no recipients field, no cadence choice ('weekly'/'Monday' are hardcoded), no dedup — clicking five times creates five identical schedules. Nothing ever runs or emails.",
+   "requiredBehaviour": "A real form (report, format, cadence, timezone, recipients, filters), persisted and executed by the scheduler, with per-recipient delivery so the distribution list is not exposed as the copy claims.",
+   "apiMethodPath": "POST /api/v1/support/report-schedules",
+   "authorization": "support_admin",
+   "validation": "at least one recipient, valid emails; cadence valid; duplicate (report,cadence,recipients) rejected",
+   "sideEffect": "sends report emails on schedule"
+  },
+  {
+   "id": "OP-SUP-EXPORT-SCHEDULE-DELETE",
+   "entity": "ReportSchedule",
+   "action": "delete",
+   "surface": "?tab=settings → Report exports → Delete",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 897,
+   "currentBehaviour": "Unconfirmed array filter on reportSchedules.",
+   "requiredBehaviour": "Confirm; cancel future runs; audited.",
+   "apiMethodPath": "DELETE /api/v1/support/report-schedules/{id}",
+   "authorization": "support_admin",
+   "validation": "confirm token",
+   "sideEffect": "cancels scheduled sends"
+  },
+  {
+   "id": "OP-SUP-TIERS-LIST",
+   "entity": "ServiceTierPolicy",
+   "action": "read",
+   "surface": "?tab=settings → Tiers & search",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 946,
+   "currentBehaviour": "Maps the hardcoded four tiers and reads supportSettings.tierPolicies[tier], which is always empty, so every row shows 'Standard SLA' with the amber 'Using the default' warning. There is no control to map a tier to a policy.",
+   "requiredBehaviour": "Editable tier→policy mapping (by FK) with a clear indication when a mapped policy no longer exists.",
+   "apiMethodPath": "GET/PUT /api/v1/support/service-tiers",
+   "authorization": "support_admin",
+   "validation": "policy must exist and be active",
+   "sideEffect": "changes SLA targets for that tier's tickets"
+  },
+  {
+   "id": "OP-SUP-TIERS-ASSIGN",
+   "entity": "Contact/Customer",
+   "action": "update",
+   "surface": "(missing)",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 931,
+   "currentBehaviour": "DOES NOT EXIST. The blurb instructs 'Set a customer's tier on their contact record', but support has no contact record and no link to CRM.",
+   "requiredBehaviour": "Tier assignment on the customer/contact entity, resolved onto each ticket at creation.",
+   "apiMethodPath": "PATCH /api/v1/crm/contacts/{id} (serviceTier)",
+   "authorization": "support_admin | crm_admin",
+   "validation": "tier ∈ enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-KB-INDEX",
+   "entity": "KbSearchIndexEntry",
+   "action": "execute",
+   "surface": "?tab=settings → Tiers & search → 'Index articles'",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 997,
+   "currentBehaviour": "updateSupportSettings({indexedArticles: published.map(a => a.id)}) — copies the ids of all published articles into an array, which flips the meter to 100%. No text is read, no embedding is computed, no model is called; the meter measures only whether the button was pressed. Disabled when there are no published articles. Stale ids are filtered out at read time rather than removed.",
+   "requiredBehaviour": "Chunk + embed each published article with the configured embedding model, store vectors with a content hash and model id, support incremental re-index on change, and report genuine coverage and staleness.",
+   "apiMethodPath": "POST /api/v1/support/kb/index",
+   "authorization": "support_admin",
+   "validation": "embedding provider configured, else 409 with a reason",
+   "sideEffect": "calls the embedding provider; consumes credits"
+  },
+  {
+   "id": "OP-SUP-AGENTS-LIST",
+   "entity": "CatalogAgent",
+   "action": "list",
+   "surface": "?tab=settings → AI agents",
+   "sourceFile": "src/screens/app/support/settings.tsx",
+   "sourceLine": 942,
+   "currentBehaviour": "Renders the nine static SUP agents from src/lib/agentCatalog.ts. Read-only: no enable/disable, no configuration, no run history, no link to guardrails or credits despite the copy about tenant guardrails and a shared credit pool.",
+   "requiredBehaviour": "Per-tenant agent enablement and configuration with run history and credit accounting, or an explicitly read-only catalogue.",
+   "apiMethodPath": "GET /api/v1/support/agents",
+   "authorization": "support_admin",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-SUP-AUDIT-WRITE",
+   "entity": "SupportAuditEvent",
+   "action": "create",
+   "surface": "every support mutation",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 174,
+   "currentBehaviour": "auditEvent() prepends a row with user:'owner', role:'Org_admin', status:'Success', ip:'' regardless of the real actor, and the list is truncated to 500 entries on the generic logAudit path. resourceId is inconsistent across support actions (reference, uuid or title). addKbCategory writes no audit row at all.",
+   "requiredBehaviour": "Server-written audit with the real actor, tenant, IP, request id and before/after payloads; retained, not truncated; consistent resource keys.",
+   "apiMethodPath": "internal (service layer)",
+   "authorization": "system",
+   "validation": "actor resolved from the session, never from the client",
+   "sideEffect": "none"
+  }
+ ],
+ "surfaces": [
+  {
+   "route": "/app/support-ticketing",
+   "tab": "dashboard (no ?tab)",
+   "title": "Support Dashboard",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:98-129",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "loaded",
+    "empty ('No data' per breakdown, 'N/A' CSAT)",
+    "not-installed gate"
+   ],
+   "statesMissing": [
+    "loading/skeleton",
+    "error",
+    "denied",
+    "stale/refresh",
+    "date scoping",
+    "server aggregation"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=tickets",
+   "tab": "tickets",
+   "title": "All tickets",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:131-441",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "loaded list",
+    "empty (never-created vs no-match wording)",
+    "inline expand",
+    "create dialog with required-field disable"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "conflict",
+    "denied",
+    "pagination",
+    "sorting",
+    "ticket detail route",
+    "reply/thread",
+    "property editing",
+    "delete/merge",
+    "success toast",
+    "saved views persistence"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=knowledge_base",
+   "tab": "knowledge_base",
+   "title": "Knowledge Base / Articles",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:443-682",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "loaded",
+    "empty (two variants)",
+    "create dialogs",
+    "CSV import with a result note"
+   ],
+   "statesMissing": [
+    "loading",
+    "import error/dry-run/per-row errors",
+    "article edit",
+    "publish/archive transition",
+    "article read view",
+    "delete confirmation",
+    "pagination",
+    "denied",
+    "real search (substring only)"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=my_requests",
+   "tab": "my_requests",
+   "title": "My support requests",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:684-760",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "loaded",
+    "empty ('No requests yet.')",
+    "create dialog"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "request detail/thread",
+    "status timeline",
+    "reply from requester",
+    "attachment",
+    "success confirmation",
+    "identity matching beyond an exact email string"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=sla_policies",
+   "tab": "sla_policies",
+   "title": "SLA Policies",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:20-45 (PlanGate)",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "gated lock card with back and upgrade actions"
+   ],
+   "statesMissing": [
+    "everything: list, create, edit, targets, tier binding, calendar binding",
+    "real entitlement check (the gate is a hardcoded constant)"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=canned_responses",
+   "tab": "canned_responses",
+   "title": "Canned Responses",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:762-844",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "loaded",
+    "empty",
+    "create dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "edit",
+    "search/filter",
+    "pagination",
+    "delete confirmation",
+    "any consumer (no reply composer exists)"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=routing_rules",
+   "tab": "routing_rules",
+   "title": "Routing rules",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:20-45 (PlanGate)",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "gated lock card"
+   ],
+   "statesMissing": [
+    "everything: rule model, editor, evaluator, ordering, test-run",
+    "real entitlement check"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=reports",
+   "tab": "reports",
+   "title": "Support reports",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/panes.tsx:846-961",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "seven tab strip",
+    "range select",
+    "SLA table with totals",
+    "empty ('No tickets in <range>.')",
+    "honest placeholder for the other six tabs"
+   ],
+   "statesMissing": [
+    "six of seven reports",
+    "loading",
+    "error",
+    "export from the report",
+    "drill-down",
+    "tab state in the URL",
+    "timezone-correct ranges"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → ticket_fields",
+   "title": "Ticket fields (Statuses/Categories/Priorities/Types/Channels)",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:74-280",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "five sub-tabs",
+    "table with colour dots, slug, behaviour, SLA hours",
+    "create/edit dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "delete confirmation",
+    "in-use check",
+    "reorder (grab handle is a no-op)",
+    "colour picker",
+    "uniqueness validation",
+    "denied",
+    "migration of tickets on rename/delete"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → web_widget",
+   "title": "Web widget",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:284-458",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "all nine fields",
+    "live preview",
+    "install card",
+    "copy-to-clipboard with a Copied label",
+    "dirty-gated save"
+   ],
+   "statesMissing": [
+    "save success/error",
+    "the widget script itself",
+    "public intake endpoint",
+    "per-tenant key (snippet is hardcoded to 'acme')",
+    "origin allowlist",
+    "clipboard-failure message"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → csat_survey",
+   "title": "CSAT survey",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:462-606",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "six settings with hints",
+    "dirty-gated save",
+    "'What the customer sees' panel",
+    "note line after the manual send"
+   ],
+   "statesMissing": [
+    "any survey delivery",
+    "survey landing page/token",
+    "rating capture",
+    "save success/error",
+    "NaN guards on the numeric inputs",
+    "scale definition"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → escalation_rules",
+   "title": "Escalation rules",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1096-1105 + 1040-1091",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "rule list",
+    "create dialog",
+    "delete",
+    "empty state",
+    "two manual sweeps with a result line (the sweeps genuinely mutate tickets)"
+   ],
+   "statesMissing": [
+    "rule structure (trigger/conditions/actions)",
+    "enable toggle",
+    "edit",
+    "any scheduler",
+    "business-hours awareness",
+    "use of the tenant's edited SLA hours (the detector reads static defaults)"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → inbox_accounts",
+   "title": "Inbox accounts",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1106-1114",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "notice banner",
+    "name+detail create",
+    "delete",
+    "empty state"
+   ],
+   "statesMissing": [
+    "connection fields",
+    "credential storage",
+    "test connection",
+    "poller",
+    "health/last-polled",
+    "threading and dedup"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → inbound_channels",
+   "title": "Inbound channels",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1115-1123",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "name+detail create",
+    "delete",
+    "empty state"
+   ],
+   "statesMissing": [
+    "channel type",
+    "provider binding",
+    "generated webhook URL and secret",
+    "delivery log",
+    "signature verification"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → parse_failures",
+   "title": "Parse failures",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:728-741",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "a hardcoded all-clear paragraph"
+   ],
+   "statesMissing": [
+    "the entire feature: store, list, detail, retry, discard, loading, error"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → business_hours",
+   "title": "Business-hour schedules",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1124-1133",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "name+detail create",
+    "delete",
+    "empty state mentioning the 24/7 fallback"
+   ],
+   "statesMissing": [
+    "timezone",
+    "weekday windows",
+    "holidays",
+    "default flag",
+    "any consumer"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → auto_responses",
+   "title": "Auto-responses",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1134-1143",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "name+detail create",
+    "delete",
+    "empty state"
+   ],
+   "statesMissing": [
+    "conditions",
+    "template body",
+    "ordering",
+    "once-per-ticket enforcement",
+    "loop protection",
+    "sender"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → shift_handoffs",
+   "title": "Shift handoffs",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1144-1153",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "name+detail create",
+    "delete",
+    "empty state"
+   ],
+   "statesMissing": [
+    "team model",
+    "run time/timezone",
+    "clear-assignee behaviour",
+    "scheduler",
+    "preview of affected tickets"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → csat_review",
+   "title": "CSAT low-score review queue",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:743-782",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "threshold-aware blurb",
+    "list markup",
+    "empty state",
+    "'Show reviewed' checkbox"
+   ],
+   "statesMissing": [
+    "any CSAT data (structurally impossible today)",
+    "review action",
+    "reviewed/unreviewed split (the checkbox is a no-op)",
+    "NPS detractors",
+    "pagination"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → report_exports",
+   "title": "Report exports & scheduled emails",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:784-911",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "report/format/date controls",
+    "real Blob CSV download of tickets in range",
+    "schedule list",
+    "create schedule",
+    "delete schedule",
+    "empty state"
+   ],
+   "statesMissing": [
+    "report-specific columns",
+    "real Excel",
+    "safe CSV quoting/injection guard",
+    "recipients",
+    "cadence choice",
+    "schedule execution",
+    "export audit",
+    "range validation"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → tiers_search",
+   "title": "Service tiers & KB search indexing",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:913-1006",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "tier table with 'Using the default' warning",
+    "index coverage meter computed from real published-article counts",
+    "Index articles button disabled when nothing is published"
+   ],
+   "statesMissing": [
+    "tier→policy editing (tierPolicies is never written)",
+    "tier assignment on customers",
+    "actual embedding/index",
+    "staleness detection",
+    "index removal"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing?tab=settings",
+   "tab": "settings → ai_agents",
+   "title": "AI agents",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/settings.tsx:1007-1030",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static list of the nine bundled SUP agents"
+   ],
+   "statesMissing": [
+    "enable/disable",
+    "configuration",
+    "run history",
+    "credit accounting",
+    "guardrail binding",
+    "empty/error states"
+   ]
+  },
+  {
+   "route": "/app/support-ticketing (uninstalled)",
+   "tab": "n/a",
+   "title": "Not installed gate",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/support/SupportTicketing.tsx:40-52",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "not-installed message with a marketplace link"
+   ],
+   "statesMissing": [
+    "server-side authorization (the gate is a localStorage array)"
+   ]
+  }
+ ],
+ "falseSuccessCopy": [
+  {
+   "file": "src/screens/app/support/panes.tsx",
+   "line": 181,
+   "text": "Saved view: {queue · status · source}",
+   "why": "'+ Save current filter' only setStates a display string. Nothing is named or persisted, the view cannot be re-applied, and it vanishes on refresh."
+  },
+  {
+   "file": "src/screens/app/support/panes.tsx",
+   "line": 187,
+   "text": "Customer requests, sorted by SLA pressure.",
+   "why": "There is no sort at all. The list is whatever order the array holds (newest created first, because addTicket prepends); no SLA due time exists to sort by."
+  },
+  {
+   "file": "src/screens/app/support/panes.tsx",
+   "line": 277,
+   "text": "Describe the problem in any language...",
+   "why": "KB search is a lowercase substring match over title+body. No language handling, no stemming, no ranking, no translation."
+  },
+  {
+   "file": "src/screens/app/support/panes.tsx",
+   "line": 920,
+   "text": "First-response met / First-response %",
+   "why": "The column is computed as count of tickets where !slaBreached. No first-response timestamp is captured anywhere in the product, so the figure is not a first-response measurement."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 54,
+   "text": "Rules fire when a ticket crosses an SLA boundary (before / on / after breach).",
+   "why": "An escalation rule is two free-text fields. Nothing parses, schedules or fires anything; there is no SLA clock to cross."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 64,
+   "text": "IMAP inboxes polled every 3 minutes - new emails create tickets, replies append to the matching thread.",
+   "why": "No poller, no connection fields, no credential storage, no dedup, and no thread to append to."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 72,
+   "text": "Each channel exposes a webhook that the connector POSTs to with the customer message.",
+   "why": "No webhook URL is generated, no secret minted, and the app has no API route handlers at all."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 82,
+   "text": "Shared working calendars that SLA policies and auto-responses point at. Add a public holiday here once instead of to every policy separately.",
+   "why": "A schedule holds only a name and a free-text detail — no timezone, hours or holidays — and nothing points at it."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 91,
+   "text": "Rules are checked in priority order and the first match wins — one acknowledgement per ticket, never two. Replies to no-reply addresses, bounces and other autoresponders are skipped automatically so a mail loop can't start.",
+   "why": "Auto-response rules have no order column, no conditions, no template and no executor. None of the stated loop protection exists."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 100,
+   "text": "Move a team's live tickets to the next shift at a set time. Resolved tickets stay put, and the assignee is cleared...",
+   "why": "There is no team entity, no time field and no scheduler; no ticket has ever been moved by this feature."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 214,
+   "text": "Inbound messages that could not be turned into a ticket. Fix the cause, then retry — the original message is kept so nothing is lost.",
+   "why": "No parse-failure store and no retry control exist; nothing is kept."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 217,
+   "text": "Nothing has failed to parse. Inbound mail is landing cleanly.",
+   "why": "Hardcoded paragraph with no query behind it. It reports healthy inbound mail on an instance that receives no mail at all."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 261,
+   "text": "Nothing needs review. Every low score has been followed up.",
+   "why": "The queue is derived from Ticket.csat, which no control can ever write. The all-clear is structurally unconditional, and no follow-up can be recorded either."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 574,
+   "text": "{n} surveys queued for resolved tickets without a rating.",
+   "why": "'Send pending surveys now' only calls setNote(). Nothing is queued, no email is sent, no record is written — and because csat is never writable, every resolved ticket is counted again on every click."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 601,
+   "text": "The link is signed, expires, and works once — a second submission can't overwrite the first.",
+   "why": "No survey link, token, expiry or submission endpoint exists anywhere in the codebase."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 91,
+   "text": "Thanks — we've got your message and emailed you a copy. (default widget confirmation, src/lib/workspace.tsx:795)",
+   "why": "Default confirmation text asserts an email copy. No mail is sent by any code path, and the widget that would show this text does not exist."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 216,
+   "text": "Paste this once, just before </body> on any page that should show the widget. (install snippet)",
+   "why": "The snippet points at https://apragya.ai/api/v1/public/support-widget.js — a script this repository does not build or serve — and hardcodes data-tenant=\"acme\" for every tenant."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 818,
+   "text": "Export a report — Download the current data as CSV or Excel.",
+   "why": "The report selector only changes the filename and the Excel option produces an identical text/csv file. Exported columns are always the ticket columns regardless of the report chosen."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 867,
+   "text": "Email a report on a cadence. Each recipient gets their own copy, so the distribution list is never exposed.",
+   "why": "A schedule is created with one click, with no recipients field, a hardcoded 'weekly / every Monday' cadence, and no executor or mail transport. Nothing is ever emailed."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 929,
+   "text": "A tier picks which SLA policy applies, so a Platinum customer's urgent ticket is due sooner than a Bronze one.",
+   "why": "tierPolicies is never written by any control and SLA Policies is a plan-gated, unimplemented surface; no ticket's due time depends on a tier."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 176,
+   "text": "Indexing articles by meaning fixes that. Keyword search keeps running alongside...",
+   "why": "'Index articles' copies published article ids into an array. No text is chunked, no embedding is computed, no model is called, and KB search remains a substring match."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 986,
+   "text": "{n} of {m} published articles searchable by meaning",
+   "why": "The percentage measures only whether the button was pressed; an edited or re-worded article still counts as indexed because no content hash is stored."
+  },
+  {
+   "file": "src/screens/app/support/settings.tsx",
+   "line": 215,
+   "text": "They run under the tenant's guardrails and spend from the shared credit pool. (AI agents)",
+   "why": "The pane is a static catalogue read. No agent here is enabled, configured, run, metered against credits, or bound to a guardrail policy."
+  },
+  {
+   "file": "src/screens/app/support/panes.tsx",
+   "line": 29,
+   "text": "Your current plan (trial) doesn't include {feature}. Upgrade to unlock this feature for your organization.",
+   "why": "The gate comes from a hardcoded `gatedSections` map in src/lib/supportData.ts, not from any plan or entitlement record, so it shows for every tenant on every plan — and there is no implementation behind it to unlock."
+  },
+  {
+   "file": "src/screens/app/support/SupportTicketing.tsx",
+   "line": 67,
+   "text": "Enterprise helpdesk with SLA management, ticket routing, canned responses, and CSAT.",
+   "why": "SLA management and ticket routing are plan-gated shells, CSAT can never be collected, and canned responses have no place to be used."
+  }
+ ],
+ "openQuestions": [
+  "CSAT scale is contradictory in the source and must be decided, not guessed: the settings input for 'Low-score threshold' is min=1 max=5 and the dashboard averages a number to one decimal, but the 'What the customer sees' panel offers only 'Thumbs Up / Thumbs Down' (settings.tsx:523-533 vs 592-600). Is CSAT a 1–5 rating, a binary satisfied/not, or a 5-point scale presented as two buttons?",
+  "Is NPS per-ticket or per-relationship, and what triggers it? The review-queue copy claims 'every NPS detractor (0–6)' joins the low-score queue and a report tab is named NPS, but no model, survey, cadence or capture surface exists anywhere (settings.tsx:734-736, supportData.ts:62).",
+  "What exactly starts and stops an SLA clock? Statuses carry a 'waiting — SLA paused' behaviour but nothing pauses anything. Confirm: does the clock pause for the whole time in a waiting status, resume on the next active status, and is the first-response clock separate from the resolution clock?",
+  "What counts as a 'first response'? The SLA report prints a First-response column but no first-response timestamp exists. Is it the first public outbound agent message only, or does an auto-response satisfy it?",
+  "How is 'reopen' defined for the Reopen Rate report — any transition from a closed-behaviour status back to an active one, only within N days of resolution, or only customer-initiated reopens?",
+  "Should the SLA detector measure from ticket creation (as the prototype does) or from the last customer reply / last status change? The current sweep uses createdAt with no business hours (settings.tsx:1048-1052).",
+  "Auto-close currently reuses the CSAT 'Skip tickets older than (days)' value as its window (settings.tsx:1057). Is that intentional, or does auto-close need its own configurable window — and must a ticket awaiting a CSAT response be exempt?",
+  "Which entitlement actually gates SLA Policies and Routing Rules? Today the gate is a hardcoded constant map, not a plan record, and there is no implementation behind it. Confirm whether these ship, and in which plan tier.",
+  "Ticket reference scheme: is SUP-0001 per tenant, per company or global, does it reset annually, and what is the format beyond 9999? The prototype derives it from array length, which is neither gap-free nor collision-safe.",
+  "Should tickets be scoped to a legal entity (Company) as well as a tenant? The workspace models multiple companies and intercompany pairs, but a ticket carries no company reference at all.",
+  "Service tier → SLA policy resolution is by display NAME today ('create a policy called \"Platinum\"'). Confirm this becomes a foreign key, and decide the behaviour when a mapped policy is renamed or deleted — silently fall back to the default (current behaviour) or block the change?",
+  "Where does a customer's service tier live? The Tiers pane says 'Set a customer's tier on their contact record', but support has no contact entity and no defined link to the CRM app.",
+  "Are the four service tiers (Bronze/Silver/Gold/Platinum) a fixed platform vocabulary or tenant-editable? They are a hardcoded const array today while every other taxonomy is editable.",
+  "Email provider and sending contract for CSAT surveys, auto-responses, scheduled report emails and ticket notifications — no provider, credential, sender domain, bounce handling or suppression list exists in the repository. This must be chosen explicitly; it cannot be inferred.",
+  "Inbound email: which protocol and credential model (IMAP password, OAuth app password, or a provider API), and what is the thread-matching key — RFC Message-ID/In-Reply-To/References, a reference token injected into the subject, or a per-ticket reply-to address? None is specified in source.",
+  "Inbound channel providers (SMS / WhatsApp / chat) and their webhook signature scheme, replay window and tenant-resolution strategy — unspecified; must not be invented.",
+  "Business-hours semantics: which timezone source (tenant, team or policy), what holiday-calendar format, and does a schedule attach to an SLA policy, a team, or both?",
+  "Auto-response matching: what conditions are supported (channel, category, keyword, business hours), and what is the message template/merge-field syntax? Canned responses have the same open question — 'body' has no defined variable syntax today.",
+  "Shift handoff requires a team model that does not exist. Define teams, membership, and the 'incoming team's own assignment strategy' named in the copy (round-robin, least-loaded, manual?).",
+  "Report exports offers an 'Excel' format that currently produces CSV. Is a real XLSX writer required, or should the option be removed?",
+  "Which report each scheduled export actually runs, on what cadence options, in whose timezone, and to which recipients — the current schedule row has none of these and hardcodes 'weekly / every Monday'.",
+  "Roles and permissions for support are entirely absent: every audit row is written as role 'Org_admin'. Define the role set (agent, senior agent, supervisor, admin, end user, portal user) and, specifically, who may reassign another agent's ticket, who may see internal notes, who may export, and who may edit ticket fields.",
+  "Should the 'Types' taxonomy (Question/Problem/Incident/Task/Feature Request) be applied to tickets? It is fully editable in Settings but no ticket carries a type and nothing reads it.",
+  "Tags: free-text (current behaviour) or a managed vocabulary? And should the tag filter support multiple comma-separated tags with AND or OR semantics — the placeholder says 'tag(s)' but only one needle is matched.",
+  "KB article visibility: the widget Help tab and the partner portal 'Help / KB' tab both imply public articles, but an article has only draft/published/archived with no internal-vs-public flag. Define the visibility model, and whether portal visibility is per-role.",
+  "KB multi-language: the Tiers & search copy is explicitly about a German customer and an English article. Is the KB multi-locale with translated variants of one article, or one article per locale?",
+  "Attachments: tickets, replies and KB articles have no file handling at all. Confirm whether attachments are in scope and which object store/limits/virus-scanning apply.",
+  "Widget public intake: which tenant identifier goes in the embed snippet (it is hardcoded to 'acme' today), what origin allowlist and rate limits apply, and what anti-abuse measure is acceptable for an anonymous ticket-creation endpoint.",
+  "'My requests' matches on an exact email string equality. Should requester identity be a contact record (so an agent-created ticket appears for its requester), and should portal users and internal employees share one requester identity model?",
+  "Data retention and deletion for tickets, thread messages, raw inbound messages and CSAT comments — the prototype has no delete path for tickets and truncates its audit log at 500 entries, so neither retention nor legal hold is expressed anywhere."
+ ]
+}

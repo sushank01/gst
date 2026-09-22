@@ -147,8 +147,11 @@ export default function Governance() {
     [audit],
   )
 
+  // The clock is read inside the memo body, not during render, so the value is
+  // stable for the life of the memo rather than drifting each render.
   const filtered = useMemo(() => {
-    const cutoff = ranges[range] === Infinity ? 0 : Date.now() - ranges[range] * 86_400_000
+    const now = new Date().getTime()
+    const cutoff = ranges[range] === Infinity ? 0 : now - ranges[range] * 86_400_000
     const needle = query.trim().toLowerCase()
 
     const rows = audit.filter((event) => {

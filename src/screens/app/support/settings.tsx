@@ -17,14 +17,14 @@ import {
   type FieldRow,
 } from '../../../lib/supportData'
 import { useWorkspace, type SupportRule, type SupportSettings } from '../../../lib/workspace'
-import { Dialog, Label, inputClass } from '../travel/shell'
+import { Dialog, Label, inputClass } from '../../../components/EnterpriseUi'
 
 /** Every settings pane edits `supportSettings`, so they share one save shape. */
 function useSettings<K extends keyof SupportSettings>(key: K) {
   const { supportSettings, updateSupportSettings } = useWorkspace()
   const [draft, setDraft] = useState<SupportSettings[K]>(supportSettings[key])
   const dirty = JSON.stringify(draft) !== JSON.stringify(supportSettings[key])
-  return { draft, setDraft, dirty, save: () => updateSupportSettings({ [key]: draft } as Partial<SupportSettings>) }
+  return { draft, setDraft, dirty, save: () => updateSupportSettings({ [key]: draft }) }
 }
 
 function Hint({ children }: { children: React.ReactNode }) {
@@ -84,7 +84,7 @@ function TicketFieldsPane() {
   const [draft, setDraft] = useState<FieldRow>({ id: '', label: '', slug: '' })
 
   function persist(next: FieldRow[]) {
-    updateSupportSettings({ [key]: next } as Partial<SupportSettings>)
+    updateSupportSettings({ [key]: next })
   }
 
   return (
@@ -663,7 +663,7 @@ function RuleListPane({
                   onClick={() =>
                     updateSupportSettings({
                       [settingsKey]: rules.filter((item) => item.id !== rule.id),
-                    } as Partial<SupportSettings>)
+                    })
                   }
                 >
                   Delete
@@ -709,7 +709,7 @@ function RuleListPane({
                     ...rules,
                     { id: crypto.randomUUID(), name: draft.name.trim(), detail: draft.detail.trim(), enabled: true },
                   ],
-                } as Partial<SupportSettings>)
+                })
                 setDraft({ name: '', detail: '' })
                 setOpen(false)
               }}
@@ -1040,7 +1040,10 @@ function EscalationActions() {
   const { tickets, updateTicket, supportSettings } = useWorkspace()
   const [result, setResult] = useState('')
 
-  const hoursSince = (iso: string) => (Date.now() - new Date(iso).getTime()) / 3_600_000
+  // The sweep compares against one instant, captured when the pane mounts,
+  // so every ticket in a run is measured against the same clock.
+  const [runAt] = useState(() => Date.now())
+  const hoursSince = (iso: string) => (runAt - new Date(iso).getTime()) / 3_600_000
   const slaFor = (priority: string) =>
     defaultPriorities.find((row) => row.label === priority)?.slaHours ?? 24
 

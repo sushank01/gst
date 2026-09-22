@@ -1,3 +1,5 @@
+> **2026-09-21 audit:** This repository remains a frontend prototype, not a production application. See [the audit and specifications](docs/audit/README.md), [actual verification](docs/audit/VERIFICATION.md), and [the standalone 62-loop implementation prompt](docs/IMPLEMENTATION-PROMPT.md). The historical reconstruction notes below describe appearance/local behavior and must not be interpreted as evidence of real backend/integrations.
+
 # Apragya AI — starting flow
 
 A rebuild of the acquisition-to-activation flow on [apragya.ai](https://apragya.ai):
@@ -35,7 +37,7 @@ npm start        # serve the production build
 
 Routes are real App Router segments under `src/app`, mirroring the URLs the live product
 uses: the marketing pages at the root, the data-driven product/company/legal pages behind one
-`[slug]` segment with `generateStaticParams`, and the whole workspace under `/app` sharing a
+`[...slug]` catch-all segment with `generateStaticParams`, and the whole workspace under `/app` sharing a
 layout that supplies the rail, the top bar and the copilot dock. `/app/me` nests its own
 `PortalLayout`; Pitch Pilot owns its left rail and takes one optional catch-all; any installed
 app without a purpose-built surface falls through `/app/[slug]` to the generic portal.

@@ -1,0 +1,4972 @@
+{
+ "domain": "Sales & POS (/app/sales-pos) — order-to-cash, till/shifts, returns, subscriptions, AR, reports, settings",
+ "entities": [
+  {
+   "name": "Customer",
+   "sourceType": "PosCustomer",
+   "sourceFile": "src/lib/workspace.tsx:226-233",
+   "purpose": "Master trading-partner directory. Every sales document points at a customer by NAME STRING, not by id.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "active",
+    "inactive"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() client-side today; server must mint"
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. Today all POS data lives in one localStorage key 'apragya.workspace'"
+    },
+    {
+     "name": "companyId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. Company type exists (workspace.tsx:589) but POS never scopes to it"
+    },
+    {
+     "name": "code",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. Stable human key; unique (tenant_id, code)"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "trim()-ed, required (create disabled on blank). No uniqueness today; duplicates silently collapse in every group-by"
+    },
+    {
+     "name": "email",
+     "tsType": "string",
+     "sqlType": "citext",
+     "nullable": true,
+     "notes": "'' when blank. NO format validation anywhere"
+    },
+    {
+     "name": "taxId",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "'' when blank. No format check. GSTIN semantics NOT inferable from source"
+    },
+    {
+     "name": "active",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "default true; hardcoded true at create and on CSV import; no UI ever sets false"
+    },
+    {
+     "name": "customerGroupId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW FK -> customer_group. Groups pane exists but has ZERO linkage to customers"
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false,
+     "notes": "NEW. UI hardcodes 'USD' everywhere"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "ISO string"
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. Replaces absent delete; there is no customer delete today"
+    },
+    {
+     "name": "createdBy",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SalesDocument",
+     "via": "customer display-name string",
+     "gap": "PosDoc.customer is a free-text name copied from the select option label (parts.tsx:173, panes.tsx:531). Renaming or duplicating a customer orphans every document; typed names are accepted when the customer list is empty"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "CustomerGroup",
+     "via": "none",
+     "gap": "No column, no picker, no report grouping. The Customer groups settings pane is decorative"
+    },
+    {
+     "kind": "hasMany",
+     "target": "LoyaltyLedgerEntry",
+     "via": "none",
+     "gap": "Loyalty pane promises accrual per customer; no linkage exists"
+    }
+   ]
+  },
+  {
+   "name": "CustomerGroup",
+   "sourceType": "PosCustomerGroup",
+   "sourceFile": "src/lib/workspace.tsx:283",
+   "purpose": "Customer segment (Walk-in / Regulars / Wholesale).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "unique (tenant_id, lower(name)) — pane copy explicitly promises 'Regulars' cannot split from 'regulars'"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW — not stored today"
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW — today delete is a hard array filter (settings.tsx:218)"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Customer",
+     "via": "none",
+     "gap": "Deleting a group today cannot cascade because nothing references it"
+    }
+   ]
+  },
+  {
+   "name": "SalesDocument",
+   "sourceType": "PosDoc",
+   "sourceFile": "src/lib/workspace.tsx:236-248",
+   "purpose": "CURRENT god-table holding all nine document kinds in one array. Must split into the nine entities below; kept here because it is the literal persisted shape.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Draft",
+    "Sent",
+    "Accepted",
+    "Rejected",
+    "Expired",
+    "Ordered",
+    "Cancelled",
+    "Superseded",
+    "Confirmed",
+    "Partially delivered",
+    "Delivered",
+    "Closed",
+    "Dispatched",
+    "Invoiced",
+    "Posted",
+    "Part paid",
+    "Paid",
+    "Overdue",
+    "Active",
+    "Applied",
+    "Pending",
+    "Failed",
+    "Paused",
+    "Ended"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "companyId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "kind",
+     "tsType": "'quotation'|'order'|'delivery'|'invoice'|'return'|'credit'|'refund'|'contract'|'subscription'",
+     "sqlType": "text CHECK IN (...) / enum sales_doc_kind",
+     "nullable": false
+    },
+    {
+     "name": "reference",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'QT|SO|DN|INV|RMA|CN|RF|RC|SUB-0001'. Generated as filter(kind).length+1 (workspace.tsx:1994) — DELETING A DOC MAKES THE NEXT REFERENCE A DUPLICATE. Needs unique (tenant_id, kind, reference) + a sequence table"
+    },
+    {
+     "name": "customer",
+     "tsType": "string",
+     "sqlType": "text (today) -> uuid FK (required)",
+     "nullable": false,
+     "notes": "display name string, not a key"
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text -> per-kind enum",
+     "nullable": false,
+     "notes": "UNTYPED string. Set once at create from statuses[1] and NEVER changed — updatePosDoc has zero callers"
+    },
+    {
+     "name": "total",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "JS float from Number(draft.total)||0 on a free-text <input type=number>. NO line items exist; the total is a trusted typed number. Must be derived from lines"
+    },
+    {
+     "name": "currency",
+     "tsType": "— missing —",
+     "sqlType": "char(3)",
+     "nullable": false,
+     "notes": "NEW. UI prints literal 'USD' (parts.tsx:148, everywhere)"
+    },
+    {
+     "name": "source",
+     "tsType": "string",
+     "sqlType": "text / enum",
+     "nullable": false,
+     "notes": "'Manual' on every create; 'Subscription <ref>' from the sweep (SalesPos.tsx:66). Filter vocabulary is Manual|POS|Subscription|Order but 'POS' and 'Order' are never written"
+    },
+    {
+     "name": "payment",
+     "tsType": "string",
+     "sqlType": "text / enum (Unpaid|Part paid|Paid)",
+     "nullable": false,
+     "notes": "hardcoded 'Unpaid' at every create site and never updated -> Paid/Part paid counts are permanently 0. Should be derived from allocations, not stored"
+    },
+    {
+     "name": "reason",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "OVERLOADED: quotation TITLE (panes.tsx:577) and credit/return/refund REASON (parts.tsx:221). Must be split into title + reason_code + reason_note"
+    },
+    {
+     "name": "dueDate",
+     "tsType": "string",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "ALWAYS '' — no create path sets it. Consequence: AR aging treats age as -1 so every open invoice lands in 'Current', and the Overdue KPI is structurally 0"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "used as the document date; there is no separate issue/posting date"
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW, needed for optimistic concurrency"
+    },
+    {
+     "name": "postedAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "createdBy",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Customer",
+     "via": "name string",
+     "gap": "display-name FK"
+    },
+    {
+     "kind": "hasMany",
+     "target": "SalesDocumentLine",
+     "via": "none",
+     "gap": "No line items exist at all. Every total, tax figure and margin report is therefore unbacked"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "SalesDocument",
+     "via": "none",
+     "gap": "No parent linkage: quotation->order->delivery->invoice->return->credit->refund chain is entirely unmodelled. 'source' is the only hint and it is a string"
+    }
+   ]
+  },
+  {
+   "name": "Quotation",
+   "sourceType": "PosDoc (kind='quotation')",
+   "sourceFile": "src/screens/app/pos/panes.tsx:437-591",
+   "purpose": "Priced proposal. Drives pipeline value and win rate.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Draft",
+    "Sent",
+    "Accepted",
+    "Rejected",
+    "Expired",
+    "Ordered",
+    "Cancelled",
+    "Superseded"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false,
+     "notes": "id, tenant, company, reference, customer_id, status, currency, created_at…"
+    },
+    {
+     "name": "title",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "currently stored in PosDoc.reason"
+    },
+    {
+     "name": "validUntil",
+     "tsType": "— missing —",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "NEW. 'Expired' status exists with no expiry field to drive it"
+    },
+    {
+     "name": "version",
+     "tsType": "— missing —",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "NEW. 'Superseded' status implies versioning that is absent"
+    },
+    {
+     "name": "supersededById",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "convertedOrderId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. 'Ordered' status implies conversion; no conversion exists"
+    },
+    {
+     "name": "subtotal / discountTotal / taxTotal / grandTotal",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4) x4",
+     "nullable": false,
+     "notes": "NEW. Only one trusted 'total' exists today"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SalesDocumentLine",
+     "via": "none",
+     "gap": "win-rate and pipeline KPIs (panes.tsx:451-456) sum a typed number"
+    }
+   ]
+  },
+  {
+   "name": "SalesOrder",
+   "sourceType": "PosDoc (kind='order')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:91-105",
+   "purpose": "Confirmed order tracked to fulfilment.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Draft",
+    "Confirmed",
+    "Partially delivered",
+    "Delivered",
+    "Closed"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false
+    },
+    {
+     "name": "quotationId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "rateContractId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW — contract precedence is promised in copy, unmodelled"
+    },
+    {
+     "name": "confirmedAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "fulfilledQty / orderedQty",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4) on lines",
+     "nullable": false,
+     "notes": "NEW — 'Partially delivered' is unreachable without per-line quantities"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "DeliveryNote",
+     "via": "none",
+     "gap": "no link; dashboard counts orders 'to fulfil' as status!=='Closed' only"
+    }
+   ]
+  },
+  {
+   "name": "DeliveryNote",
+   "sourceType": "PosDoc (kind='delivery')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:106-120",
+   "purpose": "Shipment record. Copy promises COGS posting and inventory journals.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Draft",
+    "Dispatched",
+    "Delivered",
+    "Invoiced"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false
+    },
+    {
+     "name": "salesOrderId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "warehouseId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW — till offers 'Main warehouse'/'Store front' as hardcoded <option>s (panes.tsx:678-681); no warehouse entity anywhere"
+    },
+    {
+     "name": "dispatchedAt / deliveredAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz x2",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "cogsAmount",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "NEW — no unit cost exists to compute it"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SalesDocumentLine",
+     "via": "none",
+     "gap": "over-delivery cannot be detected"
+    }
+   ]
+  },
+  {
+   "name": "SalesInvoice",
+   "sourceType": "PosDoc (kind='invoice')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:121-165",
+   "purpose": "Receivable document. Sole input to the dashboard and AR aging.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Draft",
+    "Posted",
+    "Part paid",
+    "Paid",
+    "Overdue",
+    "Cancelled"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false
+    },
+    {
+     "name": "salesOrderId / deliveryNoteId",
+     "tsType": "— missing —",
+     "sqlType": "uuid x2",
+     "nullable": true,
+     "notes": "NEW — required by MatchPolicy.requireOrder/requireDelivery, which currently gate nothing"
+    },
+    {
+     "name": "subscriptionId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW — sweep writes 'Subscription SUB-0001' into the free-text source column instead"
+    },
+    {
+     "name": "billingPeriodKey",
+     "tsType": "— missing —",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW — the unique key that makes the sweep idempotent. Absent today"
+    },
+    {
+     "name": "issueDate",
+     "tsType": "— missing —",
+     "sqlType": "date",
+     "nullable": false,
+     "notes": "NEW — createdAt timestamp is used as a stand-in"
+    },
+    {
+     "name": "dueDate",
+     "tsType": "string (always '')",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "never populated; payment terms are unmodelled"
+    },
+    {
+     "name": "postedAt / postedBy",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz, uuid",
+     "nullable": true,
+     "notes": "NEW — NOTHING in the UI can move an invoice off 'Draft'"
+    },
+    {
+     "name": "amountPaid / amountOutstanding",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4) x2",
+     "nullable": false,
+     "notes": "NEW — derive from allocations, not from the 'payment' string"
+    },
+    {
+     "name": "taxTotal / taxBreakdown",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4), jsonb",
+     "nullable": true,
+     "notes": "NEW — tax categories exist as display strings only"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "PaymentAllocation",
+     "via": "none",
+     "gap": "no payments model; 'payment' is a frozen string"
+    },
+    {
+     "kind": "hasMany",
+     "target": "CreditNote",
+     "via": "none",
+     "gap": "returns/credits are not linked to the invoice they credit"
+    }
+   ]
+  },
+  {
+   "name": "SalesReturn",
+   "sourceType": "PosDoc (kind='return')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:168-183",
+   "purpose": "RMA raised against a sales invoice.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Draft",
+    "Posted",
+    "Part paid",
+    "Paid",
+    "Overdue",
+    "Cancelled"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false
+    },
+    {
+     "name": "reason",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "free text; no reason-code taxonomy"
+    },
+    {
+     "name": "originalInvoiceId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. Empty-state copy says returns are raised from an invoice's action — that action does not exist"
+    },
+    {
+     "name": "restockWarehouseId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SalesInvoice",
+     "via": "none",
+     "gap": "return status vocabulary is the INVOICE vocabulary (SalesPos.tsx:174) — Part paid/Overdue are meaningless on a return"
+    }
+   ]
+  },
+  {
+   "name": "CreditNote",
+   "sourceType": "PosDoc (kind='credit')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:184-194",
+   "purpose": "Account-level credit (goodwill, settlement, rebate).",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Draft",
+    "Posted",
+    "Applied"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false
+    },
+    {
+     "name": "reason",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "appliedAmount / remainingAmount",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4) x2",
+     "nullable": false,
+     "notes": "NEW — 'Applied' status has no application record behind it"
+    },
+    {
+     "name": "salesReturnId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "PaymentAllocation",
+     "via": "none",
+     "gap": "cannot be applied to anything"
+    }
+   ]
+  },
+  {
+   "name": "Refund",
+   "sourceType": "PosDoc (kind='refund')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:195-206",
+   "purpose": "Money actually returned to a customer.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Pending",
+    "Sent",
+    "Failed"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false
+    },
+    {
+     "name": "reason",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "creditNoteId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW — blurb says a refund settles a credit note; no link"
+    },
+    {
+     "name": "method / providerRef / sentAt / failureCode",
+     "tsType": "— missing —",
+     "sqlType": "text, text, timestamptz, text",
+     "nullable": true,
+     "notes": "NEW. 'Sent'/'Failed' imply an execution path. NO provider contract is inferable from source — must not be invented"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CreditNote",
+     "via": "none",
+     "gap": "no ceiling check possible; a refund can exceed the credit"
+    }
+   ]
+  },
+  {
+   "name": "RateContract",
+   "sourceType": "PosDoc (kind='contract')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:78-89",
+   "purpose": "Negotiated rate with committed volume and term that overrides the price list.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Active",
+    "Expired"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false,
+     "notes": "'total' is the only numeric captured — meaningless for a rate contract"
+    },
+    {
+     "name": "startDate / endDate",
+     "tsType": "— missing —",
+     "sqlType": "date x2",
+     "nullable": false,
+     "notes": "NEW. Blurb promises a 'term'; no date field exists, so 'Expired' can never be reached"
+    },
+    {
+     "name": "committedVolume",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "NEW. Blurb promises it; not captured"
+    },
+    {
+     "name": "consumedVolume",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "RateContractLine",
+     "via": "none",
+     "gap": "No per-item agreed rate exists, so 'A contract rate overrides the price list' cannot be true"
+    }
+   ]
+  },
+  {
+   "name": "RateContractLine",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:82 (copy only)",
+   "purpose": "Agreed unit rate per item/category for a contract.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "rateContractId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "itemRef",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "no Item/Product entity exists anywhere in this domain"
+    },
+    {
+     "name": "unitPrice",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false
+    },
+    {
+     "name": "minQty",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "RateContract",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "Subscription",
+   "sourceType": "PosDoc (kind='subscription')",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:209-223",
+   "purpose": "Recurring billing schedule that drafts invoices.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Active",
+    "Paused",
+    "Ended"
+   ],
+   "fields": [
+    {
+     "name": "(SalesDocument base columns)",
+     "tsType": "—",
+     "sqlType": "—",
+     "nullable": false,
+     "notes": "'total' is the per-period amount, indistinguishable from a document total"
+    },
+    {
+     "name": "interval / intervalCount",
+     "tsType": "— missing —",
+     "sqlType": "text enum, integer",
+     "nullable": false,
+     "notes": "NEW. THERE IS NO CADENCE FIELD AT ALL — the sweep bills every Active subscription on every click"
+    },
+    {
+     "name": "anchorDate / startDate / endDate",
+     "tsType": "— missing —",
+     "sqlType": "date x3",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "nextRunAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW — required for a due-date filter; 'Run due now' currently filters only on status==='Active'"
+    },
+    {
+     "name": "lastBilledPeriodKey",
+     "tsType": "— missing —",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW — the idempotency key"
+    },
+    {
+     "name": "pausedAt / endedAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz x2",
+     "nullable": true,
+     "notes": "NEW — 'Paused'/'Ended' are unreachable, nothing mutates status"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SubscriptionBillingPeriod",
+     "via": "none",
+     "gap": "no period ledger — repeated sweeps duplicate invoices without limit"
+    },
+    {
+     "kind": "hasMany",
+     "target": "SalesInvoice",
+     "via": "source string 'Subscription <reference>'",
+     "gap": "string linkage, breaks on reference reuse after delete"
+    }
+   ]
+  },
+  {
+   "name": "SubscriptionBillingPeriod",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx:59-73",
+   "purpose": "One billed period per subscription — the record that makes the sweep idempotent and retry-safe.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "pending",
+    "invoiced",
+    "skipped",
+    "failed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "subscriptionId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "periodKey",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "UNIQUE (subscription_id, period_key) — the missing constraint"
+    },
+    {
+     "name": "periodStart / periodEnd",
+     "tsType": "string",
+     "sqlType": "date x2",
+     "nullable": false
+    },
+    {
+     "name": "amount",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false
+    },
+    {
+     "name": "invoiceId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text enum",
+     "nullable": false
+    },
+    {
+     "name": "runId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "idempotency key of the sweep request"
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Subscription",
+     "via": "id"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "SalesInvoice",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "SalesDocumentLine",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/parts.tsx:186-194",
+   "purpose": "Line item for every document kind. THE central missing entity — today a document is a customer name plus a typed number.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "documentId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "lineNo",
+     "tsType": "number",
+     "sqlType": "integer",
+     "nullable": false
+    },
+    {
+     "name": "itemRef",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "no product catalogue exists in this domain"
+    },
+    {
+     "name": "description",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "quantity",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false
+    },
+    {
+     "name": "uom",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "unitPrice",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false
+    },
+    {
+     "name": "discountPct",
+     "tsType": "number",
+     "sqlType": "numeric(9,4)",
+     "nullable": true
+    },
+    {
+     "name": "discountAmount",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": true
+    },
+    {
+     "name": "taxCategoryId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "FK -> tax_category. Settings copy says 'Items point at a category' — no item ever does"
+    },
+    {
+     "name": "taxRateSnapshot",
+     "tsType": "number",
+     "sqlType": "numeric(9,4)",
+     "nullable": true,
+     "notes": "rate frozen at posting so historical documents keep their original rules"
+    },
+    {
+     "name": "taxAmount",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false
+    },
+    {
+     "name": "lineTotal",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "computed server-side; document total = SUM(lineTotal)"
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false
+    },
+    {
+     "name": "unitCost",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "needed for the promised COGS posting and the Margin-by-Category report"
+    },
+    {
+     "name": "sourceLineId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "quote line -> order line -> delivery line -> invoice line chain"
+    },
+    {
+     "name": "deliveredQty / invoicedQty / returnedQty",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) x3",
+     "nullable": false,
+     "notes": "drives Partially delivered, over-delivery and partial-refund ceilings"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SalesDocument",
+     "via": "id"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "TaxCategory",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "DocumentNumberSequence",
+   "sourceType": "NEW",
+   "sourceFile": "src/lib/workspace.tsx:1994",
+   "purpose": "Per-tenant, per-kind monotonic counter replacing filter(kind).length + 1.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "PK part"
+    },
+    {
+     "name": "companyId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "PK part"
+    },
+    {
+     "name": "kind",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "PK part"
+    },
+    {
+     "name": "prefix",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "QT/SO/DN/INV/RMA/CN/RF/RC/SUB (workspace.tsx:1983-1993)"
+    },
+    {
+     "name": "nextValue",
+     "tsType": "number",
+     "sqlType": "bigint",
+     "nullable": false,
+     "notes": "allocate under row lock; never derive from COUNT(*)"
+    },
+    {
+     "name": "padding",
+     "tsType": "number",
+     "sqlType": "smallint",
+     "nullable": false,
+     "notes": "4 today"
+    }
+   ],
+   "relations": []
+  },
+  {
+   "name": "PosShift",
+   "sourceType": "PosShift",
+   "sourceFile": "src/lib/workspace.tsx:251-263",
+   "purpose": "Till session. Closing it records a counted drawer and its variance.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "open",
+    "closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "companyId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    },
+    {
+     "name": "cashier",
+     "tsType": "string",
+     "sqlType": "text -> uuid FK users/employees",
+     "nullable": false,
+     "notes": "DISPLAY NAME from session.user.fullName, falling back to the literal 'Cashier' (panes.tsx:697). Every cashier metric groups by this string"
+    },
+    {
+     "name": "terminalId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW — no till/terminal entity; concurrent shifts on one till are undetectable"
+    },
+    {
+     "name": "openingFloat",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "Number(float)||0 from a free-text number input"
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false,
+     "notes": "hardcoded 'USD' and labelled 'Org default' — never read from Company.currency"
+    },
+    {
+     "name": "warehouse",
+     "tsType": "string",
+     "sqlType": "text -> uuid FK",
+     "nullable": true,
+     "notes": "one of three hardcoded option strings incl. '— no inventory leg —'"
+    },
+    {
+     "name": "notes",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "openedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "closedAt",
+     "tsType": "string | undefined",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "presence of this is the only 'open' flag"
+    },
+    {
+     "name": "cashTaken",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "WRITTEN AS 0 AND NEVER INCREMENTED — no sale capture exists. Every takings figure is therefore 0 and variance = counted - float"
+    },
+    {
+     "name": "cardTaken",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "same: permanently 0"
+    },
+    {
+     "name": "countedCash",
+     "tsType": "number | undefined",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "Number(counted); negative values accepted"
+    },
+    {
+     "name": "expectedCash",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "NEW — computed at close and frozen"
+    },
+    {
+     "name": "variance",
+     "tsType": "— missing —",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "NEW — recomputed on every render today (panes.tsx:723)"
+    },
+    {
+     "name": "varianceReasonCode / varianceReasonNote",
+     "tsType": "— missing —",
+     "sqlType": "text x2",
+     "nullable": true,
+     "notes": "NEW — settings promise a blocking reason prompt above a threshold; no such field or prompt exists"
+    },
+    {
+     "name": "closedBy",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "PosSale",
+     "via": "none",
+     "gap": "there is no sale entity at all"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Customer",
+     "via": "n/a"
+    }
+   ]
+  },
+  {
+   "name": "PosSale",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/panes.tsx:653-656 (copy only)",
+   "purpose": "A till sale. Entirely absent from the prototype — the POS 'till' only opens and closes drawers.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "open",
+    "completed",
+    "voided",
+    "refunded"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "shiftId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "receiptNo",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "unique per tenant; the invoice list has a 'Scan receipt' box with nothing to scan"
+    },
+    {
+     "name": "customerId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "walk-in allowed?"
+    },
+    {
+     "name": "subtotal / discountTotal / taxTotal / grandTotal",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) x4",
+     "nullable": false
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false,
+     "notes": "shift copy states only products priced in the shift currency may be sold"
+    },
+    {
+     "name": "loyaltyPointsEarned / loyaltyPointsRedeemed",
+     "tsType": "number",
+     "sqlType": "numeric(18,4) x2",
+     "nullable": true
+    },
+    {
+     "name": "invoiceId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "source='POS' filter exists but nothing writes it"
+    },
+    {
+     "name": "soldAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "idempotencyKey",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "unique — no duplicate receipt on retry"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "PosShift",
+     "via": "id"
+    },
+    {
+     "kind": "hasMany",
+     "target": "PosSaleTender",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "PosSaleTender",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/panes.tsx:654",
+   "purpose": "One tender leg of a sale — cash / card / UPI. Named in copy, never modelled.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "captured",
+    "voided",
+    "refunded"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "saleId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "method",
+     "tsType": "string",
+     "sqlType": "text enum (cash|card|upi|other)",
+     "nullable": false,
+     "notes": "shift dashboard splits only 'Cash' vs 'Card / UPI / other'"
+    },
+    {
+     "name": "amount",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false
+    },
+    {
+     "name": "changeGiven",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": true
+    },
+    {
+     "name": "providerRef",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "no payment provider contract is inferable from source"
+    },
+    {
+     "name": "capturedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "PosSale",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "CustomerPayment",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/panes.tsx:250-255",
+   "purpose": "Money received against receivables. Required for the Paid / Part paid states the UI counts.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "received",
+    "cleared",
+    "bounced",
+    "voided"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "customerId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "amount",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false
+    },
+    {
+     "name": "method",
+     "tsType": "string",
+     "sqlType": "text enum",
+     "nullable": false
+    },
+    {
+     "name": "receivedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "reference",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "idempotencyKey",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "unique — guards payment replay"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "PaymentAllocation",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "PaymentAllocation",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/panes.tsx:30 (open = payment !== 'Paid')",
+   "purpose": "Applies a payment or credit note to an invoice. Without it 'payment' is an unmovable string.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "paymentId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true
+    },
+    {
+     "name": "creditNoteId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "CHECK exactly one of payment_id / credit_note_id"
+    },
+    {
+     "name": "invoiceId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "amount",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "CHECK amount > 0 and SUM(amount) <= invoice.grandTotal"
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3)",
+     "nullable": false
+    },
+    {
+     "name": "allocatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SalesInvoice",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "TaxCategory",
+   "sourceType": "PosTaxCategory",
+   "sourceFile": "src/lib/workspace.tsx:275-281",
+   "purpose": "Named tax slab items point at. Today stores pre-rendered display strings, not a computable rule.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "e.g. 'GST 18%'"
+    },
+    {
+     "name": "rate",
+     "tsType": "number",
+     "sqlType": "numeric(9,4)",
+     "nullable": false,
+     "notes": "Number(draft.rate)||0; no upper bound, negatives accepted"
+    },
+    {
+     "name": "withinState",
+     "tsType": "string",
+     "sqlType": "text (today) -> component rows",
+     "nullable": false,
+     "notes": "DISPLAY STRING 'CGST 9% + SGST 9%' built at create (settings.tsx:168) or 'Exempt' at 0. Not parseable back into components"
+    },
+    {
+     "name": "interState",
+     "tsType": "string",
+     "sqlType": "text (today) -> component rows",
+     "nullable": false,
+     "notes": "DISPLAY STRING 'IGST 18%' / 'Exempt'"
+    },
+    {
+     "name": "effectiveFrom / effectiveTo",
+     "tsType": "— missing —",
+     "sqlType": "date x2",
+     "nullable": true,
+     "notes": "NEW — rate changes must not retroactively alter posted documents"
+    },
+    {
+     "name": "createdAt / updatedAt / archivedAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz x3",
+     "nullable": true,
+     "notes": "NEW — delete is a hard array filter today"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SalesDocumentLine",
+     "via": "none",
+     "gap": "no line ever references a category; deleting one is unguarded"
+    }
+   ]
+  },
+  {
+   "name": "TaxComponent",
+   "sourceType": "NEW",
+   "sourceFile": "src/lib/posData.ts:130-135",
+   "purpose": "The computable split behind a tax category (component name, rate, applicability).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "taxCategoryId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "componentName",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "CGST/SGST/IGST appear in seeded strings; the statutory rules behind them are NOT inferable from this source and must not be invented"
+    },
+    {
+     "name": "rate",
+     "tsType": "number",
+     "sqlType": "numeric(9,4)",
+     "nullable": false
+    },
+    {
+     "name": "applicability",
+     "tsType": "string",
+     "sqlType": "text enum (within_jurisdiction|cross_jurisdiction)",
+     "nullable": false
+    },
+    {
+     "name": "ledgerAccountId",
+     "tsType": "string | null",
+     "sqlType": "uuid",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "TaxCategory",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "LoyaltyProgramme",
+   "sourceType": "PosLoyaltyProgramme",
+   "sourceFile": "src/lib/workspace.tsx:286-292",
+   "purpose": "Point accrual rate and point value. Tiers array exists but is always [].",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false
+    },
+    {
+     "name": "pointsPer",
+     "tsType": "number",
+     "sqlType": "numeric(18,6)",
+     "nullable": false,
+     "notes": "points per unit spent; default '1'"
+    },
+    {
+     "name": "pointValue",
+     "tsType": "number",
+     "sqlType": "numeric(18,6)",
+     "nullable": false,
+     "notes": "monetary value of one point; default '0.01'. Needs a currency column"
+    },
+    {
+     "name": "currency",
+     "tsType": "— missing —",
+     "sqlType": "char(3)",
+     "nullable": false,
+     "notes": "NEW — pointValue is money with no currency"
+    },
+    {
+     "name": "active",
+     "tsType": "— missing —",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW — multiple programmes can coexist with no rule for which applies"
+    },
+    {
+     "name": "createdAt / archivedAt",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz x2",
+     "nullable": true,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "LoyaltyTier",
+     "via": "embedded tiers[] always empty",
+     "gap": "The pane is titled 'Loyalty & tiers' and promises a tier ladder; no UI can add a tier"
+    }
+   ]
+  },
+  {
+   "name": "LoyaltyTier",
+   "sourceType": "PosLoyaltyProgramme['tiers'][n]",
+   "sourceFile": "src/lib/workspace.tsx:291",
+   "purpose": "Tier reached on lifetime spend.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW — embedded objects have no id"
+    },
+    {
+     "name": "programmeId",
+     "tsType": "— missing —",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false
+    },
+    {
+     "name": "threshold",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "money (lifetime spend) — needs a currency and a measurement window"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "LoyaltyProgramme",
+     "via": "embedded array"
+    }
+   ]
+  },
+  {
+   "name": "LoyaltyLedgerEntry",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/settings.tsx:313-316 (copy only)",
+   "purpose": "Append-only accrual/redemption ledger implied by 'points accrue on the net subtotal and are spent at the till'.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "accrued",
+    "redeemed",
+    "expired",
+    "adjusted",
+    "reversed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "customerId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "programmeId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "kind",
+     "tsType": "string",
+     "sqlType": "text enum",
+     "nullable": false
+    },
+    {
+     "name": "points",
+     "tsType": "number",
+     "sqlType": "numeric(18,6)",
+     "nullable": false,
+     "notes": "signed"
+    },
+    {
+     "name": "sourceSaleId / sourceInvoiceId",
+     "tsType": "string | null",
+     "sqlType": "uuid x2",
+     "nullable": true
+    },
+    {
+     "name": "occurredAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Customer",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "CashVariancePolicy",
+   "sourceType": "PosCashVariance",
+   "sourceFile": "src/lib/workspace.tsx:295-301",
+   "purpose": "Thresholds for reason-required and amber/red flagging. Read by the shift dashboard; enforced nowhere.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW; singleton per tenant/company today"
+    },
+    {
+     "name": "reasonAbove",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "default 1. Money in the till currency; NOT enforced at close"
+    },
+    {
+     "name": "amberWorst",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "default 1"
+    },
+    {
+     "name": "redWorst",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "default 5. CHECK redWorst >= amberWorst (validated client-side only, settings.tsx:458)"
+    },
+    {
+     "name": "amberAverage",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "default 0.5. 'recent average' window length is undefined in source"
+    },
+    {
+     "name": "redAverage",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "default 2. CHECK redAverage >= amberAverage"
+    },
+    {
+     "name": "currency",
+     "tsType": "— missing —",
+     "sqlType": "char(3)",
+     "nullable": false,
+     "notes": "NEW — copy says 'the till's own currency' but thresholds are single global numbers"
+    },
+    {
+     "name": "averageWindowDays",
+     "tsType": "— missing —",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "NEW — required to compute 'recent average'; never defined and never computed"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SalesAppSettings",
+     "via": "embedded"
+    }
+   ]
+  },
+  {
+   "name": "MatchPolicy",
+   "sourceType": "MatchSettings",
+   "sourceFile": "src/lib/workspace.tsx:265-272",
+   "purpose": "3-way match tolerances and required-document flags. Saved, read back, and never applied.",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "statusVocabulary": [
+    "Warn — flag it, allow the post",
+    "Block — refuse the post",
+    "Ignore — no check"
+   ],
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "priceTolerance",
+     "tsType": "number",
+     "sqlType": "numeric(9,4)",
+     "nullable": false,
+     "notes": "percent, default 5. No min/max; Number('') -> NaN is possible via the number input"
+    },
+    {
+     "name": "priceAction",
+     "tsType": "string",
+     "sqlType": "text enum",
+     "nullable": false,
+     "notes": "stores the full English sentence as the value (posData.ts:102-106) — needs a code column plus a label"
+    },
+    {
+     "name": "quantityTolerance",
+     "tsType": "number",
+     "sqlType": "numeric(9,4)",
+     "nullable": false,
+     "notes": "percent, default 2"
+    },
+    {
+     "name": "quantityAction",
+     "tsType": "string",
+     "sqlType": "text enum",
+     "nullable": false
+    },
+    {
+     "name": "requireOrder",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "default false; gates nothing"
+    },
+    {
+     "name": "requireDelivery",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "default false; gates nothing"
+    },
+    {
+     "name": "updatedAt / updatedBy",
+     "tsType": "— missing —",
+     "sqlType": "timestamptz, uuid",
+     "nullable": true,
+     "notes": "NEW. Match changes are NOT written to the POS Change History (they call updateMatchSettings, not updatePosSettings)"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SalesInvoice",
+     "via": "none",
+     "gap": "no invoice posting path exists for the policy to run in"
+    }
+   ]
+  },
+  {
+   "name": "SalesCustomField",
+   "sourceType": "PosCustomField",
+   "sourceFile": "src/lib/workspace.tsx:303",
+   "purpose": "Extra field definitions for Sales & POS records.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Text",
+    "Number",
+    "Date",
+    "Dropdown",
+    "Checkbox"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false
+    },
+    {
+     "name": "type",
+     "tsType": "string",
+     "sqlType": "text enum",
+     "nullable": false,
+     "notes": "'Dropdown' is selectable but NO option list is ever captured"
+    },
+    {
+     "name": "entityType",
+     "tsType": "— missing —",
+     "sqlType": "text enum",
+     "nullable": false,
+     "notes": "NEW — a field is defined for the whole app with no target record"
+    },
+    {
+     "name": "required / defaultValue / options / position",
+     "tsType": "— missing —",
+     "sqlType": "boolean, text, jsonb, integer",
+     "nullable": true,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SalesCustomFieldValue",
+     "via": "none",
+     "gap": "No create dialog in this domain renders custom fields, so no value is ever captured"
+    }
+   ]
+  },
+  {
+   "name": "SalesCustomFieldValue",
+   "sourceType": "NEW",
+   "sourceFile": "src/screens/app/pos/settings.tsx:528",
+   "purpose": "Captured value of a custom field on a record.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "fieldId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "entityType",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false
+    },
+    {
+     "name": "entityId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "valueText / valueNumber / valueDate / valueBool",
+     "tsType": "string|number|string|boolean",
+     "sqlType": "text, numeric(18,4), date, boolean",
+     "nullable": true,
+     "notes": "typed columns rather than a stringly blob"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SalesCustomField",
+     "via": "id"
+    }
+   ]
+  },
+  {
+   "name": "SalesAppSettings",
+   "sourceType": "PosSettings",
+   "sourceFile": "src/lib/workspace.tsx:311-319",
+   "purpose": "Per-tenant settings aggregate for the app (tax, groups, loyalty, variance, fields, agents, change log).",
+   "tenantScoped": true,
+   "companyScoped": true,
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW; PK"
+    },
+    {
+     "name": "appCode",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'POS'"
+    },
+    {
+     "name": "version",
+     "tsType": "— missing —",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "NEW — UI shows a hardcoded 'v1.0.0' everywhere (settings.tsx:762, 809)"
+    },
+    {
+     "name": "taxCategories / customerGroups / loyalty / customFields",
+     "tsType": "arrays",
+     "sqlType": "separate tables",
+     "nullable": false,
+     "notes": "nested arrays today; must become child tables"
+    },
+    {
+     "name": "cashVariance",
+     "tsType": "PosCashVariance",
+     "sqlType": "child row",
+     "nullable": false
+    },
+    {
+     "name": "agents",
+     "tsType": "{pauseAll,autoRunOnNew,autoPauseAt,disabled[]}",
+     "sqlType": "child row",
+     "nullable": false
+    },
+    {
+     "name": "changes",
+     "tsType": "PosChange[]",
+     "sqlType": "child table",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "SalesSettingsChange",
+     "via": "embedded array"
+    }
+   ]
+  },
+  {
+   "name": "SalesSettingsChange",
+   "sourceType": "PosChange",
+   "sourceFile": "src/lib/workspace.tsx:306",
+   "purpose": "Change History row. Presented as undoable; nothing can undo it.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "at",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "rendered as at.slice(0,16) — raw UTC ISO shown as if local"
+    },
+    {
+     "name": "by",
+     "tsType": "string",
+     "sqlType": "uuid FK users",
+     "nullable": false,
+     "notes": "HARDCODED literal 'owner' (workspace.tsx:2101) — never the signed-in user"
+    },
+    {
+     "name": "summary",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "English sentence composed at the call site; not machine-readable"
+    },
+    {
+     "name": "reverted",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "ALWAYS false — no code path sets it true, yet a 'Show reverted' filter exists"
+    },
+    {
+     "name": "beforeValue / afterValue",
+     "tsType": "— missing —",
+     "sqlType": "jsonb x2",
+     "nullable": true,
+     "notes": "NEW — without these an undo is impossible"
+    },
+    {
+     "name": "changeType / entityType / entityId",
+     "tsType": "— missing —",
+     "sqlType": "text, text, uuid",
+     "nullable": true,
+     "notes": "NEW"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "SalesAppSettings",
+     "via": "embedded array"
+    }
+   ]
+  },
+  {
+   "name": "SalesAgentControl",
+   "sourceType": "PosSettings['agents']",
+   "sourceFile": "src/lib/workspace.tsx:317",
+   "purpose": "Per-app AI agent switches and credit guardrail.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "pauseAll",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "labelled '(all apps)' but stored only under POS settings — the label is wrong"
+    },
+    {
+     "name": "autoRunOnNew",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "default true; no agent ever runs"
+    },
+    {
+     "name": "autoPauseAt",
+     "tsType": "string",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "FREE-TEXT STRING for an AI-credit threshold; never parsed, never compared"
+    },
+    {
+     "name": "disabled",
+     "tsType": "string[]",
+     "sqlType": "child table agent_disabled(agent_name)",
+     "nullable": false,
+     "notes": "stores agent NAMES ('Quote Quality Reviewer'), not ids"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "manyToMany",
+     "target": "AgentDefinition",
+     "via": "agent name string",
+     "gap": "agentCatalog.ts entries have no id; renaming an agent silently re-enables it"
+    }
+   ]
+  },
+  {
+   "name": "SalesAuditEvent",
+   "sourceType": "AuditEvent",
+   "sourceFile": "src/lib/workspace.tsx:161-186",
+   "purpose": "Append-only trail. POS writes pos.customer_created, pos.<kind>_created, pos.doc_updated, pos.shift_opened, pos.shift_closed, pos.match_settings_updated, pos.settings_updated.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Success",
+    "Failed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW"
+    },
+    {
+     "name": "at",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false
+    },
+    {
+     "name": "user",
+     "tsType": "'owner' | ''",
+     "sqlType": "uuid FK users",
+     "nullable": false,
+     "notes": "literal 'owner' — not a real actor"
+    },
+    {
+     "name": "role",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "hardcoded 'Org_admin'"
+    },
+    {
+     "name": "action",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "'Success' | 'Failed'",
+     "sqlType": "text enum",
+     "nullable": false,
+     "notes": "always 'Success' — failures are never recorded"
+    },
+    {
+     "name": "resource",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "'customer' | 'sales_doc' | 'shift' | 'app'"
+    },
+    {
+     "name": "resourceId",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "a NAME for customers/shifts, a REFERENCE for docs, a random uuid when omitted"
+    },
+    {
+     "name": "ip",
+     "tsType": "string",
+     "sqlType": "inet",
+     "nullable": true,
+     "notes": "always ''"
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Customer",
+     "via": "name string",
+     "gap": "resourceId is not a key"
+    }
+   ]
+  }
+ ],
+ "operations": [
+  {
+   "id": "OP-POS-NAV-TAB",
+   "entity": "—",
+   "action": "read",
+   "surface": "/app/sales-pos?tab=<id>",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 54,
+   "currentBehaviour": "router.push of ?tab=<id>; unknown tab silently falls back to dashboard, so the `?? <Empty title=\"Not found\"/>` at line 255 is dead code",
+   "requiredBehaviour": "Unknown tab returns a real 404/not-found state; nav reflects role-visible sections only",
+   "apiMethodPath": "n/a (client route)",
+   "authorization": "tenant member with POS entitlement",
+   "validation": "tab id in the known set"
+  },
+  {
+   "id": "OP-POS-INSTALL-GATE",
+   "entity": "—",
+   "action": "read",
+   "surface": "/app/sales-pos (app not installed)",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 40,
+   "currentBehaviour": "Reads installed[] from localStorage; renders a marketplace Link. Any user can flip the array in devtools",
+   "requiredBehaviour": "Server-side entitlement check; API refuses POS endpoints without the entitlement",
+   "apiMethodPath": "GET /api/v1/entitlements",
+   "authorization": "tenant member",
+   "validation": "entitlement active, not trial-expired"
+  },
+  {
+   "id": "OP-POS-DASH-READ",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 39,
+   "currentBehaviour": "Client reduce over posDocs. `posted` = invoices with status not Draft/Cancelled — but no code path ever changes status, so posted is ALWAYS empty and every KPI is 0.00",
+   "requiredBehaviour": "Server aggregate over posted invoices scoped by tenant/company/currency/date range",
+   "apiMethodPath": "GET /api/v1/sales/reports/overview?period=",
+   "authorization": "sales_viewer+, tenant+company scope",
+   "validation": "period in 7d|30d|90d; currency required"
+  },
+  {
+   "id": "OP-POS-DASH-PERIOD",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 87,
+   "currentBehaviour": "setState only; filters client-side on ageOf(createdAt) <= days using Date.now()",
+   "requiredBehaviour": "Server-side date-range filter on an explicit issue date in the tenant time zone",
+   "apiMethodPath": "GET /api/v1/sales/reports/overview",
+   "authorization": "sales_viewer+",
+   "validation": "enum period"
+  },
+  {
+   "id": "OP-POS-DASH-OTC",
+   "entity": "SalesDocument",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 142,
+   "currentBehaviour": "Counts per stage client-side; prints `USD {value}` as a RAW unformatted float (line 149) while every other figure uses money()",
+   "requiredBehaviour": "Server stage counts and sums with consistent money formatting and currency scoping",
+   "apiMethodPath": "GET /api/v1/sales/reports/order-to-cash",
+   "authorization": "sales_viewer+",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-DASH-MONTHLY",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 56,
+   "currentBehaviour": "Buckets posted invoices by getMonth() IGNORING THE YEAR, so a 2024 invoice lands in the 2025 bar; header claims CY and admits 'no fiscal year configured'",
+   "requiredBehaviour": "Bucket by fiscal period with an explicit year filter and a configured fiscal calendar",
+   "apiMethodPath": "GET /api/v1/sales/reports/monthly?year=",
+   "authorization": "sales_viewer+",
+   "validation": "year, company, currency"
+  },
+  {
+   "id": "OP-POS-DASH-AGING",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 63,
+   "currentBehaviour": "Buckets on dueDate, which is always '' — age resolves to -1 so everything would fall in 'Current'; combined with posted=[] the panel is always empty",
+   "requiredBehaviour": "Age from a real dueDate derived from payment terms; buckets computed server-side as at a snapshot date",
+   "apiMethodPath": "GET /api/v1/sales/reports/aging?asOf=",
+   "authorization": "ar_viewer+",
+   "validation": "asOf date"
+  },
+  {
+   "id": "OP-POS-DASH-PAYMENTDUE",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 207,
+   "currentBehaviour": "HARDCODED: every band renders 'USD 0', '0 invoices' and a zero bar regardless of data",
+   "requiredBehaviour": "Real due-band aggregation (Overdue / Due today / 7d / 8-30d / later)",
+   "apiMethodPath": "GET /api/v1/sales/reports/payment-due",
+   "authorization": "ar_viewer+",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-DASH-PAYSTATUS",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 250,
+   "currentBehaviour": "Counts doc.payment === Paid|Part paid|Unpaid; payment is hardcoded 'Unpaid' at create and never updated, so Paid and Part paid are permanently 0",
+   "requiredBehaviour": "Derive payment state from allocations vs invoice total",
+   "apiMethodPath": "GET /api/v1/sales/reports/payment-status",
+   "authorization": "ar_viewer+",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-DASH-TOPDEBTORS",
+   "entity": "Customer",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 76,
+   "currentBehaviour": "Groups open invoices by the customer NAME STRING into a Map, top 5. Two customers with the same name merge into one row",
+   "requiredBehaviour": "Group by customer_id; display name resolved at render",
+   "apiMethodPath": "GET /api/v1/sales/reports/top-debtors?limit=5",
+   "authorization": "ar_viewer+",
+   "validation": "limit"
+  },
+  {
+   "id": "OP-POS-DASH-DEADLINKS",
+   "entity": "—",
+   "action": "read",
+   "surface": "?tab=dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 169,
+   "currentBehaviour": "'Reports →' (169), 'Chase →' (204) and 'View all →' (230) are plain <span> elements styled as accent links — not focusable, no handler, no href",
+   "requiredBehaviour": "Real navigation to the reports / collections / AR aging surfaces, keyboard reachable",
+   "apiMethodPath": "n/a",
+   "authorization": "—",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-LIST",
+   "entity": "Customer",
+   "action": "list",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 290,
+   "currentBehaviour": "Filters the whole in-memory posCustomers array; no pagination, no sort, no loading or error state",
+   "requiredBehaviour": "Paged, sorted, tenant-scoped server list with loading/error/empty states",
+   "apiMethodPath": "GET /api/v1/sales/customers",
+   "authorization": "sales_viewer+, tenant scope",
+   "validation": "page, pageSize<=100, sort whitelist"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-SEARCH",
+   "entity": "Customer",
+   "action": "list",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 352,
+   "currentBehaviour": "setState + client substring match over name+email+taxId, lowercased",
+   "requiredBehaviour": "Server search with trigram/FTS index, debounced",
+   "apiMethodPath": "GET /api/v1/sales/customers?q=",
+   "authorization": "sales_viewer+",
+   "validation": "q length <= 200"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-SHOWINACTIVE",
+   "entity": "Customer",
+   "action": "list",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 361,
+   "currentBehaviour": "setState only. Useless in practice: active is hardcoded true at every create path, so the inactive set is always empty",
+   "requiredBehaviour": "includeArchived query param backed by a real archive action",
+   "apiMethodPath": "GET /api/v1/sales/customers?includeArchived=true",
+   "authorization": "sales_viewer+",
+   "validation": "boolean"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-CREATE",
+   "entity": "Customer",
+   "action": "create",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 419,
+   "currentBehaviour": "addPosCustomer -> localStorage via useWorkspace; id = crypto.randomUUID(), active forced true, no duplicate check, no email validation, writes a pos.customer_created audit row whose resourceId is the NAME",
+   "requiredBehaviour": "Server create with validation, dedup suggestion, tenant scope, real actor in audit",
+   "apiMethodPath": "POST /api/v1/sales/customers",
+   "authorization": "sales_editor+",
+   "validation": "name required/trimmed/<=200; email RFC + unique per tenant; taxId format per jurisdiction (UNDEFINED in source)",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-EXPORT",
+   "entity": "Customer",
+   "action": "export",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 296,
+   "currentBehaviour": "Triggers a Blob download named customers.csv built by naive template join — NO quoting, NO escaping, NO formula guard. A name containing a comma corrupts the row; a name starting with '=' is a spreadsheet formula. The shared csvCell/downloadCsv helpers in src/lib/csv.ts are NOT used",
+   "requiredBehaviour": "Server export honouring the caller's permission and current filter, RFC4180 quoting, formula-safety prefix, correct MIME, audit row",
+   "apiMethodPath": "GET /api/v1/sales/customers/export.csv",
+   "authorization": "sales_viewer+ with export permission",
+   "validation": "filter echoed and applied server-side",
+   "sideEffect": "file download"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-IMPORT",
+   "entity": "Customer",
+   "action": "import",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 307,
+   "currentBehaviour": "FileReader + split(/\\r?\\n/).slice(1) + row.split(','), ignoring the header names entirely and assuming column order name,email,taxId. Quoted commas break it. No size/MIME limit, no dedup, no error surface, no preview — each row is committed one-by-one and a mid-file failure leaves a partial import. parseCsv() in src/lib/csv.ts is NOT used",
+   "requiredBehaviour": "Staged upload, header mapping, per-row validation report, dedup, atomic commit, size/MIME limits",
+   "apiMethodPath": "POST /api/v1/sales/customers/import (stage) + POST .../commit",
+   "authorization": "sales_editor+ with import permission",
+   "validation": "MIME text/csv, size cap, header mapping, per-row errors returned",
+   "sideEffect": "bulk write"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-UPDATE",
+   "entity": "Customer",
+   "action": "update",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 374,
+   "currentBehaviour": "MISSING — rows are not clickable; there is no detail view and no edit control anywhere",
+   "requiredBehaviour": "Detail + edit with optimistic-concurrency version check",
+   "apiMethodPath": "PATCH /api/v1/sales/customers/{id}",
+   "authorization": "sales_editor+",
+   "validation": "same as create; If-Match version"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-ARCHIVE",
+   "entity": "Customer",
+   "action": "delete",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 374,
+   "currentBehaviour": "MISSING — no delete or deactivate control exists despite the Inactive badge and the Show inactive filter",
+   "requiredBehaviour": "Archive (never hard delete) with a block when open documents reference the customer",
+   "apiMethodPath": "POST /api/v1/sales/customers/{id}/archive",
+   "authorization": "sales_manager+",
+   "validation": "no open AR balance"
+  },
+  {
+   "id": "OP-POS-CUSTOMER-GROUP-ASSIGN",
+   "entity": "Customer",
+   "action": "update",
+   "surface": "?tab=customers",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 198,
+   "currentBehaviour": "MISSING — the Customer groups pane promises segments 'chosen from a list on the customer record'; the customer form has only name/email/taxId",
+   "requiredBehaviour": "Group picker on the customer record; reports groupable by segment",
+   "apiMethodPath": "PATCH /api/v1/sales/customers/{id}",
+   "authorization": "sales_editor+",
+   "validation": "groupId exists in tenant"
+  },
+  {
+   "id": "OP-POS-CONTRACT-LIST",
+   "entity": "RateContract",
+   "action": "list",
+   "surface": "?tab=rate_contracts",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 114,
+   "currentBehaviour": "Client filter of posDocs on kind==='contract' plus a status equality check",
+   "requiredBehaviour": "Server list with paging and status/term filters",
+   "apiMethodPath": "GET /api/v1/sales/rate-contracts",
+   "authorization": "sales_viewer+",
+   "validation": "status enum"
+  },
+  {
+   "id": "OP-POS-CONTRACT-CREATE",
+   "entity": "RateContract",
+   "action": "create",
+   "surface": "?tab=rate_contracts",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc with status = statuses[1] = 'Active', total = Number(text)||0, source 'Manual', payment 'Unpaid', dueDate ''. Captures NO rate, NO committed volume and NO term despite the blurb",
+   "requiredBehaviour": "Create with start/end dates, committed volume and at least one contract line carrying an agreed unit price",
+   "apiMethodPath": "POST /api/v1/sales/rate-contracts",
+   "authorization": "sales_manager+",
+   "validation": "endDate > startDate; at least one line; price >= 0",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-POS-CONTRACT-DELETE",
+   "entity": "RateContract",
+   "action": "delete",
+   "surface": "?tab=rate_contracts",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 149,
+   "currentBehaviour": "removePosDoc — an UNCONFIRMED hard delete from the array. Writes NO audit event (removePosDoc is the only POS mutator with no auditEvent call). Also corrupts numbering: the next contract reuses the deleted reference",
+   "requiredBehaviour": "Confirmation, soft archive, audit row, referential guard",
+   "apiMethodPath": "POST /api/v1/sales/rate-contracts/{id}/archive",
+   "authorization": "sales_manager+",
+   "validation": "not referenced by an open order",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-POS-CONTRACT-PRICE-RESOLVE",
+   "entity": "RateContract",
+   "action": "execute",
+   "surface": "?tab=rate_contracts",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 82,
+   "currentBehaviour": "MISSING — 'A contract rate overrides the price list, so what is agreed is what gets invoiced' is copy only; there is no price list, no item and no resolution step",
+   "requiredBehaviour": "Price resolution service: contract line > price list > manual override, with the applied source recorded on the document line",
+   "apiMethodPath": "POST /api/v1/sales/pricing/resolve",
+   "authorization": "sales_editor+",
+   "validation": "contract active on the document date"
+  },
+  {
+   "id": "OP-POS-QUOTE-LIST",
+   "entity": "Quotation",
+   "action": "list",
+   "surface": "?tab=quotations",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 445,
+   "currentBehaviour": "Client filter on status chip + substring over reference/customer/reason",
+   "requiredBehaviour": "Server list/filter/search with paging",
+   "apiMethodPath": "GET /api/v1/sales/quotations",
+   "authorization": "sales_viewer+",
+   "validation": "status enum, q length"
+  },
+  {
+   "id": "OP-POS-QUOTE-FILTER",
+   "entity": "Quotation",
+   "action": "list",
+   "surface": "?tab=quotations",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 472,
+   "currentBehaviour": "setState only. Eight of the nine chips (Sent/Accepted/Rejected/Expired/Ordered/Cancelled/Superseded) can never match a row because create always writes 'Draft' and nothing updates status",
+   "requiredBehaviour": "Server filter against a real quote state machine",
+   "apiMethodPath": "GET /api/v1/sales/quotations?status=",
+   "authorization": "sales_viewer+",
+   "validation": "status enum"
+  },
+  {
+   "id": "OP-POS-QUOTE-KPI",
+   "entity": "Quotation",
+   "action": "read",
+   "surface": "?tab=quotations",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 451,
+   "currentBehaviour": "Pipeline value and win rate reduce over trusted typed totals; win rate divides Accepted+Ordered by Accepted+Ordered+Rejected — all permanently zero because no quote leaves Draft",
+   "requiredBehaviour": "Server KPIs from line-derived totals and recorded state transitions",
+   "apiMethodPath": "GET /api/v1/sales/quotations/metrics",
+   "authorization": "sales_viewer+",
+   "validation": "date range, currency"
+  },
+  {
+   "id": "OP-POS-QUOTE-CREATE",
+   "entity": "Quotation",
+   "action": "create",
+   "surface": "?tab=quotations",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 566,
+   "currentBehaviour": "addPosDoc kind='quotation', status 'Draft', total = Number(text)||0, and the TITLE IS STORED IN THE `reason` COLUMN. No lines, no tax, no validity date",
+   "requiredBehaviour": "Create with lines; totals computed server-side; validUntil captured; title is its own column",
+   "apiMethodPath": "POST /api/v1/sales/quotations",
+   "authorization": "sales_editor+",
+   "validation": "customerId exists; >=1 line; qty>0; unitPrice>=0; currency matches customer/company",
+   "sideEffect": "AI 'Quote Quality Reviewer' agent is advertised to run on create — it does not"
+  },
+  {
+   "id": "OP-POS-QUOTE-TRANSITION",
+   "entity": "Quotation",
+   "action": "transition",
+   "surface": "?tab=quotations",
+   "sourceFile": "src/lib/posData.ts",
+   "sourceLine": 50,
+   "currentBehaviour": "MISSING — no send/accept/reject/expire/cancel/supersede control exists; updatePosDoc has zero call sites in the entire codebase",
+   "requiredBehaviour": "Explicit state machine with allowed transitions, actor, timestamp and audit",
+   "apiMethodPath": "POST /api/v1/sales/quotations/{id}/transition",
+   "authorization": "sales_editor+ (accept/reject may need sales_manager)",
+   "validation": "transition legal from current state; version check"
+  },
+  {
+   "id": "OP-POS-QUOTE-CONVERT",
+   "entity": "SalesOrder",
+   "action": "create",
+   "surface": "?tab=quotations",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 453,
+   "currentBehaviour": "MISSING — the 'Ordered' status implies quote-to-order conversion; no such action exists",
+   "requiredBehaviour": "Idempotent convert (one order per quote version) copying lines and prices",
+   "apiMethodPath": "POST /api/v1/sales/quotations/{id}/convert",
+   "authorization": "sales_editor+",
+   "validation": "quote Accepted; Idempotency-Key header; refuse double conversion"
+  },
+  {
+   "id": "OP-POS-ORDER-LIST",
+   "entity": "SalesOrder",
+   "action": "list",
+   "surface": "?tab=sales_orders",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 114,
+   "currentBehaviour": "Client filter on kind + status",
+   "requiredBehaviour": "Server list with fulfilment-state filters",
+   "apiMethodPath": "GET /api/v1/sales/orders",
+   "authorization": "sales_viewer+",
+   "validation": "status enum"
+  },
+  {
+   "id": "OP-POS-ORDER-CREATE",
+   "entity": "SalesOrder",
+   "action": "create",
+   "surface": "?tab=sales_orders",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc kind='order', status 'Draft', total from a typed number, no lines, no quote link, no delivery date",
+   "requiredBehaviour": "Create from lines; optional quotationId; server totals; stock reservation where an inventory leg is configured",
+   "apiMethodPath": "POST /api/v1/sales/orders",
+   "authorization": "sales_editor+",
+   "validation": "customerId; >=1 line; qty>0; price rules; Idempotency-Key",
+   "sideEffect": "stock reservation (promised by the app blurb, absent today)"
+  },
+  {
+   "id": "OP-POS-ORDER-DELETE",
+   "entity": "SalesOrder",
+   "action": "delete",
+   "surface": "?tab=sales_orders",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 149,
+   "currentBehaviour": "Unconfirmed hard delete, no audit, breaks reference numbering",
+   "requiredBehaviour": "Cancel (state transition) rather than delete once confirmed; archive only while draft",
+   "apiMethodPath": "POST /api/v1/sales/orders/{id}/cancel",
+   "authorization": "sales_manager+",
+   "validation": "no delivery/invoice raised"
+  },
+  {
+   "id": "OP-POS-ORDER-CONFIRM",
+   "entity": "SalesOrder",
+   "action": "transition",
+   "surface": "?tab=sales_orders",
+   "sourceFile": "src/lib/posData.ts",
+   "sourceLine": 62,
+   "currentBehaviour": "MISSING — Confirmed / Partially delivered / Delivered / Closed are unreachable statuses",
+   "requiredBehaviour": "Confirm action plus fulfilment-driven status derived from delivered quantities",
+   "apiMethodPath": "POST /api/v1/sales/orders/{id}/confirm",
+   "authorization": "sales_editor+",
+   "validation": "legal transition; version check"
+  },
+  {
+   "id": "OP-POS-DELIVERY-CREATE",
+   "entity": "DeliveryNote",
+   "action": "create",
+   "surface": "?tab=delivery_notes",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc kind='delivery', status 'Draft'. No order link, no warehouse, no quantities, NO COGS and NO journal entry despite the blurb",
+   "requiredBehaviour": "Create against order lines with shipped quantities; post stock movement and COGS transactionally",
+   "apiMethodPath": "POST /api/v1/sales/delivery-notes",
+   "authorization": "warehouse_operator+/sales_editor+",
+   "validation": "shippedQty <= orderedQty - alreadyShipped (over-delivery rule undefined in source); warehouse required when an inventory leg is on",
+   "sideEffect": "inventory movement + GL posting (currently none)"
+  },
+  {
+   "id": "OP-POS-DELIVERY-DISPATCH",
+   "entity": "DeliveryNote",
+   "action": "transition",
+   "surface": "?tab=delivery_notes",
+   "sourceFile": "src/lib/posData.ts",
+   "sourceLine": 63,
+   "currentBehaviour": "MISSING — Dispatched / Delivered / Invoiced are unreachable",
+   "requiredBehaviour": "Dispatch and deliver transitions with timestamps; Invoiced derived from invoice linkage",
+   "apiMethodPath": "POST /api/v1/sales/delivery-notes/{id}/transition",
+   "authorization": "warehouse_operator+",
+   "validation": "legal transition"
+  },
+  {
+   "id": "OP-POS-DELIVERY-DELETE",
+   "entity": "DeliveryNote",
+   "action": "delete",
+   "surface": "?tab=delivery_notes",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 149,
+   "currentBehaviour": "Unconfirmed hard delete with no audit",
+   "requiredBehaviour": "Reverse the shipment with a compensating movement; never delete a posted note",
+   "apiMethodPath": "POST /api/v1/sales/delivery-notes/{id}/reverse",
+   "authorization": "sales_manager+",
+   "validation": "not invoiced"
+  },
+  {
+   "id": "OP-POS-INVOICE-LIST",
+   "entity": "SalesInvoice",
+   "action": "list",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 114,
+   "currentBehaviour": "Client filter on kind + status only",
+   "requiredBehaviour": "Server list with status/payment/source/date/customer filters and paging",
+   "apiMethodPath": "GET /api/v1/sales/invoices",
+   "authorization": "sales_viewer+/ar_viewer+",
+   "validation": "filter enums"
+  },
+  {
+   "id": "OP-POS-INVOICE-SCAN",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 141,
+   "currentBehaviour": "INERT — an uncontrolled <input> with a placeholder 'Scan receipt or type invoice no...'; no value, no onChange, no handler. Typing does nothing",
+   "requiredBehaviour": "Lookup by receipt/invoice number that navigates to the document",
+   "apiMethodPath": "GET /api/v1/sales/invoices?reference=",
+   "authorization": "sales_viewer+",
+   "validation": "reference format"
+  },
+  {
+   "id": "OP-POS-INVOICE-FILTER-PAYMENT",
+   "entity": "SalesInvoice",
+   "action": "list",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 146,
+   "currentBehaviour": "INERT — uncontrolled <select> with no value/onChange; changing it filters nothing",
+   "requiredBehaviour": "Real payment-state filter backed by allocations",
+   "apiMethodPath": "GET /api/v1/sales/invoices?payment=",
+   "authorization": "ar_viewer+",
+   "validation": "enum Unpaid|Part paid|Paid"
+  },
+  {
+   "id": "OP-POS-INVOICE-FILTER-SOURCE",
+   "entity": "SalesInvoice",
+   "action": "list",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 154,
+   "currentBehaviour": "INERT — uncontrolled <select>. Its vocabulary (Manual|POS|Subscription|Order) also over-promises: only 'Manual' and 'Subscription <ref>' are ever written",
+   "requiredBehaviour": "Real source filter against a typed source enum plus a source document id",
+   "apiMethodPath": "GET /api/v1/sales/invoices?source=",
+   "authorization": "sales_viewer+",
+   "validation": "enum"
+  },
+  {
+   "id": "OP-POS-INVOICE-CREATE",
+   "entity": "SalesInvoice",
+   "action": "create",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc kind='invoice', status 'Draft', payment 'Unpaid', dueDate '', total = a typed number. No lines, no tax, no order/delivery link",
+   "requiredBehaviour": "Create from order/delivery lines; server-computed subtotal/discount/tax/grand total; dueDate from payment terms",
+   "apiMethodPath": "POST /api/v1/sales/invoices",
+   "authorization": "sales_editor+",
+   "validation": "customerId; >=1 line; MatchPolicy.requireOrder/requireDelivery enforced here; currency consistency; Idempotency-Key",
+   "sideEffect": "none today"
+  },
+  {
+   "id": "OP-POS-INVOICE-POST",
+   "entity": "SalesInvoice",
+   "action": "transition",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 125,
+   "currentBehaviour": "MISSING — the blurb promises 'post to GL' but NOTHING in the app can move an invoice off Draft. This single gap zeroes the dashboard, AR aging and every revenue KPI",
+   "requiredBehaviour": "Atomic post: allocate the number, freeze tax rates, write balanced journal entries, make the document immutable",
+   "apiMethodPath": "POST /api/v1/sales/invoices/{id}/post",
+   "authorization": "sales_manager+ / accountant",
+   "validation": "match policy result; open fiscal period; balanced entry; no double post (idempotent)",
+   "sideEffect": "GL journal entries"
+  },
+  {
+   "id": "OP-POS-INVOICE-MATCH",
+   "entity": "SalesInvoice",
+   "action": "execute",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1075,
+   "currentBehaviour": "MISSING — MatchPolicy is stored and re-read but never evaluated; the blurb promises 'run a 3-way match'",
+   "requiredBehaviour": "Compare invoice lines against order and delivery lines, apply price/quantity tolerance and the warn/block/ignore action, persist the match result",
+   "apiMethodPath": "POST /api/v1/sales/invoices/{id}/match",
+   "authorization": "sales_editor+",
+   "validation": "tolerance basis (per line vs per document) is UNDEFINED in source"
+  },
+  {
+   "id": "OP-POS-INVOICE-PAYMENT",
+   "entity": "CustomerPayment",
+   "action": "create",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 30,
+   "currentBehaviour": "MISSING — no record-payment control exists; the payment column is a frozen string",
+   "requiredBehaviour": "Record a payment and allocate it across invoices; derive Part paid/Paid; guard replay with an idempotency key",
+   "apiMethodPath": "POST /api/v1/sales/payments",
+   "authorization": "ar_editor+",
+   "validation": "amount>0; allocation <= outstanding; currency match; Idempotency-Key",
+   "sideEffect": "GL posting"
+  },
+  {
+   "id": "OP-POS-INVOICE-DELETE",
+   "entity": "SalesInvoice",
+   "action": "delete",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 149,
+   "currentBehaviour": "A 'Delete' button hard-deletes any invoice from the array with NO confirmation and NO audit event, and frees its reference number for reuse",
+   "requiredBehaviour": "Draft invoices archive; posted invoices are corrected by a credit note, never deleted",
+   "apiMethodPath": "POST /api/v1/sales/invoices/{id}/void",
+   "authorization": "sales_manager+",
+   "validation": "not posted, or produce a reversing document"
+  },
+  {
+   "id": "OP-POS-INVOICE-NAV-RETURNS",
+   "entity": "SalesReturn",
+   "action": "read",
+   "surface": "?tab=sales_invoices",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 135,
+   "currentBehaviour": "'Returns (RMA)' button calls select('sales_returns') — navigates to the list; carries NO invoice context",
+   "requiredBehaviour": "Raise a return against the selected invoice, pre-filled with its lines",
+   "apiMethodPath": "POST /api/v1/sales/returns",
+   "authorization": "sales_editor+",
+   "validation": "invoiceId required"
+  },
+  {
+   "id": "OP-POS-SHIFT-OPEN",
+   "entity": "PosShift",
+   "action": "create",
+   "surface": "?tab=pos",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 692,
+   "currentBehaviour": "openPosShift -> localStorage. cashier = session.user.fullName (a STRING, falling back to the literal 'Cashier'), currency hardcoded 'USD' and labelled 'Org default' though Company.currency is never read, warehouse one of three hardcoded strings, cashTaken/cardTaken forced to 0. NOTHING prevents a second open shift for the same cashier or till",
+   "requiredBehaviour": "Open a shift bound to terminal + authenticated cashier id + company currency; refuse a second open shift on the same terminal",
+   "apiMethodPath": "POST /api/v1/pos/shifts",
+   "authorization": "cashier+",
+   "validation": "openingFloat >= 0; no existing open shift for terminal; currency = company currency; Idempotency-Key",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-POS-SHIFT-CLOSE",
+   "entity": "PosShift",
+   "action": "transition",
+   "surface": "?tab=pos",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 636,
+   "currentBehaviour": "closePosShift(id, Number(counted)) — sets closedAt and countedCash. Accepts NEGATIVE counts; never asks for a variance reason even though the settings hint promises the close is blocked above `reasonAbove`; expected cash = openingFloat + cashTaken where cashTaken is always 0. Two tabs can close the same shift with no conflict detection",
+   "requiredBehaviour": "Close with a server-computed expected figure, a frozen variance, a mandatory reason above the policy threshold, and an optimistic-concurrency guard against concurrent closes",
+   "apiMethodPath": "POST /api/v1/pos/shifts/{id}/close",
+   "authorization": "cashier (own shift) or shift_manager",
+   "validation": "countedCash >= 0; reason required when |variance| > reasonAbove; shift still open; If-Match version",
+   "sideEffect": "cash journal posting"
+  },
+  {
+   "id": "OP-POS-SHIFT-WAREHOUSE",
+   "entity": "PosShift",
+   "action": "update",
+   "surface": "?tab=pos",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 677,
+   "currentBehaviour": "setState; three HARDCODED options ('— no inventory leg —', 'Main warehouse', 'Store front') stored as a display string. The copy directly below promises DR COGS / CR Inventory postings that do not exist",
+   "requiredBehaviour": "Warehouse list from the inventory module, stored as a FK; posting rules only where the inventory integration is genuinely wired",
+   "apiMethodPath": "GET /api/v1/inventory/warehouses",
+   "authorization": "cashier+",
+   "validation": "warehouse belongs to the company"
+  },
+  {
+   "id": "OP-POS-SALE-CREATE",
+   "entity": "PosSale",
+   "action": "create",
+   "surface": "?tab=pos",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 653,
+   "currentBehaviour": "MISSING ENTIRELY — the 'POS till' pane only opens and closes a drawer. There is no cart, no item lookup, no tender entry, no receipt. cashTaken/cardTaken are written as 0 and never incremented anywhere in the codebase",
+   "requiredBehaviour": "Full sale capture: cart lines, discounts, tax, loyalty, multi-tender, receipt number, invoice generation, shift totals updated transactionally",
+   "apiMethodPath": "POST /api/v1/pos/sales",
+   "authorization": "cashier with an open shift",
+   "validation": "open shift required; line prices from the pricing service; tender sum == grand total; Idempotency-Key prevents duplicate receipts",
+   "sideEffect": "receipt, invoice, stock movement, loyalty accrual"
+  },
+  {
+   "id": "OP-POS-SALE-TENDER",
+   "entity": "PosSaleTender",
+   "action": "create",
+   "surface": "?tab=pos",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 654,
+   "currentBehaviour": "MISSING — 'cash, card, and UPI tenders all roll up to one cashier reconciliation' is copy with no model behind it",
+   "requiredBehaviour": "Per-tender rows rolling into shift cash/card totals; card/UPI capture needs a payment provider that is NOT specified anywhere in source",
+   "apiMethodPath": "POST /api/v1/pos/sales/{id}/tenders",
+   "authorization": "cashier",
+   "validation": "amount>0; currency = shift currency; sum <= grand total"
+  },
+  {
+   "id": "OP-POS-SHIFT-LIST",
+   "entity": "PosShift",
+   "action": "list",
+   "surface": "?tab=shift_dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 719,
+   "currentBehaviour": "Client filter on closedAt + ageOf(closedAt) <= days; cashier counts use a Set of NAME STRINGS",
+   "requiredBehaviour": "Server list scoped by tenant/company/terminal with cashier ids",
+   "apiMethodPath": "GET /api/v1/pos/shifts",
+   "authorization": "shift_manager+ (own shifts for a cashier)",
+   "validation": "period enum"
+  },
+  {
+   "id": "OP-POS-SHIFT-TAKINGS",
+   "entity": "PosShift",
+   "action": "read",
+   "surface": "?tab=shift_dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 731,
+   "currentBehaviour": "Sums cashTaken/cardTaken which are structurally 0, so 'Till takings', 'Cash mix' and 'Takings by cashier' always render USD 0. The sub-line also claims '{closed.length} sales' using the SHIFT count as a sale count",
+   "requiredBehaviour": "Aggregate from real sale tenders; sales counted from sales, not shifts",
+   "apiMethodPath": "GET /api/v1/pos/shifts/metrics",
+   "authorization": "shift_manager+",
+   "validation": "date range, currency"
+  },
+  {
+   "id": "OP-POS-SHIFT-VARIANCE",
+   "entity": "PosShift",
+   "action": "read",
+   "surface": "?tab=shift_dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 723,
+   "currentBehaviour": "Recomputes variance on every render as countedCash - (openingFloat + cashTaken); bands read posSettings.cashVariance.redWorst/amberWorst. The 'recent average' thresholds stored in settings are NEVER used by any code",
+   "requiredBehaviour": "Persist the variance at close; evaluate worst-shift AND rolling-average bands over a defined window",
+   "apiMethodPath": "GET /api/v1/pos/shifts/variance",
+   "authorization": "shift_manager+",
+   "validation": "window length (undefined in source)"
+  },
+  {
+   "id": "OP-POS-SHIFT-AUTOREFRESH",
+   "entity": "PosShift",
+   "action": "read",
+   "surface": "?tab=shift_dashboard",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 740,
+   "currentBehaviour": "A green dot and the text 'Auto-refresh 30s' with NO interval, subscription or polling anywhere in the file",
+   "requiredBehaviour": "Real polling or a live subscription, or remove the claim",
+   "apiMethodPath": "GET /api/v1/pos/shifts?since=",
+   "authorization": "shift_manager+",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-RETURN-CREATE",
+   "entity": "SalesReturn",
+   "action": "create",
+   "surface": "?tab=sales_returns",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc kind='return' with a free-text Reason, status 'Draft' taken from the INVOICE status list (so a return can be 'Part paid' or 'Overdue'). No invoice link, no quantities, no refund ceiling",
+   "requiredBehaviour": "Raise against an invoice line with returned quantities capped at invoiced minus already returned; own status vocabulary",
+   "apiMethodPath": "POST /api/v1/sales/returns",
+   "authorization": "sales_editor+",
+   "validation": "originalInvoiceId required; returnedQty <= remaining; reason code from a taxonomy",
+   "sideEffect": "restock movement"
+  },
+  {
+   "id": "OP-POS-RETURN-DELETE",
+   "entity": "SalesReturn",
+   "action": "delete",
+   "surface": "?tab=sales_returns",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 149,
+   "currentBehaviour": "Unconfirmed hard delete, no audit",
+   "requiredBehaviour": "Void with a reversing document; never delete",
+   "apiMethodPath": "POST /api/v1/sales/returns/{id}/void",
+   "authorization": "sales_manager+",
+   "validation": "no credit note raised"
+  },
+  {
+   "id": "OP-POS-CREDIT-CREATE",
+   "entity": "CreditNote",
+   "action": "create",
+   "surface": "?tab=credit_notes",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc kind='credit', status 'Draft', free-text reason, typed total. No customer-account linkage beyond the name, no applied/remaining tracking",
+   "requiredBehaviour": "Create against the customer account with a reason code; track applied vs remaining; post to GL when posted",
+   "apiMethodPath": "POST /api/v1/sales/credit-notes",
+   "authorization": "sales_manager+",
+   "validation": "amount>0; reason code; approval threshold (UNDEFINED in source)",
+   "sideEffect": "GL posting"
+  },
+  {
+   "id": "OP-POS-CREDIT-APPLY",
+   "entity": "PaymentAllocation",
+   "action": "execute",
+   "surface": "?tab=credit_notes",
+   "sourceFile": "src/lib/posData.ts",
+   "sourceLine": 190,
+   "currentBehaviour": "MISSING — the 'Applied' status exists with no application action and no target",
+   "requiredBehaviour": "Apply a credit note against one or more invoices, decrementing its remaining amount atomically",
+   "apiMethodPath": "POST /api/v1/sales/credit-notes/{id}/apply",
+   "authorization": "ar_editor+",
+   "validation": "applied <= remaining; invoice outstanding >= amount"
+  },
+  {
+   "id": "OP-POS-CREDIT-DELETE",
+   "entity": "CreditNote",
+   "action": "delete",
+   "surface": "?tab=credit_notes",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 149,
+   "currentBehaviour": "Unconfirmed hard delete of a financial document, no audit",
+   "requiredBehaviour": "Void only while unapplied and unposted",
+   "apiMethodPath": "POST /api/v1/sales/credit-notes/{id}/void",
+   "authorization": "sales_manager+",
+   "validation": "unapplied"
+  },
+  {
+   "id": "OP-POS-REFUND-CREATE",
+   "entity": "Refund",
+   "action": "create",
+   "surface": "?tab=refunds",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc kind='refund', status = statuses[1] = 'Pending', free-text reason, typed total. No credit-note link, no method, no ceiling",
+   "requiredBehaviour": "Create against a credit note or over-payment with a capped amount and a capture method",
+   "apiMethodPath": "POST /api/v1/sales/refunds",
+   "authorization": "ar_manager+ (separation of duties from the credit note author)",
+   "validation": "amount <= credit remaining; method required; Idempotency-Key",
+   "sideEffect": "outbound payment — NO provider contract is inferable from source"
+  },
+  {
+   "id": "OP-POS-REFUND-EXECUTE",
+   "entity": "Refund",
+   "action": "execute",
+   "surface": "?tab=refunds",
+   "sourceFile": "src/lib/posData.ts",
+   "sourceLine": 201,
+   "currentBehaviour": "MISSING — 'Sent' and 'Failed' are unreachable; nothing sends money",
+   "requiredBehaviour": "Dispatch through an approved payout path with replay protection, uncertain-result recovery and a recorded provider reference; or an explicitly recorded manual settlement",
+   "apiMethodPath": "POST /api/v1/sales/refunds/{id}/execute",
+   "authorization": "finance_approver",
+   "validation": "exactly-once; provider reference persisted before status flips",
+   "sideEffect": "real money movement — requires an explicit provider decision"
+  },
+  {
+   "id": "OP-POS-REFUND-DELETE",
+   "entity": "Refund",
+   "action": "delete",
+   "surface": "?tab=refunds",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 149,
+   "currentBehaviour": "Unconfirmed hard delete of a payout record, no audit",
+   "requiredBehaviour": "Cancel only while Pending; never delete a sent refund",
+   "apiMethodPath": "POST /api/v1/sales/refunds/{id}/cancel",
+   "authorization": "finance_approver",
+   "validation": "status = Pending"
+  },
+  {
+   "id": "OP-POS-AGING-READ",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=ar_aging",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 922,
+   "currentBehaviour": "Duplicated bucket logic (identical to the dashboard's, copy-pasted). Because dueDate is always '' and posted is always empty, the pane permanently shows 0 across all five buckets",
+   "requiredBehaviour": "Single server aging service with an asOf snapshot date, bucket definitions and currency scope",
+   "apiMethodPath": "GET /api/v1/sales/ar/aging?asOf=",
+   "authorization": "ar_viewer+",
+   "validation": "asOf date; company; currency"
+  },
+  {
+   "id": "OP-POS-AGING-BYCUSTOMER",
+   "entity": "Customer",
+   "action": "read",
+   "surface": "?tab=ar_aging",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 936,
+   "currentBehaviour": "Groups by customer NAME string and sorts by amount. The sub-heading claims 'Ordered oldest-first within each row' — no per-row ordering or per-row detail exists at all",
+   "requiredBehaviour": "Group by customer id with an expandable per-invoice breakdown ordered by age",
+   "apiMethodPath": "GET /api/v1/sales/ar/aging/by-customer",
+   "authorization": "ar_viewer+",
+   "validation": "paging"
+  },
+  {
+   "id": "OP-POS-AGING-EXPORT",
+   "entity": "SalesInvoice",
+   "action": "export",
+   "surface": "?tab=ar_aging",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 941,
+   "currentBehaviour": "MISSING — no export control on an AR surface",
+   "requiredBehaviour": "Permission-scoped CSV/XLSX export with a snapshot date and formula-safe cells",
+   "apiMethodPath": "GET /api/v1/sales/ar/aging/export.csv",
+   "authorization": "ar_viewer+ with export permission",
+   "validation": "MIME must match the label",
+   "sideEffect": "file download"
+  },
+  {
+   "id": "OP-POS-REPORT-TAB",
+   "entity": "—",
+   "action": "read",
+   "surface": "?tab=reports",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1011,
+   "currentBehaviour": "setState only; the tab is not reflected in the URL so a report cannot be linked or refreshed into",
+   "requiredBehaviour": "URL-addressable report tabs with server-side data per tab",
+   "apiMethodPath": "n/a",
+   "authorization": "sales_viewer+",
+   "validation": "tab id enum"
+  },
+  {
+   "id": "OP-POS-REPORT-STATUS-FILTER",
+   "entity": "SalesOrder",
+   "action": "list",
+   "surface": "?tab=reports",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1026,
+   "currentBehaviour": "Client filter. Its option list ['All statuses','Draft','Confirmed','Delivered','Closed'] silently OMITS 'Partially delivered' which exists in orderStatuses, so those orders are unreachable from every report. The filter also applies to all ten tabs though only one uses it",
+   "requiredBehaviour": "Filter vocabulary derived from a single status enum; per-tab applicable filters",
+   "apiMethodPath": "GET /api/v1/sales/reports/{tab}?status=",
+   "authorization": "sales_viewer+",
+   "validation": "status enum"
+  },
+  {
+   "id": "OP-POS-REPORT-TRACKER",
+   "entity": "SalesOrder",
+   "action": "read",
+   "surface": "?tab=reports&report=tracker",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1038,
+   "currentBehaviour": "The ONLY implemented tab: renders the filtered sales-order array as a flat list. No date range, no totals, no paging, no export",
+   "requiredBehaviour": "Order-to-cash tracker with stage timestamps, ageing, totals and export",
+   "apiMethodPath": "GET /api/v1/sales/reports/tracker",
+   "authorization": "sales_viewer+",
+   "validation": "date range, company, currency"
+  },
+  {
+   "id": "OP-POS-REPORT-CUSTOMER",
+   "entity": "Customer",
+   "action": "read",
+   "surface": "?tab=reports&report=customer",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty: '<label> needs trade history this rebuild does not simulate yet.'",
+   "requiredBehaviour": "Revenue, order count, AOV and outstanding per customer over a date range",
+   "apiMethodPath": "GET /api/v1/sales/reports/customer-performance",
+   "authorization": "sales_viewer+",
+   "validation": "date range; currency"
+  },
+  {
+   "id": "OP-POS-REPORT-COHORT",
+   "entity": "Customer",
+   "action": "read",
+   "surface": "?tab=reports&report=cohort",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty",
+   "requiredBehaviour": "Cohort retention by first-purchase month",
+   "apiMethodPath": "GET /api/v1/sales/reports/cohort",
+   "authorization": "sales_viewer+",
+   "validation": "cohort granularity and retention window are UNDEFINED in source"
+  },
+  {
+   "id": "OP-POS-REPORT-MARGIN",
+   "entity": "SalesDocumentLine",
+   "action": "read",
+   "surface": "?tab=reports&report=margin",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty",
+   "requiredBehaviour": "Margin by category — requires item categories AND unit cost, neither of which exists in this domain",
+   "apiMethodPath": "GET /api/v1/sales/reports/margin",
+   "authorization": "sales_manager+ (cost data is sensitive)",
+   "validation": "date range; cost basis method undefined in source"
+  },
+  {
+   "id": "OP-POS-REPORT-DAILY",
+   "entity": "PosSale",
+   "action": "read",
+   "surface": "?tab=reports&report=daily",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty",
+   "requiredBehaviour": "Daily sales series in the tenant time zone",
+   "apiMethodPath": "GET /api/v1/sales/reports/daily",
+   "authorization": "sales_viewer+",
+   "validation": "time zone, date range"
+  },
+  {
+   "id": "OP-POS-REPORT-ZREPORT",
+   "entity": "PosShift",
+   "action": "read",
+   "surface": "?tab=reports&report=zreport",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty",
+   "requiredBehaviour": "Day sheet / Z-report per shift and terminal: tenders, voids, refunds, drawer count, variance",
+   "apiMethodPath": "GET /api/v1/pos/reports/z-report",
+   "authorization": "shift_manager+",
+   "validation": "shift or business date required"
+  },
+  {
+   "id": "OP-POS-REPORT-ITEM",
+   "entity": "SalesDocumentLine",
+   "action": "read",
+   "surface": "?tab=reports&report=item",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty",
+   "requiredBehaviour": "Item sales by quantity and value — blocked on the missing line-item model",
+   "apiMethodPath": "GET /api/v1/sales/reports/items",
+   "authorization": "sales_viewer+",
+   "validation": "date range"
+  },
+  {
+   "id": "OP-POS-REPORT-CASHIER",
+   "entity": "PosShift",
+   "action": "read",
+   "surface": "?tab=reports&report=cashier",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty",
+   "requiredBehaviour": "Cashier performance from sales and variance, grouped by cashier id",
+   "apiMethodPath": "GET /api/v1/pos/reports/cashier",
+   "authorization": "shift_manager+",
+   "validation": "date range"
+  },
+  {
+   "id": "OP-POS-REPORT-CASHFLOW",
+   "entity": "SalesInvoice",
+   "action": "read",
+   "surface": "?tab=reports&report=cashflow",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty, though the page blurb advertises 'an AI cashflow forecast'",
+   "requiredBehaviour": "Forecast from due dates and payment history; the model/provider is not specified in source",
+   "apiMethodPath": "GET /api/v1/sales/reports/cashflow-forecast",
+   "authorization": "finance_viewer+",
+   "validation": "horizon; currency"
+  },
+  {
+   "id": "OP-POS-REPORT-AI",
+   "entity": "—",
+   "action": "execute",
+   "surface": "?tab=reports&report=ai",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1054,
+   "currentBehaviour": "Canned Empty; no prompt box, no model call, no credit spend",
+   "requiredBehaviour": "Grounded question answering over the tenant's own sales records with credit reservation and an audit trail",
+   "apiMethodPath": "POST /api/v1/sales/reports/ai-assist",
+   "authorization": "sales_viewer+ with AI entitlement",
+   "validation": "credit balance; prompt-injection handling on retrieved rows"
+  },
+  {
+   "id": "OP-POS-REPORT-EXPORT",
+   "entity": "—",
+   "action": "export",
+   "surface": "?tab=reports",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1004,
+   "currentBehaviour": "MISSING — no export control on any report tab",
+   "requiredBehaviour": "Per-report export whose MIME matches its label",
+   "apiMethodPath": "GET /api/v1/sales/reports/{tab}/export",
+   "authorization": "export permission",
+   "validation": "format enum",
+   "sideEffect": "file download"
+  },
+  {
+   "id": "OP-POS-SUB-LIST",
+   "entity": "Subscription",
+   "action": "list",
+   "surface": "?tab=subscriptions",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 114,
+   "currentBehaviour": "Client filter on kind + status ['All','Active','Paused','Ended']",
+   "requiredBehaviour": "Server list with next-run and due filters",
+   "apiMethodPath": "GET /api/v1/sales/subscriptions",
+   "authorization": "sales_viewer+",
+   "validation": "status enum"
+  },
+  {
+   "id": "OP-POS-SUB-CREATE",
+   "entity": "Subscription",
+   "action": "create",
+   "surface": "?tab=subscriptions",
+   "sourceFile": "src/screens/app/pos/parts.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "addPosDoc kind='subscription', status 'Active'. Captures ONLY customer and amount — no interval, no start date, no anchor, no next run",
+   "requiredBehaviour": "Capture interval/count, start and anchor dates, end condition, and the lines to bill",
+   "apiMethodPath": "POST /api/v1/sales/subscriptions",
+   "authorization": "sales_editor+",
+   "validation": "interval enum; startDate; amount>0; currency",
+   "sideEffect": "schedules future billing"
+  },
+  {
+   "id": "OP-POS-SUB-SWEEP",
+   "entity": "SalesInvoice",
+   "action": "execute",
+   "surface": "?tab=subscriptions",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 59,
+   "currentBehaviour": "NOT IDEMPOTENT. 'Run due now' iterates EVERY subscription whose status === 'Active' — 'due' is never evaluated because no due date exists — and calls addPosDoc for each, creating a fresh Draft invoice on EVERY click. No period key, no dedup, no last-run marker, no request key, no confirmation, no result summary. Two clicks produce two identical invoices per subscription; the button then navigates to the invoice list via select('sales_invoices'), which looks like success. Each invoice copies sub.total verbatim and sets dueDate ''",
+   "requiredBehaviour": "Server sweep keyed by (subscriptionId, periodKey) with a UNIQUE constraint so a repeat click, a double submit or a dispatcher retry is a no-op; only genuinely due periods are billed; a run record reports created/skipped/failed counts",
+   "apiMethodPath": "POST /api/v1/sales/subscriptions/run-due",
+   "authorization": "sales_manager+ / scheduler service identity",
+   "validation": "Idempotency-Key required; per-period unique constraint; asOf date; refuse periods already invoiced",
+   "sideEffect": "creates invoices (and, once posting exists, GL entries)"
+  },
+  {
+   "id": "OP-POS-SUB-SCHEDULED",
+   "entity": "Subscription",
+   "action": "execute",
+   "surface": "?tab=subscriptions",
+   "sourceFile": "src/screens/app/pos/SalesPos.tsx",
+   "sourceLine": 213,
+   "currentBehaviour": "MISSING — the blurb states 'Daily beat task auto-generates draft invoices'. No scheduler, cron or job exists; only the manual button",
+   "requiredBehaviour": "A real scheduled job sharing the same idempotent service as the manual sweep, with run history and failure alerting",
+   "apiMethodPath": "POST /api/v1/jobs/subscriptions/daily",
+   "authorization": "scheduler service identity",
+   "validation": "one run per tenant per business date"
+  },
+  {
+   "id": "OP-POS-SUB-PAUSE",
+   "entity": "Subscription",
+   "action": "transition",
+   "surface": "?tab=subscriptions",
+   "sourceFile": "src/lib/posData.ts",
+   "sourceLine": 215,
+   "currentBehaviour": "MISSING — 'Paused' and 'Ended' are unreachable; only Delete exists, which silently stops billing and frees the SUB reference",
+   "requiredBehaviour": "Pause / resume / end transitions with effective dates",
+   "apiMethodPath": "POST /api/v1/sales/subscriptions/{id}/transition",
+   "authorization": "sales_manager+",
+   "validation": "legal transition; effective date"
+  },
+  {
+   "id": "OP-POS-MATCH-EDIT",
+   "entity": "MatchPolicy",
+   "action": "update",
+   "surface": "?tab=match_settings",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1108,
+   "currentBehaviour": "setState into a local draft; Number(event.target.value) yields NaN for a cleared field, and NaN !== saved keeps the Save button enabled so NaN can be persisted. No min/max bound",
+   "requiredBehaviour": "Bounded numeric input with server validation",
+   "apiMethodPath": "n/a (draft)",
+   "authorization": "sales_manager+",
+   "validation": "0 <= tolerance <= 100; finite"
+  },
+  {
+   "id": "OP-POS-MATCH-SAVE",
+   "entity": "MatchPolicy",
+   "action": "update",
+   "surface": "?tab=match_settings",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1077,
+   "currentBehaviour": "updateMatchSettings -> localStorage + a pos.match_settings_updated audit row. NOTE: it does NOT write a POS Change History entry, so the Change History pane under-reports actual configuration changes",
+   "requiredBehaviour": "Versioned policy save with actor, before/after values, and a Change History row",
+   "apiMethodPath": "PUT /api/v1/sales/settings/match-policy",
+   "authorization": "sales_manager+",
+   "validation": "tolerances finite and bounded; action enum",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-POS-MATCH-REQDOCS",
+   "entity": "MatchPolicy",
+   "action": "update",
+   "surface": "?tab=match_settings",
+   "sourceFile": "src/screens/app/pos/panes.tsx",
+   "sourceLine": 1167,
+   "currentBehaviour": "Checkbox -> local draft. Copy says 'Refuse an invoice that is not linked back to its paperwork' and 'Blocks invoicing before the goods have shipped'; nothing is ever blocked",
+   "requiredBehaviour": "Enforced at invoice create/post: refuse when the required linkage is absent",
+   "apiMethodPath": "PUT /api/v1/sales/settings/match-policy",
+   "authorization": "sales_manager+",
+   "validation": "boolean"
+  },
+  {
+   "id": "OP-POS-SET-TAX-SEED",
+   "entity": "TaxCategory",
+   "action": "create",
+   "surface": "?tab=settings/tax",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 51,
+   "currentBehaviour": "Appends five rows (0/5/12/18/28) built from standardGstSlabs. Clicking twice creates DUPLICATE categories with no uniqueness check. Stores rendered strings like 'CGST 9% + SGST 9%', not computable components",
+   "requiredBehaviour": "Idempotent seeding of a tax taxonomy with computable components and effective dates. Statutory rates and their applicability must be an explicit product/legal decision, not copied from a seed array",
+   "apiMethodPath": "POST /api/v1/sales/settings/tax-categories/seed",
+   "authorization": "org_admin/finance_admin",
+   "validation": "unique name per tenant; idempotent on re-run",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-POS-SET-TAX-CREATE",
+   "entity": "TaxCategory",
+   "action": "create",
+   "surface": "?tab=settings/tax",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 155,
+   "currentBehaviour": "updatePosSettings with a new row; rate = Number(draft.rate)||0 (negatives and >100 accepted); the split is derived as rate/2 and rendered into two strings at create time, so later rate edits cannot exist",
+   "requiredBehaviour": "Create a category with typed components and an effective-from date; rate bounds enforced server-side",
+   "apiMethodPath": "POST /api/v1/sales/settings/tax-categories",
+   "authorization": "finance_admin",
+   "validation": "0 <= rate <= 100; unique name; component split must be an explicit rule",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-POS-SET-TAX-DELETE",
+   "entity": "TaxCategory",
+   "action": "delete",
+   "surface": "?tab=settings/tax",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 97,
+   "currentBehaviour": "Array filter + a Change History line. No confirmation, and no check for documents using the category (none can, since nothing references it)",
+   "requiredBehaviour": "Archive with effective-to; refuse while referenced by unposted documents; posted documents keep their frozen rate",
+   "apiMethodPath": "POST /api/v1/sales/settings/tax-categories/{id}/archive",
+   "authorization": "finance_admin",
+   "validation": "not referenced"
+  },
+  {
+   "id": "OP-POS-SET-GROUP-SEED",
+   "entity": "CustomerGroup",
+   "action": "create",
+   "surface": "?tab=settings/groups",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 238,
+   "currentBehaviour": "REPLACES the whole array with Walk-in/Regulars/Wholesale (assignment, not append) — only reachable from the empty state, so nothing is lost today, but the semantics are destructive",
+   "requiredBehaviour": "Idempotent seed that skips existing names",
+   "apiMethodPath": "POST /api/v1/sales/settings/customer-groups/seed",
+   "authorization": "sales_manager+",
+   "validation": "idempotent"
+  },
+  {
+   "id": "OP-POS-SET-GROUP-CREATE",
+   "entity": "CustomerGroup",
+   "action": "create",
+   "surface": "?tab=settings/groups",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 268,
+   "currentBehaviour": "Appends {id, name}; NO case-insensitive uniqueness check despite the pane copy promising exactly that ('can\\'t split across Regulars and regulars')",
+   "requiredBehaviour": "Create with a citext unique constraint per tenant",
+   "apiMethodPath": "POST /api/v1/sales/settings/customer-groups",
+   "authorization": "sales_manager+",
+   "validation": "unique lower(name); length <= 100"
+  },
+  {
+   "id": "OP-POS-SET-GROUP-DELETE",
+   "entity": "CustomerGroup",
+   "action": "delete",
+   "surface": "?tab=settings/groups",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 216,
+   "currentBehaviour": "Array filter, no confirmation, no reassignment of members (there are none to reassign)",
+   "requiredBehaviour": "Archive; require a reassignment target when customers are attached",
+   "apiMethodPath": "POST /api/v1/sales/settings/customer-groups/{id}/archive",
+   "authorization": "sales_manager+",
+   "validation": "member reassignment"
+  },
+  {
+   "id": "OP-POS-SET-LOYALTY-CREATE",
+   "entity": "LoyaltyProgramme",
+   "action": "create",
+   "surface": "?tab=settings/loyalty",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 384,
+   "currentBehaviour": "Appends {name, pointsPer, pointValue, tiers: []}. tiers is ALWAYS an empty array — the pane is titled 'Loyalty & tiers' and there is no tier UI. pointValue is money with no currency. Multiple overlapping programmes can be created with no active flag",
+   "requiredBehaviour": "Create with currency, active flag, effective dates and an editable tier ladder",
+   "apiMethodPath": "POST /api/v1/sales/settings/loyalty-programmes",
+   "authorization": "sales_manager+",
+   "validation": "pointsPer >= 0; pointValue >= 0; currency; at most one active programme (rule undefined in source)"
+  },
+  {
+   "id": "OP-POS-SET-LOYALTY-TIERS",
+   "entity": "LoyaltyTier",
+   "action": "update",
+   "surface": "?tab=settings/loyalty",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 291,
+   "currentBehaviour": "MISSING — the tiers field exists in the type and is never populated or rendered",
+   "requiredBehaviour": "Add/edit/remove tiers with thresholds, currency and a defined lifetime-spend window",
+   "apiMethodPath": "PUT /api/v1/sales/settings/loyalty-programmes/{id}/tiers",
+   "authorization": "sales_manager+",
+   "validation": "thresholds strictly increasing"
+  },
+  {
+   "id": "OP-POS-SET-LOYALTY-ACCRUE",
+   "entity": "LoyaltyLedgerEntry",
+   "action": "create",
+   "surface": "?tab=settings/loyalty",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 313,
+   "currentBehaviour": "MISSING — 'Points accrue on the net subtotal of every sale attached to a customer, and are spent at the till as a discount on the bill' is copy only; there is no sale, no ledger and no balance",
+   "requiredBehaviour": "Accrue on sale completion and redeem at the till against an append-only ledger with a balance projection",
+   "apiMethodPath": "POST /api/v1/sales/loyalty/accrue | /redeem",
+   "authorization": "system (accrual) / cashier (redemption)",
+   "validation": "redemption <= balance; rounding rule undefined in source"
+  },
+  {
+   "id": "OP-POS-SET-LOYALTY-DELETE",
+   "entity": "LoyaltyProgramme",
+   "action": "delete",
+   "surface": "?tab=settings/loyalty",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 326,
+   "currentBehaviour": "Array filter, no confirmation — would silently discard accrued balances if any existed",
+   "requiredBehaviour": "Close the programme with an effective date; balances settled or migrated",
+   "apiMethodPath": "POST /api/v1/sales/settings/loyalty-programmes/{id}/close",
+   "authorization": "sales_manager+",
+   "validation": "zero outstanding balance or an explicit migration"
+  },
+  {
+   "id": "OP-POS-SET-VARIANCE-SAVE",
+   "entity": "CashVariancePolicy",
+   "action": "update",
+   "surface": "?tab=settings/variance",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 498,
+   "currentBehaviour": "Saves the five parsed numbers. Client-only cross-field check (red >= amber, settings.tsx:458); Number('')||0 silently turns a blank field into 0; thresholds are unit-less numbers with no currency. Only redWorst/amberWorst are ever consumed — the two average thresholds are dead configuration",
+   "requiredBehaviour": "Server-validated policy with a currency, an averaging window, and actual enforcement at shift close",
+   "apiMethodPath": "PUT /api/v1/sales/settings/cash-variance",
+   "authorization": "sales_manager+/finance_admin",
+   "validation": "all >= 0; redWorst >= amberWorst; redAverage >= amberAverage; currency required"
+  },
+  {
+   "id": "OP-POS-SET-VARIANCE-RESTORE",
+   "entity": "CashVariancePolicy",
+   "action": "update",
+   "surface": "?tab=settings/variance",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 505,
+   "currentBehaviour": "Always writes the defaults AND always appends a 'Restored the default cash variance tolerance' Change History row, even when the values are already the defaults — inflating the change log with no-op entries",
+   "requiredBehaviour": "No-op when already at defaults; otherwise a recorded change with before/after values",
+   "apiMethodPath": "POST /api/v1/sales/settings/cash-variance/restore-defaults",
+   "authorization": "sales_manager+",
+   "validation": "skip when unchanged"
+  },
+  {
+   "id": "OP-POS-SET-FIELD-CREATE",
+   "entity": "SalesCustomField",
+   "action": "create",
+   "surface": "?tab=settings/fields",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 596,
+   "currentBehaviour": "Appends {label, type}. Choosing 'Dropdown' captures NO options. No target entity, no required flag, no default, no ordering",
+   "requiredBehaviour": "Definition bound to a target entity with options, required flag, default and position",
+   "apiMethodPath": "POST /api/v1/sales/settings/custom-fields",
+   "authorization": "org_admin",
+   "validation": "unique label per entity; options required for Dropdown"
+  },
+  {
+   "id": "OP-POS-SET-FIELD-CAPTURE",
+   "entity": "SalesCustomFieldValue",
+   "action": "create",
+   "surface": "?tab=customers / all create dialogs",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 528,
+   "currentBehaviour": "MISSING — no create dialog in this domain (customer, quotation, or the shared DocListPane) renders custom fields, so a defined field can never hold a value. The Appearance pane cheerfully reports 'Custom fields on records: N'",
+   "requiredBehaviour": "Render defined fields on the target record forms and persist typed values",
+   "apiMethodPath": "POST /api/v1/sales/{entity}/{id}/custom-fields",
+   "authorization": "same as the parent record",
+   "validation": "per-field type and required validation"
+  },
+  {
+   "id": "OP-POS-SET-FIELD-DELETE",
+   "entity": "SalesCustomField",
+   "action": "delete",
+   "surface": "?tab=settings/fields",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 545,
+   "currentBehaviour": "Array filter, no confirmation, no value cleanup",
+   "requiredBehaviour": "Archive the definition and retain historical values",
+   "apiMethodPath": "POST /api/v1/sales/settings/custom-fields/{id}/archive",
+   "authorization": "org_admin",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-SET-AGENT-TOGGLE",
+   "entity": "SalesAgentControl",
+   "action": "update",
+   "surface": "?tab=settings/agents",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 701,
+   "currentBehaviour": "Adds/removes the agent NAME string in disabled[] and writes a Change History line. No agent ever runs, so the switch changes nothing observable; the row caption 'Runs automatically on create' is false",
+   "requiredBehaviour": "Enable/disable a real agent binding by id, gating actual execution and credit spend",
+   "apiMethodPath": "PUT /api/v1/apps/POS/agents/{agentId}/enabled",
+   "authorization": "org_admin",
+   "validation": "agentId exists for the app"
+  },
+  {
+   "id": "OP-POS-SET-AGENT-PAUSEALL",
+   "entity": "SalesAgentControl",
+   "action": "update",
+   "surface": "?tab=settings/agents",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 644,
+   "currentBehaviour": "Checkbox labelled 'Pause AI agents (all apps)' but persisted ONLY inside posSettings.agents — it cannot affect any other app. Summary text claims 'Paused AI agents across all apps'",
+   "requiredBehaviour": "A tenant-level pause switch stored once, honoured by every app's agent runner",
+   "apiMethodPath": "PUT /api/v1/tenants/{id}/agents/pause",
+   "authorization": "org_admin",
+   "validation": "boolean"
+  },
+  {
+   "id": "OP-POS-SET-AGENT-AUTOPAUSE",
+   "entity": "SalesAgentControl",
+   "action": "update",
+   "surface": "?tab=settings/agents",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 672,
+   "currentBehaviour": "A FREE-TEXT input (placeholder 'off') persisted as a raw string on every keystroke — each character typed appends a 'Changed the auto-pause threshold' row to Change History. Never parsed or compared to creditsUsed",
+   "requiredBehaviour": "Numeric threshold, debounced, validated, and actually enforced against the credit ledger",
+   "apiMethodPath": "PUT /api/v1/apps/POS/agents/auto-pause",
+   "authorization": "org_admin",
+   "validation": "numeric >= 0 or null; one change entry per committed edit"
+  },
+  {
+   "id": "OP-POS-SET-AGENT-DELETE",
+   "entity": "SalesAgentControl",
+   "action": "delete",
+   "surface": "?tab=settings/agents",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 723,
+   "currentBehaviour": "A trash ICON rendered inside an aria-hidden <span> — it looks like a delete control on every agent row but is not a button and has no handler",
+   "requiredBehaviour": "Either a real remove-binding action or remove the affordance",
+   "apiMethodPath": "DELETE /api/v1/apps/POS/agents/{agentId}",
+   "authorization": "org_admin",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-SET-SCHEDULES",
+   "entity": "—",
+   "action": "read",
+   "surface": "?tab=settings/schedules",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 734,
+   "currentBehaviour": "Entirely static: a permanent empty box 'No workflow attached to Sales & POS'. It does NOT read the tenant's schedules array, so a real POS schedule would not appear",
+   "requiredBehaviour": "List and manage schedules bound to this app, backed by a real scheduler",
+   "apiMethodPath": "GET /api/v1/apps/POS/schedules",
+   "authorization": "org_admin",
+   "validation": "cron expression; time zone"
+  },
+  {
+   "id": "OP-POS-SET-HISTORY-LIST",
+   "entity": "SalesSettingsChange",
+   "action": "list",
+   "surface": "?tab=settings/history",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 798,
+   "currentBehaviour": "Renders summary/by/at from localStorage. `by` is the hardcoded literal 'owner', and `at` is printed as at.slice(0,16) — a raw UTC ISO string shown without a time zone. Match-settings changes never appear here",
+   "requiredBehaviour": "Server-side change log with the real actor, tenant time zone rendering, and every settings surface feeding it",
+   "apiMethodPath": "GET /api/v1/apps/POS/settings/changes",
+   "authorization": "org_admin",
+   "validation": "paging"
+  },
+  {
+   "id": "OP-POS-SET-HISTORY-SHOWREVERTED",
+   "entity": "SalesSettingsChange",
+   "action": "list",
+   "surface": "?tab=settings/history",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 766,
+   "currentBehaviour": "setState filter on change.reverted — a flag NO code path ever sets to true, so the checkbox can never change the list",
+   "requiredBehaviour": "Real revert state, set by a working revert action",
+   "apiMethodPath": "GET /api/v1/apps/POS/settings/changes?includeReverted=",
+   "authorization": "org_admin",
+   "validation": "boolean"
+  },
+  {
+   "id": "OP-POS-SET-HISTORY-REVERT",
+   "entity": "SalesSettingsChange",
+   "action": "execute",
+   "surface": "?tab=settings/history",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 757,
+   "currentBehaviour": "MISSING — the pane blurb promises 'how to undo it' and the Copilot banner promises 'Every change is saved in Change History and can be undone'. There is no undo control, and no before/after values are stored to make one possible",
+   "requiredBehaviour": "Revert a change by restoring its stored before-value, recorded as a new forward change",
+   "apiMethodPath": "POST /api/v1/apps/POS/settings/changes/{id}/revert",
+   "authorization": "org_admin",
+   "validation": "revertable change type; no conflicting later change"
+  },
+  {
+   "id": "OP-POS-SET-HISTORY-RESET",
+   "entity": "SalesAppSettings",
+   "action": "update",
+   "surface": "?tab=settings/history",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 774,
+   "currentBehaviour": "Wipes taxCategories, customerGroups, loyalty, customFields and agents and restores variance defaults IN ONE UNCONFIRMED CLICK. It does NOT reset matchSettings (a different store) and does NOT clear the change log — it appends to it",
+   "requiredBehaviour": "Explicit confirmation naming what will be lost; a single settings-version rollback covering match policy too; fully reversible",
+   "apiMethodPath": "POST /api/v1/apps/POS/settings/reset",
+   "authorization": "org_admin",
+   "validation": "typed confirmation; snapshot taken before reset"
+  },
+  {
+   "id": "OP-POS-SET-APPEARANCE",
+   "entity": "SalesAppSettings",
+   "action": "read",
+   "surface": "?tab=settings/appearance",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 815,
+   "currentBehaviour": "Read-only <dl> of four HARDCODED strings ('Sales & POS', 'v1.0.0', 'Emerald…', 'Workspace teal…') plus a live custom-field count. Nothing is editable despite the pane blurb describing tile, name and list density",
+   "requiredBehaviour": "Either editable per-app appearance settings or an honest read-only statement of derived values",
+   "apiMethodPath": "GET /api/v1/apps/POS/appearance",
+   "authorization": "org_admin",
+   "validation": "—"
+  },
+  {
+   "id": "OP-POS-SET-COPILOT",
+   "entity": "—",
+   "action": "execute",
+   "surface": "?tab=settings/*",
+   "sourceFile": "src/screens/app/pos/settings.tsx",
+   "sourceLine": 879,
+   "currentBehaviour": "window.dispatchEvent(new Event('apragya:copilot')) opens the global CopilotDock, which spends 2 credits and returns a CANNED paragraph describing what the live product would do — it never edits any POS setting",
+   "requiredBehaviour": "Either a real natural-language settings editor writing through the same validated services, or copy that does not promise one",
+   "apiMethodPath": "POST /api/v1/copilot/ask",
+   "authorization": "tenant member with AI entitlement",
+   "validation": "credit reservation; action confirmation before any mutation",
+   "sideEffect": "credit spend"
+  }
+ ],
+ "surfaces": [
+  {
+   "route": "/app/sales-pos",
+   "tab": "(none) → dashboard",
+   "title": "Sales overview",
+   "screenFile": "src/screens/app/pos/panes.tsx:34 (PosDashboard)",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "populated (structurally unreachable)",
+    "per-panel empty"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "denied",
+    "real data path",
+    "working drill-down links"
+   ]
+  },
+  {
+   "route": "/app/sales-pos",
+   "tab": "(app not installed)",
+   "title": "Sales & POS is not installed",
+   "screenFile": "src/screens/app/pos/SalesPos.tsx:40",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "gate"
+   ],
+   "statesMissing": [
+    "server entitlement check",
+    "trial-expired state"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=customers",
+   "tab": "customers",
+   "title": "Customers",
+   "screenFile": "src/screens/app/pos/panes.tsx:283 (CustomersPane)",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "search",
+    "create dialog",
+    "CSV export",
+    "CSV import"
+   ],
+   "statesMissing": [
+    "detail",
+    "edit",
+    "archive",
+    "loading",
+    "error",
+    "denied",
+    "paging",
+    "import preview/errors",
+    "group assignment"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=rate_contracts",
+   "tab": "rate_contracts",
+   "title": "Rate contracts",
+   "screenFile": "src/screens/app/pos/parts.tsx:86 (DocListPane kind=contract)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "rate/term/volume capture",
+    "contract lines",
+    "pricing application",
+    "expiry",
+    "loading",
+    "error",
+    "confirm-delete"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=quotations",
+   "tab": "quotations",
+   "title": "Quotations",
+   "screenFile": "src/screens/app/pos/panes.tsx:437 (QuotationsPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "9 status chips",
+    "search",
+    "KPI row",
+    "create dialog"
+   ],
+   "statesMissing": [
+    "line items",
+    "status transitions",
+    "expiry",
+    "versioning",
+    "conversion",
+    "detail",
+    "edit",
+    "delete",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=sales_orders",
+   "tab": "sales_orders",
+   "title": "Sales orders",
+   "screenFile": "src/screens/app/pos/parts.tsx:86 (DocListPane kind=order)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "lines",
+    "confirm",
+    "fulfilment",
+    "links to delivery/invoice",
+    "detail",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=delivery_notes",
+   "tab": "delivery_notes",
+   "title": "Delivery notes",
+   "screenFile": "src/screens/app/pos/parts.tsx:86 (DocListPane kind=delivery)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "order linkage",
+    "quantities",
+    "warehouse",
+    "COGS/journal posting",
+    "dispatch/deliver transitions",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=sales_invoices",
+   "tab": "sales_invoices",
+   "title": "Sales invoices",
+   "screenFile": "src/screens/app/pos/SalesPos.tsx:121 + parts.tsx:86",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog",
+    "delete",
+    "navigate to returns"
+   ],
+   "statesMissing": [
+    "working scan box",
+    "working payment filter",
+    "working source filter",
+    "lines",
+    "posting",
+    "3-way match",
+    "payment recording",
+    "detail",
+    "loading",
+    "error",
+    "conflict"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=pos",
+   "tab": "pos",
+   "title": "POS till (open / close)",
+   "screenFile": "src/screens/app/pos/panes.tsx:593 (PosTillPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "open-shift form",
+    "close-shift form with expected/counted"
+   ],
+   "statesMissing": [
+    "the entire sale/cart/tender flow",
+    "receipt",
+    "variance reason prompt",
+    "real warehouse list",
+    "real currency source",
+    "concurrent-close conflict",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=shift_dashboard",
+   "tab": "shift_dashboard",
+   "title": "Shift dashboard",
+   "screenFile": "src/screens/app/pos/panes.tsx:712 (ShiftsPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "KPI row",
+    "period toggle",
+    "variance list",
+    "cashier bands",
+    "open-shift list",
+    "scorecard",
+    "empties"
+   ],
+   "statesMissing": [
+    "real takings (cashTaken/cardTaken never move)",
+    "the advertised 30s auto-refresh",
+    "average-variance bands",
+    "cashier identity as a key",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=sales_returns",
+   "tab": "sales_returns",
+   "title": "Sales returns",
+   "screenFile": "src/screens/app/pos/parts.tsx:86 (DocListPane kind=return)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog with reason",
+    "delete"
+   ],
+   "statesMissing": [
+    "invoice linkage",
+    "returned quantities",
+    "refund ceiling",
+    "its own status vocabulary",
+    "restock",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=credit_notes",
+   "tab": "credit_notes",
+   "title": "Credit notes",
+   "screenFile": "src/screens/app/pos/parts.tsx:86 (DocListPane kind=credit)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog with reason",
+    "delete"
+   ],
+   "statesMissing": [
+    "application to invoices",
+    "applied/remaining amounts",
+    "posting",
+    "approval",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=refunds",
+   "tab": "refunds",
+   "title": "Refunds",
+   "screenFile": "src/screens/app/pos/parts.tsx:86 (DocListPane kind=refund)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog with reason",
+    "delete"
+   ],
+   "statesMissing": [
+    "credit-note linkage",
+    "method",
+    "execution",
+    "Sent/Failed handling",
+    "separation of duties",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=ar_aging",
+   "tab": "ar_aging",
+   "title": "Accounts receivable aging",
+   "screenFile": "src/screens/app/pos/panes.tsx:919 (ArAgingPane)",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "bucket list",
+    "by-customer list",
+    "empty"
+   ],
+   "statesMissing": [
+    "real due dates",
+    "posted invoices",
+    "per-row age ordering promised in copy",
+    "export",
+    "asOf snapshot",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "reports (nav)",
+   "title": "Sales reports",
+   "screenFile": "src/screens/app/pos/panes.tsx:995 (PosReportsPane)",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "tab bar",
+    "shared status filter",
+    "count line"
+   ],
+   "statesMissing": [
+    "URL-addressable tabs",
+    "date range",
+    "export",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "tracker",
+   "title": "Sales Tracker",
+   "screenFile": "src/screens/app/pos/panes.tsx:1038",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "list",
+    "empty"
+   ],
+   "statesMissing": [
+    "totals",
+    "date range",
+    "paging",
+    "export"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "customer",
+   "title": "Customer Performance",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "cohort",
+   "title": "Cohort Retention",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "margin",
+   "title": "Margin by Category",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything (needs item categories and unit cost, neither modelled)"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "daily",
+   "title": "Daily Sales",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "zreport",
+   "title": "Day Sheet / Z-report",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything (needs sales and tenders)"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "item",
+   "title": "Item Sales",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything (needs line items)"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "cashier",
+   "title": "Cashier Performance",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "cashflow",
+   "title": "Cashflow Forecast",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "everything (advertised as an AI forecast)"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=reports",
+   "tab": "ai",
+   "title": "AI Assist",
+   "screenFile": "src/screens/app/pos/panes.tsx:1054",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "canned empty"
+   ],
+   "statesMissing": [
+    "prompt",
+    "retrieval",
+    "credit spend",
+    "audit"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=subscriptions",
+   "tab": "subscriptions",
+   "title": "Subscriptions",
+   "screenFile": "src/screens/app/pos/SalesPos.tsx:209 + parts.tsx:86",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "status filter",
+    "create dialog",
+    "delete",
+    "Run due now"
+   ],
+   "statesMissing": [
+    "cadence/next-run/period model",
+    "idempotent sweep",
+    "sweep result summary",
+    "pause/resume/end",
+    "scheduler",
+    "loading",
+    "error"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=match_settings",
+   "tab": "match_settings",
+   "title": "Match settings",
+   "screenFile": "src/screens/app/pos/panes.tsx:1063 (MatchSettingsPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "form",
+    "dirty-gated save",
+    "persistence"
+   ],
+   "statesMissing": [
+    "any enforcement",
+    "numeric bounds",
+    "NaN guard",
+    "change-history entry",
+    "loading",
+    "error",
+    "saved confirmation"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings (shell)",
+   "title": "Sales & POS settings",
+   "screenFile": "src/screens/app/pos/settings.tsx:861 (PosSettingsPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "sub-rail",
+    "Copilot banner"
+   ],
+   "statesMissing": [
+    "URL-addressable sub-tab (pane resets to Tax on every visit)",
+    "permission gating"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/tax",
+   "title": "Tax categories",
+   "screenFile": "src/screens/app/pos/settings.tsx:45 (TaxPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty with seed CTA",
+    "create dialog",
+    "delete",
+    "seed GST slabs"
+   ],
+   "statesMissing": [
+    "computable components",
+    "effective dating",
+    "duplicate guard on seeding",
+    "edit",
+    "confirm-delete",
+    "usage by any item"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/groups",
+   "title": "Customer groups",
+   "screenFile": "src/screens/app/pos/settings.tsx:188 (GroupsPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty with seed CTA",
+    "create dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "any linkage to customers",
+    "case-insensitive uniqueness promised in copy",
+    "edit",
+    "confirm-delete"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/loyalty",
+   "title": "Loyalty & tiers",
+   "screenFile": "src/screens/app/pos/settings.tsx:289 (LoyaltyPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty line",
+    "create dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "tier ladder (the pane's own title)",
+    "currency on point value",
+    "accrual",
+    "redemption",
+    "active flag",
+    "edit"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/variance",
+   "title": "Cash variance tolerance",
+   "screenFile": "src/screens/app/pos/settings.tsx:446 (VariancePane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "form",
+    "cross-field validation message",
+    "dirty-gated save",
+    "restore defaults"
+   ],
+   "statesMissing": [
+    "enforcement at shift close",
+    "currency",
+    "averaging window",
+    "use of the two average thresholds",
+    "server validation"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/fields",
+   "title": "Custom Fields",
+   "screenFile": "src/screens/app/pos/settings.tsx:520 (FieldsPane)",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "create dialog",
+    "delete"
+   ],
+   "statesMissing": [
+    "target entity",
+    "dropdown options",
+    "rendering on any record form",
+    "value capture",
+    "edit"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/agents",
+   "title": "AI Agents",
+   "screenFile": "src/screens/app/pos/settings.tsx:617 (AgentsPane)",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "credit readout",
+    "pause-all",
+    "auto-run",
+    "auto-pause input",
+    "per-agent switch"
+   ],
+   "statesMissing": [
+    "any agent execution",
+    "real credit gating",
+    "tenant-wide pause",
+    "functional per-row delete (icon is aria-hidden)"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/schedules",
+   "title": "Schedules",
+   "screenFile": "src/screens/app/pos/settings.tsx:734 (SchedulesPane)",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static empty"
+   ],
+   "statesMissing": [
+    "everything — it does not even read the tenant's schedules"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/history",
+   "title": "Change History",
+   "screenFile": "src/screens/app/pos/settings.tsx:747 (HistoryPane)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "empty",
+    "show-reverted toggle",
+    "reset to default"
+   ],
+   "statesMissing": [
+    "real actor",
+    "undo",
+    "reverted state",
+    "before/after values",
+    "match-settings coverage",
+    "confirmation on reset",
+    "time zone"
+   ]
+  },
+  {
+   "route": "/app/sales-pos?tab=settings",
+   "tab": "settings/appearance",
+   "title": "Appearance",
+   "screenFile": "src/screens/app/pos/settings.tsx:815 (AppearancePane)",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "read-only value list"
+   ],
+   "statesMissing": [
+    "every editable control the blurb describes"
+   ]
+  }
+ ],
+ "falseSuccessCopy": [
+  {
+   "file": "src/screens/app/pos/SalesPos.tsx",
+   "line": 125,
+   "text": "Draft, post to GL, run a 3-way match, refund, and chase outstanding.",
+   "why": "None of the four verbs exist. No control can move an invoice off Draft, no match runs, no refund executes, no chasing exists."
+  },
+  {
+   "file": "src/screens/app/pos/SalesPos.tsx",
+   "line": 110,
+   "text": "Record shipments, post COGS, and route revenue / inventory journal entries.",
+   "why": "Creating a delivery note writes one localStorage row. There is no COGS figure, no unit cost, no journal and no inventory integration."
+  },
+  {
+   "file": "src/screens/app/pos/SalesPos.tsx",
+   "line": 82,
+   "text": "A contract rate overrides the price list, so what is agreed is what gets invoiced.",
+   "why": "A rate contract captures only a customer name and one typed number. There is no rate, no price list, no item and no resolution step."
+  },
+  {
+   "file": "src/screens/app/pos/SalesPos.tsx",
+   "line": 213,
+   "text": "Daily beat task auto-generates draft invoices; admins can run a sweep manually.",
+   "why": "No scheduler, cron or job exists anywhere. Only the manual button exists, and it bills every Active subscription regardless of whether anything is due."
+  },
+  {
+   "file": "src/screens/app/pos/SalesPos.tsx",
+   "line": 237,
+   "text": "sales invoices with GL post, AR aging, payments, plus a full point-of-sale till with shift reconciliation",
+   "why": "The app header claims GL posting and payments (neither exists) and 'a full point-of-sale till' that cannot ring up a single sale."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 684,
+   "text": "Sales with this warehouse + a unit cost will post DR COGS / CR Inventory automatically.",
+   "why": "Specific double-entry postings promised on the till screen. No posting code, no unit cost field and no warehouse entity exist."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 654,
+   "text": "POS sales need an open shift so cash, card, and UPI tenders all roll up to one cashier reconciliation at end of day.",
+   "why": "There is no sale capture and no tender model. cashTaken and cardTaken are written as 0 at shift open and never incremented, so every reconciliation figure is 0."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 740,
+   "text": "Auto-refresh 30s (with a live green status dot)",
+   "why": "No interval, polling or subscription exists in the file. The dashboard only updates when React re-renders for another reason."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 130,
+   "text": "Daily total over the last {days} days",
+   "why": "The panel renders a single aggregate number, never a daily series. There is no chart and no per-day breakdown."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 972,
+   "text": "Sorted by amount owed. Ordered oldest-first within each row.",
+   "why": "Each row is a single summed figure per customer. There is no per-invoice detail inside a row and therefore no ordering of any kind."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 211,
+   "text": "USD 0 / 0 invoices (every Payment due band)",
+   "why": "Hardcoded literals in the JSX, not derived from data — the panel would still read zero with a full book of receivables."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 1075,
+   "text": "How strictly a Sales Invoice must agree with its Sales Order and Delivery Note before it can post.",
+   "why": "The policy is saved and re-read but never evaluated; the Warn/Block/Ignore action and the Require-Order/Require-Delivery switches gate nothing."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 1156,
+   "text": "Blocks invoicing anything that was never ordered. / Blocks invoicing before the goods have shipped.",
+   "why": "Both checkboxes persist a boolean that no code reads at invoice creation. Nothing is ever blocked."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 420,
+   "text": "Anything larger blocks the close until they pick a reason.",
+   "why": "closePosShift accepts any counted figure with no reason prompt, no threshold check and no blocking. The field to store a reason does not exist."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 314,
+   "text": "Points accrue on the net subtotal of every sale attached to a customer, and are spent at the till as a discount on the bill.",
+   "why": "There is no sale, no points balance, no ledger and no redemption path. The programme row stores only a rate and a point value."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 298,
+   "text": "Loyalty & tiers … plus the tier ladder customers climb on lifetime spend.",
+   "why": "The tiers array is hardcoded to [] at create and there is no UI anywhere to add, view or edit a tier."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 61,
+   "text": "Items point at a category, so changing a rate is one edit here rather than an edit on every affected item.",
+   "why": "No item or line-item entity exists in this domain, so nothing can point at a tax category — and the split is frozen into display strings at create time, so a rate cannot be edited at all."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 757,
+   "text": "Every change made here, with who made it and when — and how to undo it.",
+   "why": "There is no undo control; the `reverted` flag is never set; before/after values are not stored; and the author is the hardcoded literal 'owner' rather than the signed-in user."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 874,
+   "text": "Describe what you want in plain English … Every change is saved in Change History and can be undone.",
+   "why": "The button only opens the global Copilot dock, which spends 2 credits and returns a canned paragraph. It cannot change a single setting, and nothing can be undone."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 699,
+   "text": "Runs automatically on create",
+   "why": "Printed under every agent row. No agent runs on create or at any other time; the catalogue entry ('Quote Quality Reviewer') has no execution path."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 656,
+   "text": "Pause AI agents (all apps) / 'Paused AI agents across all apps'",
+   "why": "The flag is stored inside posSettings.agents, scoped to this app alone, so it cannot affect any other app even if agents ran."
+  },
+  {
+   "file": "src/screens/app/pos/settings.tsx",
+   "line": 528,
+   "text": "Add extra data fields to capture information specific to your business.",
+   "why": "No create or edit form in the domain renders custom fields, so a defined field can never hold a value — while the Appearance pane reports a count of them as if they were in use."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 666,
+   "text": "Till currency: USD — Org default",
+   "why": "Presented as inherited configuration; it is a hardcoded literal. Company.currency exists in the workspace store and is never read."
+  },
+  {
+   "file": "src/screens/app/pos/panes.tsx",
+   "line": 986,
+   "text": "Only posted, unpaid invoices appear here — a draft invoice is not yet a receivable.",
+   "why": "Technically accurate but misleading as a reassurance: no invoice can ever be posted, so this pane is permanently empty by construction rather than because nothing is owed."
+  }
+ ],
+ "openQuestions": [
+  "Subscription cadence: no interval, anchor, start or end field exists anywhere. What billing frequencies must be supported, what is the period key format, and does billing anchor to the subscription start or to a calendar boundary?",
+  "Subscription sweep scope: should 'Run due now' bill only periods whose due date has passed, and should a manual run be limited to one per tenant per business date? Source only filters on status === 'Active'.",
+  "Payment terms: dueDate is never populated. Are terms held on the customer, the contract, the invoice, or a tenant default — and are they net days, end-of-month, or a schedule?",
+  "Money semantics: is PosDoc.total tax-inclusive or tax-exclusive, and does it include or exclude discounts and shipping? No subtotal/tax/discount breakdown exists to disambiguate.",
+  "Currency policy: the till hardcodes USD labelled 'Org default' while Company.currency exists and is never read. Is the domain single-currency per company, and if not, what FX source and rate-snapshot point apply?",
+  "Rate contract semantics: the blurb promises an agreed rate, a committed volume and a term, none of which are captured. What defines precedence when a contract, a price list and a manual override disagree?",
+  "Quotation status semantics: who may move a quote to Sent/Accepted/Rejected, what triggers Expired (no validity date exists), and what distinguishes Superseded from Cancelled?",
+  "Quotation title: it is currently stored in the same `reason` column used for credit/return/refund reasons. Confirm these are two distinct concepts before the column is split.",
+  "Over-delivery: is shipping more than the ordered quantity allowed, blocked, or allowed within a tolerance? Nothing in source addresses it.",
+  "3-way match basis: are the price and quantity tolerances percentages of a line or of the document total, and are they evaluated at invoice creation, at posting, or both?",
+  "Return semantics: are returns raised per invoice line or at header level, and what caps a partial refund — invoiced quantity, invoiced value, or the remaining credit?",
+  "Credit note 'Applied': what can a credit be applied to (a specific invoice, the account balance, a future invoice), and is partial application allowed?",
+  "Refund execution: 'Sent' and 'Failed' imply an outbound payment path. No provider, method or contract is named anywhere in source — this needs an explicit product decision and must not be inferred.",
+  "Cash variance 'recent average': the policy stores amberAverage/redAverage but no code computes an average and no window length is defined. Over how many shifts or days?",
+  "Variance reason: the settings hint promises a blocking reason prompt above a threshold. Is the reason free text or a controlled taxonomy, and who may override the block?",
+  "Cashier identity: shifts store session.user.fullName as a string, defaulting to the literal 'Cashier'. Should a cashier be a platform user, an HR employee record, or a POS-specific operator?",
+  "Terminal / till identity: there is no terminal entity, so nothing prevents two concurrent open shifts. Is a shift per terminal, per cashier, or per store?",
+  "Warehouse source: the till offers two hardcoded warehouse names. Should these come from the Inventory app, and is the POS-to-inventory posting in scope at all?",
+  "Tax model: the seeded slabs render CGST/SGST/IGST strings and the within-state vs inter-state choice depends on buyer and seller registration, neither of which is captured. The statutory rules, the jurisdiction determination and the applicable rates must be supplied as an explicit decision — they must not be inferred from the seed array or from marketing copy.",
+  "Tax rate changes: must posted documents retain the rate in force at posting (rate snapshot), and do tax categories need effective-from/to dating?",
+  "Loyalty accrual: 'net subtotal' is undefined (before or after discount, before or after tax), the rounding rule for fractional points is unspecified, points have no expiry rule, and no currency is attached to pointValue.",
+  "Loyalty tiers: what window defines 'lifetime spend', in which currency, and do tiers ever downgrade?",
+  "Customer groups: the pane exists with no linkage. Is a customer in exactly one group, and does the group drive pricing, tax or only reporting?",
+  "Report definitions: cohort granularity and retention window, the margin cost basis (there is no unit cost anywhere), the Z-report boundary (business date vs shift), and the cashflow forecast method are all undefined in source.",
+  "Fiscal calendar: the dashboard states 'no fiscal year configured, assuming calendar year'. What is the fiscal year start, and does the monthly chart need a year filter (today it buckets by month across all years)?",
+  "Role model: this domain has no roles at all — every audit row is hardcoded to user 'owner' / role 'Org_admin'. The POS role catalogue (cashier, shift manager, sales editor, AR/finance approver) and the separation-of-duties rules for credit notes and refunds need to be defined.",
+  "Company scoping: Company and IntercompanyPair exist in the workspace store but no POS record references a company. Are sales documents, tills and settings scoped per legal entity?",
+  "Document deletion: every list offers an unconfirmed hard delete, including of invoices, credit notes and refunds. Which documents may ever be deleted rather than voided, and does deletion need to preserve the reference number?",
+  "Custom fields: which records should carry them (customer, each document kind, shift), and should dropdown options be captured at definition time?",
+  "Settings undo: the Change History promises undo but stores no before/after values. Which settings changes must be reversible, and what happens when a later change conflicts with the reverted one?",
+  "AI agents: the 'Quote Quality Reviewer' has no model, prompt, credit cost or output contract in source. What does it emit, where is it surfaced, and what does the auto-pause credit threshold actually gate?"
+ ]
+}

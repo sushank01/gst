@@ -1,6 +1,6 @@
 'use client'
 
-import { Icon } from '../../../components/Icon'
+import { Icon } from './Icon'
 
 /** The dashed panel every empty Travel & Expense list falls back to. */
 export function EmptyBlock({ title, blurb, icon }: { title: string; blurb?: string; icon?: string }) {
@@ -45,43 +45,12 @@ export function Panel({
   )
 }
 
-/** A KPI tile. Amounts are monospaced so columns of figures line up. */
-export function Stat({ label, value, sub, mono }: { label: string; value: string; sub?: string; mono?: boolean }) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-5">
-      <p className="text-[13px] text-fg-2">{label}</p>
-      <p className={`mt-2 text-[26px] leading-none font-bold ${mono ? 'font-mono' : ''}`}>{value}</p>
-      {sub && <p className="mt-2.5 text-[12px] text-fg-muted">{sub}</p>}
-    </div>
-  )
-}
+export { StatCard as Stat } from './StatCard'
 
 export const inputClass =
   'mt-1.5 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none'
 
-export function Dialog({
-  title,
-  onClose,
-  children,
-}: {
-  title: string
-  onClose: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal>
-      <div className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-line bg-surface p-6">
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="text-[18px] font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="text-fg-muted transition hover:text-fg">
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
+export { Dialog } from './Dialog'
 
 export function Label({ children }: { children: React.ReactNode }) {
   return <span className="text-[13px] text-fg-2">{children}</span>

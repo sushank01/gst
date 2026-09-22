@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from '../lib/router'
 import { AuthLayout } from '../components/AuthLayout'
 import { Button, Divider, Field, SsoButtons } from '../components/ui'
 import { useAuth } from '../lib/auth'
+import { ApiClientError } from '../lib/api'
 import { signInPoints } from '../lib/content'
 import { validateEmail } from '../lib/validation'
 
@@ -32,20 +33,25 @@ export default function Login() {
 
     setSubmitting(true)
     try {
-      const session = await signIn({ email })
+      const session = await signIn({ email, password })
+      // "Onboarded" means the account has a workspace, which is a server fact.
       navigate(session.onboarding ? redirectTo : '/onboarding', { replace: true })
-    } catch {
-      setErrors({ form: 'That email and password combination did not work.' })
+    } catch (error) {
+      // The server answers every failure identically; repeat its wording rather
+      // than guessing at a more specific cause.
+      setErrors({ form: error instanceof ApiClientError ? error.message : 'Could not sign in. Please try again.' })
     } finally {
       setSubmitting(false)
     }
   }
 
-  async function onSso(provider: 'google' | 'microsoft') {
-    setSubmitting(true)
-    const session = await signIn({ email: `you@${provider}.com`, provider })
-    setSubmitting(false)
-    navigate(session.onboarding ? redirectTo : '/onboarding', { replace: true })
+  /*
+   * Single sign-on needs a registered OAuth client, which is decision D3. Until
+   * those credentials exist the buttons say so instead of minting a local
+   * identity from a made-up address, which is what they used to do.
+   */
+  function onSso() {
+    setErrors({ form: 'Single sign-on is not configured on this deployment yet. Use your email and password.' })
   }
 
   return (

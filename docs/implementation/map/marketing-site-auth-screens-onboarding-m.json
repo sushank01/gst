@@ -1,0 +1,4732 @@
+{
+ "domain": "Marketing site, auth screens, onboarding, marketplace (public + in-app), account/plan, workspace overview, inbox",
+ "entities": [
+  {
+   "name": "User",
+   "sourceType": "User",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/types.ts",
+   "purpose": "The signed-in person. Two divergent shapes exist: a localStorage stub (src/lib/types.ts) and a real server table (migrations/0001_identity_and_tenancy.sql). No client code ever calls the server.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "active",
+    "suspended",
+    "deleted"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "Prototype mints it with crypto.randomUUID() in the browser (src/lib/auth.tsx:69); server generates it."
+    },
+    {
+     "name": "fullName",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Register enforces /^[A-Za-z ]+$/ (src/lib/validation.ts:3) which rejects hyphens, apostrophes and non-Latin names. signIn() fabricates it from the email local-part (src/lib/auth.tsx:92)."
+    },
+    {
+     "name": "email",
+     "tsType": "string",
+     "sqlType": "text + unique index on lower(email)",
+     "nullable": false,
+     "notes": "Lowercased on write client-side; server compares case-insensitively. Max 320 chars server-side."
+    },
+    {
+     "name": "passwordHash",
+     "tsType": "never (client)",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Argon2/bcrypt hash. The prototype NEVER captures the password: Register collects and validates it then drops it (src/screens/Register.tsx:64). Null only for provider-only identities."
+    },
+    {
+     "name": "emailVerifiedAt",
+     "tsType": "Date | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "Server-owned. No UI anywhere surfaces verified/unverified state."
+    },
+    {
+     "name": "status",
+     "tsType": "'active' | 'suspended' | 'deleted'",
+     "sqlType": "text not null default 'active' check (status in ('active','suspended','deleted'))",
+     "nullable": false
+    },
+    {
+     "name": "lastLoginAt",
+     "tsType": "Date | null",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "failedLogins",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "MAX_FAILED_LOGINS = 8 (src/server/auth/service.ts:15)."
+    },
+    {
+     "name": "lockedUntil",
+     "tsType": "Date | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "LOCKOUT_MS = 15 min."
+    },
+    {
+     "name": "organization",
+     "tsType": "string | null",
+     "sqlType": "DROP — belongs on tenants.name via memberships",
+     "nullable": true,
+     "notes": "Prototype-only scalar (src/lib/types.ts:5). Register hint promises 'We'll create your organisation now and make you its admin' but no tenant or membership row is created."
+    },
+    {
+     "name": "provider",
+     "tsType": "'password' | 'google' | 'microsoft'",
+     "sqlType": "DROP — move to user_identities.provider",
+     "nullable": false,
+     "notes": "A user can only ever have one provider today. SSO is fabricated: onSso signs in as `you@google.com` (src/screens/Login.tsx:46)."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Membership",
+     "via": "user_id"
+    },
+    {
+     "kind": "hasMany",
+     "target": "Session",
+     "via": "user_id"
+    },
+    {
+     "kind": "hasMany",
+     "target": "UserIdentity",
+     "via": "none — provider is a scalar on User",
+     "gap": "Linking a second IdP to an existing account is unrepresentable."
+    },
+    {
+     "kind": "hasMany",
+     "target": "AuthToken",
+     "via": "user_id"
+    }
+   ]
+  },
+  {
+   "name": "UserIdentity",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/types.ts",
+   "purpose": "One external identity linked to a user. Needed because User.provider is a single scalar and the SSO buttons are stubs.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "password",
+    "google",
+    "microsoft"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "string",
+     "sqlType": "uuid not null references users(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "provider",
+     "tsType": "string",
+     "sqlType": "text not null check (provider in ('password','google','microsoft'))",
+     "nullable": false,
+     "notes": "Only these three appear in source. SAML/OIDC/Okta/Azure AD are marketing claims only (src/lib/landingData.ts:152) — do not add them without a provider contract."
+    },
+    {
+     "name": "providerSubject",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "IdP 'sub'. Unknown shape — no OAuth code exists."
+    },
+    {
+     "name": "email",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false
+    },
+    {
+     "name": "linkedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "lastUsedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "user_id"
+    }
+   ]
+  },
+  {
+   "name": "Session",
+   "sourceType": "Session",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/types.ts",
+   "purpose": "Authenticated browser session. The client type is {user, onboarding} held in localStorage key 'apragya.session' and carries no token at all; the server table stores only a SHA-256 of an opaque token.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "active",
+    "revoked",
+    "expired"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "string",
+     "sqlType": "uuid not null references users(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "tokenHash",
+     "tsType": "never (client)",
+     "sqlType": "text not null unique",
+     "nullable": false,
+     "notes": "sha256 of a 32-byte base64url token. Cookie name apragya_session (src/server/auth/session.ts:17)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "never (client)",
+     "sqlType": "uuid references tenants(id) on delete cascade",
+     "nullable": true,
+     "notes": "Active tenant; switching rotates the row rather than trusting a client-supplied id."
+    },
+    {
+     "name": "issuedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "lastSeenAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false,
+     "notes": "Touched at most every 5 minutes."
+    },
+    {
+     "name": "expiresAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null",
+     "nullable": false,
+     "notes": "SESSION_TTL_MS = 30 days, SESSION_IDLE_MS = 14 days."
+    },
+    {
+     "name": "revokedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "Client signOut only deletes localStorage (src/lib/auth.tsx:120) — nothing is revoked."
+    },
+    {
+     "name": "ip",
+     "tsType": "never (client)",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "userAgent",
+     "tsType": "never (client)",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "onboarding",
+     "tsType": "OnboardingProfile | null",
+     "sqlType": "DROP — onboarding is tenant state, not session state",
+     "nullable": true,
+     "notes": "Protected(requireOnboarding) gates /app on this field (src/routes/Protected.tsx:23)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "user_id"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "tenant_id"
+    }
+   ]
+  },
+  {
+   "name": "Tenant",
+   "sourceType": "NEW (client) / tenants table (server)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/migrations/0001_identity_and_tenancy.sql",
+   "purpose": "The workspace. Client has no tenant concept at all — it infers one from session.user.organization or onboarding.workspaceName (src/screens/app/setup/useCompanies.ts:13).",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "active",
+    "suspended",
+    "closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Onboarding's workspaceName should write here; today it lands in a separate localStorage field."
+    },
+    {
+     "name": "slug",
+     "tsType": "string",
+     "sqlType": "text not null, unique on lower(slug)",
+     "nullable": false
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3) not null default 'USD'",
+     "nullable": false,
+     "notes": "ISO-4217. Pricing copy is INR (₹); in-app metrics say 'Amounts in USD' (src/screens/app/dashboardPanels.tsx:389). Unreconciled."
+    },
+    {
+     "name": "timezone",
+     "tsType": "string",
+     "sqlType": "text not null default 'UTC'",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text not null default 'active' check (status in ('active','suspended','closed'))",
+     "nullable": false
+    },
+    {
+     "name": "industryId",
+     "tsType": "NEW",
+     "sqlType": "uuid references industry_options(id)",
+     "nullable": true,
+     "notes": "Onboarding captures industry as a display string today."
+    },
+    {
+     "name": "teamSizeBand",
+     "tsType": "NEW",
+     "sqlType": "text check (team_size_band in ('just_me','2_10','11_50','51_200','200_plus'))",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Company",
+     "via": "tenant_id"
+    },
+    {
+     "kind": "hasMany",
+     "target": "Membership",
+     "via": "tenant_id"
+    },
+    {
+     "kind": "hasMany",
+     "target": "TenantAppInstallation",
+     "via": "localStorage string[] of app codes",
+     "gap": "Installation is a bare array of codes with no tenant, actor or timestamp (src/lib/workspace.tsx:78)."
+    },
+    {
+     "kind": "hasMany",
+     "target": "Subscription",
+     "via": "none",
+     "gap": "No plan/trial record exists; trial is the constant TRIAL_DAYS = 13."
+    }
+   ]
+  },
+  {
+   "name": "OnboardingProfile",
+   "sourceType": "OnboardingProfile",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/types.ts",
+   "purpose": "The 3-step wizard's result. Written once into the localStorage session and only ever read back for the primary-company name.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "Workspace",
+    "Industry",
+    "Apps"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "completedByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "workspaceName",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Required at step 0; seeded from session.user.organization (src/screens/Onboarding.tsx:21)."
+    },
+    {
+     "name": "industry",
+     "tsType": "string",
+     "sqlType": "uuid references industry_options(id)",
+     "nullable": false,
+     "notes": "Currently the display label from src/lib/content.ts:9. Required at step 1."
+    },
+    {
+     "name": "teamSize",
+     "tsType": "string",
+     "sqlType": "text check (...) — see TeamSizeBand",
+     "nullable": false,
+     "notes": "Display label ('Just me','2–10','11–50','51–200','200+'); defaults to teamSizes[1]. Never validated, never read back."
+    },
+    {
+     "name": "apps",
+     "tsType": "string[]",
+     "sqlType": "DROP — model as TenantAppInstallation rows",
+     "nullable": false,
+     "notes": "Stores app display NAMES (src/screens/Onboarding.tsx:53) while install() is called with app CODES (line 48). Two different keys for one list."
+    },
+    {
+     "name": "intent",
+     "tsType": "string | null (URL param only)",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "The hero prompt, carried /register?intent= → /onboarding?intent= and then discarded. Never persisted."
+    },
+    {
+     "name": "currentStep",
+     "tsType": "number (useState only)",
+     "sqlType": "smallint not null default 0",
+     "nullable": false,
+     "notes": "Not persisted — a refresh mid-wizard restarts at step 0."
+    },
+    {
+     "name": "completedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null",
+     "nullable": false,
+     "notes": "ISO string set in completeOnboarding (src/lib/auth.tsx:111)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none — lives inside the session blob",
+     "gap": "Onboarding state is per-browser, not per-tenant; a second admin re-runs the whole wizard."
+    },
+    {
+     "kind": "hasMany",
+     "target": "CatalogApp",
+     "via": "apps: string[] of display names",
+     "gap": "Display-name join. Renaming 'HR & People Ops' silently orphans the row."
+    }
+   ]
+  },
+  {
+   "name": "Membership",
+   "sourceType": "NEW (client) / memberships table",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/migrations/0001_identity_and_tenancy.sql",
+   "purpose": "A user's role inside a tenant. Exists and is enforced server-side; the UI hardcodes the string 'Org Admin' and never reads a role.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "active",
+    "suspended"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "string",
+     "sqlType": "uuid not null references users(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "role",
+     "tsType": "'owner'|'admin'|'member'|'viewer'",
+     "sqlType": "text not null check (role in ('owner','admin','member','viewer'))",
+     "nullable": false,
+     "notes": "Permission sets in src/server/tenancy/permissions.ts. Account screen prints a literal 'Org Admin' (src/screens/app/workspace.tsx:149) and the sidebar prints it again (src/components/AppSidebar.tsx:267)."
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text not null default 'active' check (status in ('active','suspended'))",
+     "nullable": false
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "tenant_id"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "user_id"
+    }
+   ]
+  },
+  {
+   "name": "Invitation",
+   "sourceType": "NEW (client) / invitations table",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/migrations/0001_identity_and_tenancy.sql",
+   "purpose": "A pending seat offer. Fully implemented server-side (POST /api/v1/members); the product surface that claims to send one sets a boolean.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "pending",
+    "accepted",
+    "revoked",
+    "expired"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "email",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Unique per tenant while status='pending'."
+    },
+    {
+     "name": "role",
+     "tsType": "Role",
+     "sqlType": "text not null check (role in ('owner','admin','member','viewer'))",
+     "nullable": false
+    },
+    {
+     "name": "invitedBy",
+     "tsType": "string | null",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "status",
+     "tsType": "string",
+     "sqlType": "text not null default 'pending' check (status in ('pending','accepted','revoked','expired'))",
+     "nullable": false
+    },
+    {
+     "name": "acceptedBy",
+     "tsType": "string | null",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "acceptedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "expiresAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null",
+     "nullable": false,
+     "notes": "INVITE_TTL_MS = 14 days."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "tenant_id"
+    }
+   ]
+  },
+  {
+   "name": "AuthToken",
+   "sourceType": "NEW (client) / auth_tokens table",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/migrations/0001_identity_and_tenancy.sql",
+   "purpose": "Single-use hashed token for verification, reset, invitation acceptance and MFA enrolment. No UI consumes any of them.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "email_verify",
+    "password_reset",
+    "invitation",
+    "mfa_enroll"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "purpose",
+     "tsType": "string",
+     "sqlType": "text not null check (purpose in ('email_verify','password_reset','invitation','mfa_enroll'))",
+     "nullable": false
+    },
+    {
+     "name": "tokenHash",
+     "tsType": "string",
+     "sqlType": "text not null unique",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "string | null",
+     "sqlType": "uuid references users(id) on delete cascade",
+     "nullable": true
+    },
+    {
+     "name": "tenantId",
+     "tsType": "string | null",
+     "sqlType": "uuid references tenants(id) on delete cascade",
+     "nullable": true
+    },
+    {
+     "name": "email",
+     "tsType": "string | null",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "payload",
+     "tsType": "Record<string, unknown>",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false
+    },
+    {
+     "name": "expiresAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null",
+     "nullable": false,
+     "notes": "VERIFY_TTL 24h, RESET_TTL 1h, INVITE_TTL 14d (src/server/auth/service.ts:17-19)."
+    },
+    {
+     "name": "consumedAt",
+     "tsType": "string | null",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "user_id"
+    }
+   ]
+  },
+  {
+   "name": "TwoFactorEnrollment",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "Second-factor state. Today it is one string on the workspace blob: twoFactor: 'pending' | 'on' | 'snoozed'.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "pending",
+    "on",
+    "snoozed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references users(id) on delete cascade",
+     "nullable": false,
+     "notes": "Prototype scopes it to the workspace blob, not the user — every user of that browser shares one flag."
+    },
+    {
+     "name": "method",
+     "tsType": "UNKNOWN",
+     "sqlType": "text check (method in ('totp','webauthn','sms'))",
+     "nullable": true,
+     "notes": "No enrolment flow exists. Do not pick a method from copy."
+    },
+    {
+     "name": "status",
+     "tsType": "'pending'|'on'|'snoozed'",
+     "sqlType": "text not null default 'pending' check (status in ('pending','active','snoozed','disabled'))",
+     "nullable": false,
+     "notes": "'on' is set by a single button click with no secret, no QR, no verification code (src/screens/app/Overview.tsx:34)."
+    },
+    {
+     "name": "secretEncrypted",
+     "tsType": "never (client)",
+     "sqlType": "bytea",
+     "nullable": true,
+     "notes": "Must never reach the browser."
+    },
+    {
+     "name": "confirmedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "snoozedUntil",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "'Remind me later' snoozes forever today — no expiry is stored, so the banner never returns."
+    },
+    {
+     "name": "recoveryCodeHashes",
+     "tsType": "NEW",
+     "sqlType": "text[]",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "none — stored on the tenant workspace blob",
+     "gap": "2FA is per-user by definition but is stored per-browser-workspace."
+    }
+   ]
+  },
+  {
+   "name": "CatalogApp",
+   "sourceType": "MarketApp, SmallApp, AppKind",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+   "purpose": "One installable app in the marketplace. 15 enterprise apps + 2 web apps + 1 mobile app, all hardcoded TS constants.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "Data App",
+    "Hybrid",
+    "AI-Native",
+    "operations",
+    "sales",
+    "finance",
+    "hr",
+    "legal",
+    "general",
+    "crm",
+    "enterprise",
+    "web",
+    "mobile"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "code",
+     "tsType": "string",
+     "sqlType": "text not null, unique on lower(code)",
+     "nullable": false,
+     "notes": "TE, ITAM, MFG, PP, POS, IDP, PAY, INV, HR, SUP, PM, P2P, CTR, PPTX, CRM, EVT, RQA, POD. Legacy codes CR/CM/IA/AP/PR/SL/IN/PY are remapped at read time (src/lib/workspace.tsx:879) — migrate them once, in SQL."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "An emoji for enterprise apps, a single letter for web/mobile apps."
+    },
+    {
+     "name": "tone",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "A raw Tailwind class ('bg-teal-600'). AppSidebar reverse-maps it to a hue name (src/components/AppSidebar.tsx:61). Store a colour token, not a class."
+    },
+    {
+     "name": "kind",
+     "tsType": "'Data App'|'Hybrid'|'AI-Native'",
+     "sqlType": "text not null check (kind in ('Data App','Hybrid','AI-Native'))",
+     "nullable": false
+    },
+    {
+     "name": "category",
+     "tsType": "string",
+     "sqlType": "text not null check (category in ('operations','sales','finance','hr','legal','general','crm'))",
+     "nullable": false
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "installs",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "Editorial constants (2…169). Sorted on by 'Most installed'. No counter increments them when install() runs."
+    },
+    {
+     "name": "featured",
+     "tsType": "boolean | undefined",
+     "sqlType": "boolean not null default false",
+     "nullable": false
+    },
+    {
+     "name": "gated",
+     "tsType": "boolean | undefined",
+     "sqlType": "boolean not null default false",
+     "nullable": false,
+     "notes": "MFG, IDP, PAY, EVT, RQA, POD. Gating is a bare boolean with no plan link, and Onboarding installs gated apps without checking it (src/screens/Onboarding.tsx:48)."
+    },
+    {
+     "name": "surface",
+     "tsType": "implicit (three separate arrays)",
+     "sqlType": "text not null check (surface in ('enterprise','web','mobile'))",
+     "nullable": false
+    },
+    {
+     "name": "minimumPlanId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references plans(id)",
+     "nullable": true,
+     "notes": "Nothing maps a gated app to the plan that unlocks it."
+    },
+    {
+     "name": "routePath",
+     "tsType": "implicit",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Hardcoded in src/components/AppSidebar.tsx:76; everything else falls through to /app/<code lowercased>."
+    },
+    {
+     "name": "publishedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false,
+     "notes": "The 'Latest' sort is the array's literal order today."
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "CatalogAgent",
+     "via": "agentsByAppCode Map keyed by code string",
+     "gap": "MarketApp.agents is a string[] of agent display NAMES built at module load (src/lib/appData.ts:85)."
+    },
+    {
+     "kind": "hasMany",
+     "target": "TenantAppInstallation",
+     "via": "code string in a localStorage array"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Plan",
+     "via": "gated: boolean",
+     "gap": "A boolean cannot say which plan unlocks the app, so 'Upgrade' cannot know what to sell."
+    }
+   ]
+  },
+  {
+   "name": "CatalogAgent",
+   "sourceType": "CatalogAgent, AgentGroup",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/agentCatalog.ts",
+   "purpose": "A pre-built agent bundled with an app. 60 agents across 14 groups.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "Enterprise Agent",
+    "Custom · Agent Studio"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "appId",
+     "tsType": "string (group code)",
+     "sqlType": "uuid references catalog_apps(id)",
+     "nullable": true,
+     "notes": "Group code 'FIN' (Finance & Accounting) has no matching installable app — 3 agents are unreachable from the catalog."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Currently the de-facto primary key: approvals, runs and marketplace listings all join on this string."
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "custom",
+     "tsType": "boolean | undefined",
+     "sqlType": "boolean not null default false",
+     "nullable": false,
+     "notes": "true = authored in Agent Studio; only 2 of 60 are marked."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "implicit (array index)",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CatalogApp",
+     "via": "group code string",
+     "gap": "agentGroups[].code is matched to marketApps[].code by string; 'FIN' matches nothing."
+    }
+   ]
+  },
+  {
+   "name": "TenantAppInstallation",
+   "sourceType": "NEW (Persisted.installed / Persisted.disabledApps)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "Which apps a tenant has installed and which are disabled. Today: two string[] of codes in localStorage.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "installed",
+    "disabled",
+    "uninstalled"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "appId",
+     "tsType": "string (code)",
+     "sqlType": "uuid not null references catalog_apps(id)",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "derived from two arrays",
+     "sqlType": "text not null default 'installed' check (status in ('installed','disabled','uninstalled'))",
+     "nullable": false,
+     "notes": "'disabledApps' membership is read by exactly one button label (src/screens/app/Marketplace.tsx:48). Disabling stops nothing."
+    },
+    {
+     "name": "installedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false,
+     "notes": "Only the audit row carries a timestamp; the installation itself has none."
+    },
+    {
+     "name": "installedByUserId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "disabledAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "uninstalledAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "uninstall() splices the code out; reinstalling loses all history."
+    },
+    {
+     "name": "sampleDataLoaded",
+     "tsType": "MISSING",
+     "sqlType": "boolean not null default false",
+     "nullable": false,
+     "notes": "Marketing promises 'Sample data optional' (src/lib/pages/product.ts:193); only Pitch Pilot has a pitchSampleLoaded flag."
+    },
+    {
+     "name": "version",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none — the array is the whole record"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "CatalogApp",
+     "via": "code string"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "none",
+     "gap": "install() records no actor; the audit row hardcodes user:'owner'."
+    }
+   ]
+  },
+  {
+   "name": "Plan",
+   "sourceType": "plans (untyped const)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/landingData.ts",
+   "purpose": "A pricing tier. Three cards on the landing page plus a fourth 'free forever' tier described only on /free.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "Starter",
+    "Pro",
+    "Enterprise",
+    "Free"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "code",
+     "tsType": "NEW",
+     "sqlType": "text not null unique check (code in ('free','starter','pro','enterprise'))",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "monthlyAmount",
+     "tsType": "string ('₹3,999' | 'Custom')",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "MUST be parsed out of the display string. Never float. Null when isCustomPriced."
+    },
+    {
+     "name": "annualMonthlyAmount",
+     "tsType": "string ('₹3,333')",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "The per-month price when billed annually."
+    },
+    {
+     "name": "annualTotalAmount",
+     "tsType": "string ('₹39,990 billed yearly')",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "Currently a sentence, not a number."
+    },
+    {
+     "name": "currency",
+     "tsType": "implicit in the ₹ glyph",
+     "sqlType": "char(3) not null default 'INR'",
+     "nullable": false,
+     "notes": "No currency field exists — the symbol is baked into the string."
+    },
+    {
+     "name": "isCustomPriced",
+     "tsType": "derived (monthly === 'Custom')",
+     "sqlType": "boolean not null default false",
+     "nullable": false
+    },
+    {
+     "name": "featured",
+     "tsType": "boolean | undefined",
+     "sqlType": "boolean not null default false",
+     "nullable": false
+    },
+    {
+     "name": "ctaLabel",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "ctaHref",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "creditsPerMonth",
+     "tsType": "buried in features[]",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Starter 2,000 / Pro 5,000 — text inside a feature bullet. The runtime uses MONTHLY_CREDITS = 1000 for everyone."
+    },
+    {
+     "name": "maxUsers",
+     "tsType": "buried in features[]",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Starter 10, Pro 25. Unenforced; the dashboard hardcodes '1 / 1 seats'."
+    },
+    {
+     "name": "maxEnterpriseApps",
+     "tsType": "buried in features[]",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Starter 3, Pro all. Runtime uses APP_QUOTA = 5 and never enforces it."
+    },
+    {
+     "name": "maxWebApps",
+     "tsType": "buried in features[]",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Starter 3, Pro 5. No counter exists anywhere."
+    },
+    {
+     "name": "maxMobileApps",
+     "tsType": "buried in features[]",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Starter 2, Pro 3."
+    },
+    {
+     "name": "maxRpaBots",
+     "tsType": "buried in features[]",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Starter 3, Pro 5."
+    },
+    {
+     "name": "supportTier",
+     "tsType": "buried in features[]",
+     "sqlType": "text check (support_tier in ('standard','priority','24_7'))",
+     "nullable": true,
+     "notes": "Named on /contact-support: Starter standard (next business day), Pro priority (same business day), Enterprise 24/7 + CSM."
+    },
+    {
+     "name": "annualDiscountPercent",
+     "tsType": "hardcoded in JSX",
+     "sqlType": "numeric(5,2)",
+     "nullable": true,
+     "notes": "'Save 17%' and '2 MONTHS FREE' are literals in src/screens/Landing.tsx:644,667 and are not derived from the two prices."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "active",
+     "tsType": "MISSING",
+     "sqlType": "boolean not null default true",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "PlanFeature",
+     "via": "features: string[]",
+     "gap": "Entitlements are free-text bullets, so nothing can be enforced from them."
+    },
+    {
+     "kind": "hasMany",
+     "target": "Subscription",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "PlanFeature",
+   "sourceType": "NEW (plans[].features)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/landingData.ts",
+   "purpose": "One display bullet on a pricing card, separated from the machine-readable limits above.",
+   "tenantScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "planId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references plans(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Plan",
+     "via": "plan_id"
+    }
+   ]
+  },
+  {
+   "name": "Subscription",
+   "sourceType": "NEW (TRIAL_DAYS constant)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "The tenant's current plan and trial window. Does not exist: trialDaysLeft is the constant 13 and never decrements.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "trialing",
+    "active",
+    "past_due",
+    "cancelled",
+    "expired"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "planId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references plans(id)",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'trialing' check (status in ('trialing','active','past_due','cancelled','expired'))",
+     "nullable": false,
+     "notes": "Only 'Trial' is ever rendered (src/screens/app/Overview.tsx:61)."
+    },
+    {
+     "name": "billingInterval",
+     "tsType": "useState<boolean> annual",
+     "sqlType": "text not null default 'monthly' check (billing_interval in ('monthly','annual'))",
+     "nullable": false,
+     "notes": "The monthly/annual toggle is local UI state on the landing page only."
+    },
+    {
+     "name": "currency",
+     "tsType": "NEW",
+     "sqlType": "char(3) not null",
+     "nullable": false
+    },
+    {
+     "name": "unitAmount",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "Price locked at subscribe time. numeric, never float."
+    },
+    {
+     "name": "trialStartedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "The only hint is a seeded audit row action 'trial.started' whose timestamp is module-load time, not signup time (src/lib/workspace.tsx:867)."
+    },
+    {
+     "name": "trialEndsAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "trialDaysLeft must be derived from this, not stored."
+    },
+    {
+     "name": "currentPeriodStart",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "currentPeriodEnd",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "seatsPurchased",
+     "tsType": "NEW",
+     "sqlType": "integer not null default 1",
+     "nullable": false
+    },
+    {
+     "name": "cancelledAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Plan",
+     "via": "none",
+     "gap": "No tenant is ever associated with a plan, so the gated-app 'Upgrade' link has nothing to compare against."
+    }
+   ]
+  },
+  {
+   "name": "CreditPool",
+   "sourceType": "NEW (creditsUsed / MONTHLY_CREDITS)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "The single AI Credits pool the whole platform draws on. Today: one integer counter with no period boundary, so it never resets.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "open",
+    "closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "periodStart",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null",
+     "nullable": false,
+     "notes": "Nothing anchors the 'month' in 'AI Credits this month'."
+    },
+    {
+     "name": "periodEnd",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null",
+     "nullable": false
+    },
+    {
+     "name": "allocatedCredits",
+     "tsType": "number (MONTHLY_CREDITS = 1000)",
+     "sqlType": "integer not null",
+     "nullable": false,
+     "notes": "A module constant, identical for every tenant and every plan."
+    },
+    {
+     "name": "usedCredits",
+     "tsType": "number (creditsUsed)",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "Monotonic. recordRun() adds to it directly without calling spend(), so usage can exceed the pool and creditsLeft goes negative (src/lib/workspace.tsx:1075)."
+    },
+    {
+     "name": "source",
+     "tsType": "MISSING",
+     "sqlType": "text not null default 'plan' check (source in ('plan','topup','promo'))",
+     "nullable": false,
+     "notes": "FAQ promises admin top-ups; no top-up path exists."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none"
+    },
+    {
+     "kind": "hasMany",
+     "target": "CreditLedgerEntry",
+     "via": "none",
+     "gap": "There is no ledger — only a running total, so no spend can be attributed or reversed."
+    },
+    {
+     "kind": "hasMany",
+     "target": "CreditAllocation",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "CreditAllocation",
+   "sourceType": "NEW (Persisted.creditsAllocated: boolean)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "A per-user sub-budget carved out of the tenant pool. The checklist task 'Allocate credits to yourself' sets a boolean and allocates nothing.",
+   "tenantScoped": true,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references users(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "poolId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references credit_pools(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "allocatedCredits",
+     "tsType": "MISSING (boolean only)",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "usedCredits",
+     "tsType": "MISSING",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "allocatedByUserId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CreditPool",
+     "via": "none"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "none",
+     "gap": "creditsAllocated is a tenant-wide boolean, not a per-user amount."
+    }
+   ]
+  },
+  {
+   "name": "CreditLedgerEntry",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "One credit movement, so spend is attributable and auditable. spend(n) currently just increments a counter.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "copilot",
+    "agent_run",
+    "suite_tool",
+    "vibe_build",
+    "prompt_lab",
+    "topup",
+    "period_reset"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "bigserial primary key",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "poolId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references credit_pools(id)",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "NEW",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "delta",
+     "tsType": "number",
+     "sqlType": "integer not null",
+     "nullable": false,
+     "notes": "Negative for a spend. Observed costs: Copilot 2 (src/components/CopilotDock.tsx:33), an agent run 6 (sum of sampleTrace), suite tools 2–12 (src/lib/appData.ts)."
+    },
+    {
+     "name": "reason",
+     "tsType": "NEW",
+     "sqlType": "text not null check (reason in ('copilot','agent_run','suite_tool','vibe_build','prompt_lab','topup','period_reset'))",
+     "nullable": false
+    },
+    {
+     "name": "refType",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "refId",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "occurredAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CreditPool",
+     "via": "none"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Run",
+     "via": "none",
+     "gap": "A run's credits are folded into the counter with no link back to the run."
+    }
+   ]
+  },
+  {
+   "name": "Notification",
+   "sourceType": "Notification",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "An inbox row. Only two producers exist: app install and an approval decision. notify() is exported but never called from any screen.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "unread",
+    "read"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "crypto.randomUUID() in the browser."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references users(id) on delete cascade",
+     "nullable": false,
+     "notes": "Notifications are tenant-global today with one shared `read` flag — one person reading marks it read for everyone."
+    },
+    {
+     "name": "title",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "body",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "category",
+     "tsType": "MISSING",
+     "sqlType": "text not null check (category in ('app_install','approval','system','mention'))",
+     "nullable": false,
+     "notes": "Inferred from the two producers plus the Inbox heading 'Notifications & @Mentions'. Mentions have no producer."
+    },
+    {
+     "name": "severity",
+     "tsType": "MISSING",
+     "sqlType": "text not null default 'info' check (severity in ('info','warning','critical'))",
+     "nullable": false
+    },
+    {
+     "name": "linkTo",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Rows are not clickable through to anything; clicking only marks read."
+    },
+    {
+     "name": "read",
+     "tsType": "boolean",
+     "sqlType": "readAt timestamptz",
+     "nullable": true,
+     "notes": "Store a timestamp, not a boolean — 'Total today' on the Inbox needs one."
+    },
+    {
+     "name": "at",
+     "tsType": "string",
+     "sqlType": "created_at timestamptz not null default now()",
+     "nullable": false,
+     "notes": "ISO string; rendered via relativeTime()."
+    },
+    {
+     "name": "archivedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "The client hard-caps the list at 50 and silently drops the oldest (src/lib/workspace.tsx:962)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "none",
+     "gap": "No recipient — the array is shared by the whole browser workspace."
+    }
+   ]
+  },
+  {
+   "name": "OnboardingChecklistState",
+   "sourceType": "ChecklistTask + Persisted flags",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "The 5-task 'Get the most out of Apragya' card. Two tasks are derived from real state; three are raw booleans a click sets.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "agent",
+    "app",
+    "credits",
+    "invite",
+    "copilot"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "userId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id) on delete cascade",
+     "nullable": true,
+     "notes": "Unclear whether the checklist is per-tenant or per-user; today it is per-browser."
+    },
+    {
+     "name": "creditsAllocated",
+     "tsType": "boolean",
+     "sqlType": "DERIVE from credit_allocations",
+     "nullable": false,
+     "notes": "Set true by clicking the row (src/screens/app/Overview.tsx:141). Nothing is allocated."
+    },
+    {
+     "name": "invitedTeammate",
+     "tsType": "boolean",
+     "sqlType": "DERIVE from invitations",
+     "nullable": false,
+     "notes": "Set true by clicking the row (line 142). No invitation is created and no email is queued."
+    },
+    {
+     "name": "usedCopilot",
+     "tsType": "boolean",
+     "sqlType": "boolean not null default false",
+     "nullable": false,
+     "notes": "Set by CopilotDock.ask() before the credit spend is even attempted (src/components/CopilotDock.tsx:30)."
+    },
+    {
+     "name": "dismissedChecklist",
+     "tsType": "boolean",
+     "sqlType": "dismissed_at timestamptz",
+     "nullable": true,
+     "notes": "Irreversible — there is no control anywhere to bring the card back."
+    },
+    {
+     "name": "firstAgentDone",
+     "tsType": "derived: artifacts.length > 0",
+     "sqlType": "DERIVE",
+     "nullable": false
+    },
+    {
+     "name": "firstAppDone",
+     "tsType": "derived: installed.length > 0",
+     "sqlType": "DERIVE",
+     "nullable": false,
+     "notes": "Always true on a fresh tenant — defaultInstalled is ['CRM','HR'], so the task ships pre-ticked."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "Approval",
+   "sourceType": "Approval, ApprovalDecision",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+   "purpose": "An agent run paused at a human-in-the-loop node. Two are hardcoded module constants; only the decision is persisted (a map id → decision).",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "pending",
+    "approved",
+    "modified",
+    "rejected"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string ('a1','a2')",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "Hand-written literals used as the key of Persisted.approvals."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "runId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references runs(id)",
+     "nullable": true,
+     "notes": "An approval pauses a run, but there is no link to one."
+    },
+    {
+     "name": "agent",
+     "tsType": "string",
+     "sqlType": "agent_id uuid references catalog_agents(id)",
+     "nullable": false,
+     "notes": "Display-name join ('Invoice Capture', 'Contract Analyzer')."
+    },
+    {
+     "name": "app",
+     "tsType": "string",
+     "sqlType": "app_id uuid references catalog_apps(id)",
+     "nullable": false,
+     "notes": "Display-name join ('Purchase & Payables', 'Contract Management')."
+    },
+    {
+     "name": "summary",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Contains embedded money: 'Post invoice #4821 to GL — ₹84,200 exceeds the ₹50,000 cap'."
+    },
+    {
+     "name": "node",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "guardrail",
+     "tsType": "string",
+     "sqlType": "policy_id uuid references guardrail_policies(id)",
+     "nullable": true,
+     "notes": "Display-name join to GuardrailPolicy.name ('Approval cap — ₹50,000')."
+    },
+    {
+     "name": "raisedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null",
+     "nullable": false,
+     "notes": "minutesAgo(48) / minutesAgo(155) — recomputed at module load, so it is always 'about an hour ago'."
+    },
+    {
+     "name": "status",
+     "tsType": "ApprovalDecision | undefined",
+     "sqlType": "text not null default 'pending' check (status in ('pending','approved','modified','rejected'))",
+     "nullable": false,
+     "notes": "'modified' records that the reviewer changed something but no changed value is stored."
+    },
+    {
+     "name": "decidedByUserId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "decidedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "Only the audit row has a time."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "ApprovalField",
+     "via": "fields[] inline array"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "CatalogAgent",
+     "via": "agent name string",
+     "gap": "Display-name FK."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "CatalogApp",
+     "via": "app name string",
+     "gap": "Display-name FK."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "GuardrailPolicy",
+     "via": "guardrail name string",
+     "gap": "Display-name FK — the policy is also re-keyed with a new UUID on every page load."
+    }
+   ]
+  },
+  {
+   "name": "ApprovalField",
+   "sourceType": "Approval['fields'][number]",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+   "purpose": "One extracted value the reviewer is actually approving.",
+   "tenantScoped": true,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "approvalId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references approvals(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "value",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Everything is a formatted string: '₹84,200' (money), '04 Oct 2026' (date), '3-way matched · PO-2261' (a reference). Needs typed value columns — amount numeric(18,4) + currency char(3), value_date date — or the reviewer is approving text."
+    },
+    {
+     "name": "flagged",
+     "tsType": "boolean | undefined",
+     "sqlType": "boolean not null default false",
+     "nullable": false
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Approval",
+     "via": "inline array"
+    }
+   ]
+  },
+  {
+   "name": "Run",
+   "sourceType": "Run",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "One agent execution. Read by the Overview dashboard and the checklist; the Build/Run domain owns the full shape.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "success",
+    "needs-review",
+    "failed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "Currently `run_${Math.random().toString(36).slice(2,8)}` — 6 base-36 chars, collidable."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "agent",
+     "tsType": "string",
+     "sqlType": "agent_id uuid references catalog_agents(id)",
+     "nullable": false,
+     "notes": "Display-name join."
+    },
+    {
+     "name": "source",
+     "tsType": "string",
+     "sqlType": "app_id uuid references catalog_apps(id)",
+     "nullable": true,
+     "notes": "Passed as the app's display name (src/screens/app/GenericPortal.tsx:82)."
+    },
+    {
+     "name": "status",
+     "tsType": "'success'|'needs-review'|'failed'",
+     "sqlType": "text not null check (status in ('success','needs-review','failed','running','cancelled','queued'))",
+     "nullable": false,
+     "notes": "recordRun always writes 'success'. The dashboard also renders Running, Cancelled and Queued buckets that no value can ever fill (src/screens/app/dashboardPanels.tsx:114-116,130)."
+    },
+    {
+     "name": "startedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null",
+     "nullable": false
+    },
+    {
+     "name": "finishedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "credits",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "Summed from the trace; always 6."
+    },
+    {
+     "name": "ms",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false,
+     "notes": "duration_ms. Always 3260."
+    },
+    {
+     "name": "trace",
+     "tsType": "RunStep[]",
+     "sqlType": "model as run_steps rows, not jsonb",
+     "nullable": false,
+     "notes": "Every run shares the same module-level sampleTrace array object."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "RunStep",
+     "via": "inline array"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "CatalogAgent",
+     "via": "agent name string",
+     "gap": "Display-name FK."
+    }
+   ]
+  },
+  {
+   "name": "RunStep",
+   "sourceType": "RunStep",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+   "purpose": "One node in a run trace.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "llm",
+    "tool",
+    "guardrail",
+    "hitl",
+    "output"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "bigserial primary key",
+     "nullable": false
+    },
+    {
+     "name": "runId",
+     "tsType": "NEW",
+     "sqlType": "uuid not null references runs(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "node",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "kind",
+     "tsType": "'llm'|'tool'|'guardrail'|'hitl'|'output'",
+     "sqlType": "text not null check (kind in ('llm','tool','guardrail','hitl','output'))",
+     "nullable": false
+    },
+    {
+     "name": "detail",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "ms",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "credits",
+     "tsType": "number",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Run",
+     "via": "inline array"
+    }
+   ]
+  },
+  {
+   "name": "Artifact",
+   "sourceType": "Artifact",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "Something built in Vibe/Agent Studio. In this domain it matters only because the checklist's first task is `artifacts.length > 0`.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "draft",
+    "published"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "skill",
+     "tsType": "string",
+     "sqlType": "skill_id uuid references vibe_skills(id)",
+     "nullable": true,
+     "notes": "Display-name join to VibeSkill.name."
+    },
+    {
+     "name": "kind",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Free string; VibeSkill.artifact supplies the vocabulary (Agent, App, Web app, Mobile app, Bot, Knowledge bot, Document, Spreadsheet, Deck, Website, Extension)."
+    },
+    {
+     "name": "version",
+     "tsType": "number",
+     "sqlType": "integer not null default 1",
+     "nullable": false,
+     "notes": "publishArtifact increments the version on the same row rather than snapshotting — the marketing promise of an immutable snapshot with rollback is unrepresentable."
+    },
+    {
+     "name": "status",
+     "tsType": "'draft'|'published'",
+     "sqlType": "text not null default 'draft' check (status in ('draft','published'))",
+     "nullable": false
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "publishedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "createdByUserId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "VibeSkill",
+     "via": "skill name string",
+     "gap": "Display-name FK."
+    }
+   ]
+  },
+  {
+   "name": "AuditEvent",
+   "sourceType": "AuditEvent (client) / audit_events (server)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "Append-only record of state changes. Two incompatible shapes exist; the server table is the one to keep.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "success",
+    "failure",
+    "denied",
+    "user",
+    "system",
+    "job",
+    "integration",
+    "portal"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string (uuid) / bigint",
+     "sqlType": "bigserial primary key",
+     "nullable": false
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING (client)",
+     "sqlType": "uuid references tenants(id) on delete cascade",
+     "nullable": true
+    },
+    {
+     "name": "companyId",
+     "tsType": "MISSING (client)",
+     "sqlType": "uuid references companies(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "actorUserId",
+     "tsType": "user: 'owner' | ''",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true,
+     "notes": "The client stores the literal string 'owner' or an empty string and renders it as the signed-in email — there is no actor id."
+    },
+    {
+     "name": "actorKind",
+     "tsType": "derived from user === ''",
+     "sqlType": "text not null default 'user' check (actor_kind in ('user','system','job','integration','portal'))",
+     "nullable": false
+    },
+    {
+     "name": "role",
+     "tsType": "string ('Org_admin' | '')",
+     "sqlType": "DROP — derive from memberships at read time",
+     "nullable": true
+    },
+    {
+     "name": "action",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Observed in this domain: trial.started, org.created, app.installed, app.uninstalled, app.enabled, app.disabled, agent.run, approval.approved, approval.modified, approval.rejected."
+    },
+    {
+     "name": "resource",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Observed: subscription, tenant, app, run, approval."
+    },
+    {
+     "name": "resourceId",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Defaults to a fresh random UUID when the caller omits it (src/lib/workspace.tsx:182) — an id pointing at nothing."
+    },
+    {
+     "name": "outcome",
+     "tsType": "'Success' | 'Failed'",
+     "sqlType": "text not null default 'success' check (outcome in ('success','failure','denied'))",
+     "nullable": false,
+     "notes": "Client capitalises; server does not. Nothing ever writes 'Failed'."
+    },
+    {
+     "name": "detail",
+     "tsType": "MISSING (client)",
+     "sqlType": "jsonb not null default '{}'::jsonb",
+     "nullable": false,
+     "notes": "Marketing promises before/after values; the client shape has no room for them."
+    },
+    {
+     "name": "requestId",
+     "tsType": "MISSING (client)",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "ip",
+     "tsType": "string (always '')",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "occurredAt",
+     "tsType": "at: string",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false,
+     "notes": "A fresh tenant is seeded with two identical 'trial.started' rows plus one 'org.created' row, all timestamped at module-evaluation time rather than signup (src/lib/workspace.tsx:866-870)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none in the client shape"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "User",
+     "via": "the literal string 'owner'",
+     "gap": "No actor id exists client-side."
+    }
+   ]
+  },
+  {
+   "name": "Company",
+   "sourceType": "Company",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+   "purpose": "A legal entity under the tenant. The primary entity is synthesised client-side from the signup org name and is not a stored row.",
+   "tenantScoped": true,
+   "statusVocabulary": [
+    "ACTIVE",
+    "INACTIVE"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false,
+     "notes": "The primary entity uses the literal id 'primary' (src/screens/app/setup/useCompanies.ts:21)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "MISSING (client)",
+     "sqlType": "uuid not null references tenants(id) on delete cascade",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Primary falls back through user.organization → onboarding.workspaceName → user.fullName → 'Your company'."
+    },
+    {
+     "name": "code",
+     "tsType": "string",
+     "sqlType": "text not null, unique on (tenant_id, lower(code))",
+     "nullable": false,
+     "notes": "Primary derives it as the first 3 letters of the name, uppercased, or 'ORG'."
+    },
+    {
+     "name": "currency",
+     "tsType": "string",
+     "sqlType": "char(3) not null",
+     "nullable": false,
+     "notes": "Primary hardcodes 'USD' while pricing is in INR."
+    },
+    {
+     "name": "country",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Primary hardcodes 'US'."
+    },
+    {
+     "name": "timezone",
+     "tsType": "MISSING (client)",
+     "sqlType": "text not null default 'UTC'",
+     "nullable": false
+    },
+    {
+     "name": "taxId",
+     "tsType": "MISSING (client)",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "parentId",
+     "tsType": "string | null",
+     "sqlType": "uuid references companies(id) on delete restrict",
+     "nullable": true
+    },
+    {
+     "name": "isPrimary",
+     "tsType": "derived (id === 'primary')",
+     "sqlType": "boolean not null default false, unique per tenant where is_primary",
+     "nullable": false
+    },
+    {
+     "name": "status",
+     "tsType": "'ACTIVE'|'INACTIVE'",
+     "sqlType": "archived_at timestamptz",
+     "nullable": true,
+     "notes": "Client uses a SCREAMING_CASE enum; the server convention is archived_at. Pick one."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "MISSING (client)",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "MISSING (client)",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "none in the client shape"
+    },
+    {
+     "kind": "belongsTo",
+     "target": "Company",
+     "via": "parentId"
+    }
+   ]
+  },
+  {
+   "name": "MarketingPage",
+   "sourceType": "PageSpec, Section, Cta, Card",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pages/types.ts",
+   "purpose": "A data-driven marketing route. 29 pages are compiled-in TS constants rendered by one generic component and statically generated.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "cards",
+    "prose",
+    "steps",
+    "split",
+    "list",
+    "notice"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "slug",
+     "tsType": "string",
+     "sqlType": "text not null unique",
+     "nullable": false,
+     "notes": "May contain a slash ('legal/privacy', 'vibe-studio/web-app-builder'); routed by a catch-all segment."
+    },
+    {
+     "name": "eyebrow",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "title",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "ctas",
+     "tsType": "Cta[] | undefined",
+     "sqlType": "jsonb not null default '[]'::jsonb",
+     "nullable": false,
+     "notes": "Cta = {label, to, variant: 'primary'|'secondary'|'accent'}."
+    },
+    {
+     "name": "sections",
+     "tsType": "Section[]",
+     "sqlType": "jsonb not null default '[]'::jsonb (or a marketing_sections child table)",
+     "nullable": false,
+     "notes": "Discriminated by `kind`: cards | prose | steps | split | list | notice."
+    },
+    {
+     "name": "final",
+     "tsType": "{eyebrow,title,blurb,ctas} | undefined",
+     "sqlType": "jsonb",
+     "nullable": true
+    },
+    {
+     "name": "status",
+     "tsType": "MISSING",
+     "sqlType": "text not null default 'published' check (status in ('draft','published','archived'))",
+     "nullable": false
+    },
+    {
+     "name": "locale",
+     "tsType": "MISSING",
+     "sqlType": "text not null default 'en'",
+     "nullable": false
+    },
+    {
+     "name": "publishedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "MarketingPage",
+     "via": "Cta.to string paths",
+     "gap": "Internal links are hand-written paths; a slug rename breaks them silently. '/forgot-password' is linked from Login but no page with that slug exists."
+    }
+   ]
+  },
+  {
+   "name": "FaqEntry",
+   "sourceType": "faqs",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/landingData.ts",
+   "purpose": "One landing-page FAQ, grouped into four tabs.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "Getting Started",
+    "Agents & Features",
+    "Billing & Plans",
+    "Security & Privacy"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "groupName",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "question",
+     "tsType": "string (q)",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Used as the React key and as the open/closed accordion key — two questions with identical text would collide."
+    },
+    {
+     "name": "answer",
+     "tsType": "string (a)",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Several answers assert unbuilt behaviour (admin top-ups, per-user allocations, usage alerts, rollback)."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "published",
+     "tsType": "MISSING",
+     "sqlType": "boolean not null default true",
+     "nullable": false
+    }
+   ],
+   "relations": []
+  },
+  {
+   "name": "MarketplaceStaffPick",
+   "sourceType": "marketplacePicks",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/landingData.ts",
+   "purpose": "Editorial 'Staff picks' cards on the landing page and the public marketplace.",
+   "tenantScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "agentId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references catalog_agents(id)",
+     "nullable": true,
+     "notes": "'Contract Analyzer' and 'Invoice Capture' also appear as approval agent names, and 'Lead Qualifier' resembles the CRM agent 'CRM Lead Qualifier' — none are actually linked."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "meta",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "'Legal · by Apragya' — a category and a publisher crammed into one string."
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "rating",
+     "tsType": "string ('4.9')",
+     "sqlType": "numeric(2,1) check (rating between 0 and 5)",
+     "nullable": true,
+     "notes": "No review entity exists to compute it."
+    },
+    {
+     "name": "installsLabel",
+     "tsType": "string ('2.4k')",
+     "sqlType": "integer (store the count; format at render)",
+     "nullable": true,
+     "notes": "An abbreviated string, not a number — unsortable and unsummable."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "CatalogAgent",
+     "via": "nothing — the name is retyped",
+     "gap": "Staff picks duplicate catalog names with no join."
+    }
+   ]
+  },
+  {
+   "name": "SuiteTool",
+   "sourceType": "SuiteTool",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+   "purpose": "One Business Suite productivity tool. 16 rows carrying the per-use credit cost; rendered on /business-suite and in the in-app suite.",
+   "tenantScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null unique",
+     "nullable": false
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "cost",
+     "tsType": "number",
+     "sqlType": "credit_cost integer not null",
+     "nullable": false,
+     "notes": "2–12 credits. Marketing claims '100+ tools across 16 categories' but only 16 rows exist here."
+    },
+    {
+     "name": "categorySlug",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Deep links use ?category=writing|image|development|data (src/lib/appData.ts:181) with no field to match them on."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "CreditLedgerEntry",
+     "via": "none"
+    }
+   ]
+  },
+  {
+   "name": "VibeSkill",
+   "sourceType": "VibeSkill",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+   "purpose": "One Vibe Studio build skill. 12 in appData; 9 of them also have a generated landing page.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "Agent",
+    "App",
+    "Web app",
+    "Mobile app",
+    "Bot",
+    "Knowledge bot",
+    "Document",
+    "Spreadsheet",
+    "Deck",
+    "Website",
+    "Extension"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null unique",
+     "nullable": false
+    },
+    {
+     "name": "icon",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "blurb",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "artifact",
+     "tsType": "string",
+     "sqlType": "artifact_kind text not null",
+     "nullable": false,
+     "notes": "'Knowledge bot' is the artifact kind for two different skills."
+    },
+    {
+     "name": "slug",
+     "tsType": "separate table in vibeSkills.ts",
+     "sqlType": "text unique",
+     "nullable": true,
+     "notes": "Only 9 of the 12 skills have a page slug; 'AI Agents', 'ERP Customisation' and 'Knowledge Bots' have none, so the footer list and the appData list disagree."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Artifact",
+     "via": "skill name string",
+     "gap": "Display-name FK."
+    }
+   ]
+  },
+  {
+   "name": "IndustryOption",
+   "sourceType": "industries",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/content.ts",
+   "purpose": "The controlled vocabulary behind onboarding step 2 and the landing marquee. Duplicated verbatim in src/lib/landingData.ts:11.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "Real Estate",
+    "Insurance",
+    "Healthcare",
+    "BFSI",
+    "Manufacturing",
+    "Retail & Ecomm",
+    "Govt & Public Sector"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text not null unique",
+     "nullable": false,
+     "notes": "Stored on the onboarding profile as this display string."
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    },
+    {
+     "name": "pipelineTemplateId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references pipeline_templates(id)",
+     "nullable": true,
+     "notes": "Onboarding claims 'We preload the agent pipeline built for your industry'. The 5 landing pipelines (Lead Qualification, Invoice Processing, KYC Onboarding, Real Estate Property, Order Fulfillment) are unrelated marketing data and do not map to these 7 industries."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "OnboardingProfile",
+     "via": "industry display string",
+     "gap": "Display-name FK; renaming 'Retail & Ecomm' orphans every profile."
+    }
+   ]
+  },
+  {
+   "name": "TeamSizeBand",
+   "sourceType": "teamSizes",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/content.ts",
+   "purpose": "The 5 team-size buckets offered at onboarding step 1.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "Just me",
+    "2–10",
+    "11–50",
+    "51–200",
+    "200+"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "code",
+     "tsType": "NEW",
+     "sqlType": "text not null unique check (code in ('just_me','2_10','11_50','51_200','200_plus'))",
+     "nullable": false
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text not null",
+     "nullable": false,
+     "notes": "Contains an en-dash ('2–10'), so it is unsafe as a key."
+    },
+    {
+     "name": "minUsers",
+     "tsType": "MISSING",
+     "sqlType": "integer not null",
+     "nullable": false
+    },
+    {
+     "name": "maxUsers",
+     "tsType": "MISSING",
+     "sqlType": "integer",
+     "nullable": true
+    },
+    {
+     "name": "sortOrder",
+     "tsType": "array index",
+     "sqlType": "integer not null default 0",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "OnboardingProfile",
+     "via": "teamSize display string",
+     "gap": "Display-name FK."
+    }
+   ]
+  },
+  {
+   "name": "SignupIntent",
+   "sourceType": "NEW (?intent= URL param)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/Landing.tsx",
+   "purpose": "The prompt typed into the landing hero, described in code as 'the top of the funnel'. It survives two redirects as a query string, is echoed twice, then dropped.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "hero_form",
+    "suggestion_chip"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "anonymousId",
+     "tsType": "MISSING",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "No visitor identifier exists, so an abandoned signup cannot be attributed."
+    },
+    {
+     "name": "promptText",
+     "tsType": "string (URL param)",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "source",
+     "tsType": "implicit",
+     "sqlType": "text not null check (source in ('hero_form','suggestion_chip'))",
+     "nullable": false,
+     "notes": "Chips: 'Build a CRM agent', 'Process this invoice', 'Draft a vendor contract', 'Analyze customer data', 'Automate hiring' (only the first 4 are rendered)."
+    },
+    {
+     "name": "capturedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    },
+    {
+     "name": "convertedUserId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references users(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "convertedTenantId",
+     "tsType": "MISSING",
+     "sqlType": "uuid references tenants(id) on delete set null",
+     "nullable": true
+    },
+    {
+     "name": "consumedAt",
+     "tsType": "MISSING",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "Onboarding says 'Queued for your first run' but queues nothing."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "OnboardingProfile",
+     "via": "query string only",
+     "gap": "Lost on any page refresh during signup."
+    }
+   ]
+  },
+  {
+   "name": "ContactRequest",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pages/info.ts",
+   "purpose": "A sales or support enquiry. Both pages exist and both admit in a notice block that nothing is submitted.",
+   "tenantScoped": false,
+   "statusVocabulary": [
+    "sales",
+    "support",
+    "new",
+    "contacted",
+    "closed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid primary key default gen_random_uuid()",
+     "nullable": false
+    },
+    {
+     "name": "kind",
+     "tsType": "NEW",
+     "sqlType": "text not null check (kind in ('sales','support'))",
+     "nullable": false
+    },
+    {
+     "name": "name",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "No form exists, so the field set is unknown — do not invent one."
+    },
+    {
+     "name": "email",
+     "tsType": "NEW",
+     "sqlType": "text not null",
+     "nullable": false
+    },
+    {
+     "name": "company",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "message",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true
+    },
+    {
+     "name": "planInterest",
+     "tsType": "NEW",
+     "sqlType": "uuid references plans(id)",
+     "nullable": true,
+     "notes": "Enterprise pricing CTA routes here."
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text not null default 'new' check (status in ('new','contacted','closed'))",
+     "nullable": false
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz not null default now()",
+     "nullable": false
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Plan",
+     "via": "none"
+    }
+   ]
+  }
+ ],
+ "operations": [
+  {
+   "id": "OP-MKT-LANDING-READ",
+   "entity": "MarketingPage",
+   "action": "read",
+   "surface": "/ (Landing)",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 806,
+   "currentBehaviour": "Server component renders <Landing/>; every section reads module-level constants from src/lib/landingData.ts and src/lib/appData.ts. No fetch anywhere in src/.",
+   "requiredBehaviour": "Serve published marketing content (plans, FAQs, staff picks, app catalog) from the database with ISR, so pricing and the catalog can change without a deploy.",
+   "authorization": "public",
+   "validation": "none"
+  },
+  {
+   "id": "OP-MKT-HERO-INTENT-SUBMIT",
+   "entity": "SignupIntent",
+   "action": "create",
+   "surface": "/ (Landing → hero form)",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 104,
+   "currentBehaviour": "setState only, then navigate(`/register?intent=${encodeURIComponent(intent)}`). Nothing is stored; an empty prompt navigates to /register bare.",
+   "requiredBehaviour": "POST the prompt as a SignupIntent tied to an anonymous visitor id, return its id, carry the id (not the raw text) through signup, and mark it consumed when the first run is queued.",
+   "sideEffect": "none today",
+   "authorization": "public",
+   "validation": "Trim only. No length cap — an arbitrarily long prompt goes straight into the URL."
+  },
+  {
+   "id": "OP-MKT-HERO-CHIP-CLICK",
+   "entity": "SignupIntent",
+   "action": "create",
+   "surface": "/ (Landing → suggestion chips)",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 132,
+   "currentBehaviour": "navigate to /register?intent=<chip label>. Only suggestionChips.slice(0,4) render, so 'Automate hiring' is unreachable.",
+   "requiredBehaviour": "Same as the hero form, with source='suggestion_chip' and the chip id recorded.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-PRICING-INTERVAL-TOGGLE",
+   "entity": "Plan",
+   "action": "read",
+   "surface": "/ ?#pricing",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 632,
+   "currentBehaviour": "setAnnual(boolean) — local state. Swaps which pre-formatted string the card renders. 'Save 17%' and '2 MONTHS FREE' are hardcoded and not derived from the two prices.",
+   "requiredBehaviour": "Read monthly and annual amounts as numeric(18,4) with a currency, compute the discount, and carry the chosen interval into checkout.",
+   "authorization": "public",
+   "validation": "none"
+  },
+  {
+   "id": "OP-MKT-PRICING-CTA",
+   "entity": "Plan",
+   "action": "read",
+   "surface": "/ ?#pricing",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 699,
+   "currentBehaviour": "A <Link> to plan.cta.to — '/register' for Starter and Pro, '/contact-sales' for Enterprise. The selected plan is not carried anywhere.",
+   "requiredBehaviour": "Carry the plan code and billing interval into registration so the tenant is created on the intended plan.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-FAQ-GROUP-SELECT",
+   "entity": "FaqEntry",
+   "action": "read",
+   "surface": "/ ?#faq",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 723,
+   "currentBehaviour": "setGroup(index) — setState only. The open accordion key is not reset when the group changes, so switching groups can leave every item closed.",
+   "requiredBehaviour": "Read grouped, published FAQs from the database.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-FAQ-TOGGLE",
+   "entity": "FaqEntry",
+   "action": "read",
+   "surface": "/ ?#faq",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 743,
+   "currentBehaviour": "setOpen(question text | null) — keyed on the question string.",
+   "requiredBehaviour": "Key on the FAQ id.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-AGENTCAP-SELECT",
+   "entity": "MarketingPage",
+   "action": "read",
+   "surface": "/ (Agent Studio section)",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 349,
+   "currentBehaviour": "setActive(index) over the 6 hardcoded agentStudioCapabilities; swaps a detail panel. setState only.",
+   "requiredBehaviour": "Content-managed section rows.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-PIPELINE-SELECT",
+   "entity": "MarketingPage",
+   "action": "read",
+   "surface": "/ (AI pipeline builder section)",
+   "sourceFile": "src/screens/Landing.tsx",
+   "sourceLine": 427,
+   "currentBehaviour": "setActive(index) over 5 hardcoded pipelines, each with 6 nodes and 3 stat cards. Purely presentational; no pipeline exists in the product.",
+   "requiredBehaviour": "If these are meant to be real preloadable templates, they need a PipelineTemplate entity keyed to IndustryOption. Today they are unrelated marketing copy.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-VIPPY-ASK",
+   "entity": "MarketingPage",
+   "action": "execute",
+   "surface": "/ and every marketing page (Vippy widget)",
+   "sourceFile": "src/components/VippyWidget.tsx",
+   "sourceLine": 13,
+   "currentBehaviour": "Pushes the question and an immediately-generated canned string into local state: \"On the live site Vippy answers '<text>' from Apragya's own docs.\" No network call, no persistence, no credit spend.",
+   "requiredBehaviour": "Either a real RAG endpoint over public docs with a stored conversation, or remove the input.",
+   "sideEffect": "none",
+   "authorization": "public",
+   "validation": "Non-empty after trim."
+  },
+  {
+   "id": "OP-MKT-THEME-SET",
+   "entity": "User",
+   "action": "update",
+   "surface": "/ (SiteRail) and /app/account",
+   "sourceFile": "src/components/SiteRail.tsx",
+   "sourceLine": 108,
+   "currentBehaviour": "setPreference('light'|'dark'|'system') → localStorage via src/lib/theme.tsx, applied pre-hydration by an inline boot script.",
+   "requiredBehaviour": "Acceptable as a per-device preference, but if it must follow the user across devices it needs a user_preferences row.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-MORE-FLYOUT",
+   "entity": "MarketingPage",
+   "action": "read",
+   "surface": "/ (SiteRail 'More')",
+   "sourceFile": "src/components/SiteRail.tsx",
+   "sourceLine": 88,
+   "currentBehaviour": "setMoreOpen toggle over the 7 hardcoded moreLinks; closes on outside click, Escape, or pathname change.",
+   "requiredBehaviour": "Navigation should come from published page rows so a slug rename cannot orphan a rail entry.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-PAGE-READ",
+   "entity": "MarketingPage",
+   "action": "read",
+   "surface": "/[...slug] — 29 routes (vibe-studio, agent-studio, business-suite, enterprise-apps, prompt-lab, trust, integrations, about, partners, docs, blog, help-center, contact-sales, contact-support, solutions, compare, free, legal/privacy, legal/terms, legal/cookies, vibe-studio/<9 skills>)",
+   "sourceFile": "src/app/[...slug]/page.tsx",
+   "sourceLine": 8,
+   "currentBehaviour": "generateStaticParams() enumerates allPages at build time; the handler linear-scans the array and calls notFound() on a miss. Content is a compiled TS constant.",
+   "requiredBehaviour": "Look the slug up in marketing_pages by (slug, locale, status='published'), with revalidation.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-PAGE-CTA",
+   "entity": "MarketingPage",
+   "action": "read",
+   "surface": "/[...slug]",
+   "sourceFile": "src/screens/ProductPage.tsx",
+   "sourceLine": 18,
+   "currentBehaviour": "Renders <Link to={cta.to}> for each CTA. Targets are hand-written strings; nothing validates that the target exists.",
+   "requiredBehaviour": "Validate internal CTA targets against the page table at publish time.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKT-CONTACT-SALES-SUBMIT",
+   "entity": "ContactRequest",
+   "action": "create",
+   "surface": "/contact-sales",
+   "sourceFile": "src/lib/pages/info.ts",
+   "sourceLine": 180,
+   "currentBehaviour": "No form exists at all. The page renders three cards and a notice: 'The live site collects this through a form. This rebuild shows the flow without submitting anything anywhere.'",
+   "requiredBehaviour": "A real form persisting a ContactRequest(kind='sales') and enqueueing a notification via the existing outbox table.",
+   "sideEffect": "Needs an outbox topic; the mail transport is unspecified.",
+   "authorization": "public",
+   "validation": "Unknown — no field set exists to audit."
+  },
+  {
+   "id": "OP-MKT-CONTACT-SUPPORT-SUBMIT",
+   "entity": "ContactRequest",
+   "action": "create",
+   "surface": "/contact-support",
+   "sourceFile": "src/lib/pages/info.ts",
+   "sourceLine": 207,
+   "currentBehaviour": "No form. Notice text: 'Ticket submission is stubbed in this rebuild — nothing is sent.'",
+   "requiredBehaviour": "Persist a ContactRequest(kind='support'), or create a Ticket in the Support & Ticketing app — the intended destination is not stated anywhere.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKTPL-PUB-LIST",
+   "entity": "CatalogApp",
+   "action": "list",
+   "surface": "/marketplace (public)",
+   "sourceFile": "src/screens/PublicMarketplace.tsx",
+   "sourceLine": 24,
+   "currentBehaviour": "Builds two in-memory arrays with useMemo: 15 apps, plus one synthetic 'agent' row per app.agents entry (agent names only, with a generated blurb 'Bound to <app> — fires on records as they arrive').",
+   "requiredBehaviour": "Paginated read of published catalog apps and agents.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKTPL-PUB-FILTER",
+   "entity": "CatalogApp",
+   "action": "list",
+   "surface": "/marketplace (public)",
+   "sourceFile": "src/screens/PublicMarketplace.tsx",
+   "sourceLine": 83,
+   "currentBehaviour": "setFilter('All'|'Agents'|'Apps') — client-side filter of the in-memory array.",
+   "requiredBehaviour": "Server-side filter once the catalog is a table.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKTPL-PUB-SEARCH",
+   "entity": "CatalogApp",
+   "action": "list",
+   "surface": "/marketplace (public)",
+   "sourceFile": "src/screens/PublicMarketplace.tsx",
+   "sourceLine": 97,
+   "currentBehaviour": "Case-insensitive substring match on `${name} ${meta} ${blurb}` over every row on every keystroke. No debounce, no pagination.",
+   "requiredBehaviour": "Indexed full-text search.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-MKTPL-PUB-INSTALL",
+   "entity": "TenantAppInstallation",
+   "action": "create",
+   "surface": "/marketplace (public)",
+   "sourceFile": "src/screens/PublicMarketplace.tsx",
+   "sourceLine": 118,
+   "currentBehaviour": "A button labelled 'Install' that is really a <Link to=\"/register\">. Which listing was clicked is discarded.",
+   "requiredBehaviour": "Carry the app code into registration and install it on first login, or relabel the control.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-AUTH-LOGIN-SUBMIT",
+   "entity": "Session",
+   "action": "execute",
+   "surface": "/login",
+   "sourceFile": "src/screens/Login.tsx",
+   "sourceLine": 24,
+   "currentBehaviour": "Validates email format and that the password is non-empty, then calls signIn({email}) — the password is never passed or checked. signIn awaits a 550ms setTimeout, reads localStorage, and returns the stored session when the email matches, otherwise fabricates a brand-new user whose fullName is the email local-part with [._-] replaced by spaces. Writes localStorage 'apragya.session'. Then navigates to session.onboarding ? (location.state?.from ?? '/app') : '/onboarding'.",
+   "requiredBehaviour": "POST /api/v1/auth/login (already implemented at src/app/api/v1/auth/login/route.ts) — verify the password hash, increment failed_logins, honour locked_until, create a sessions row, set the httpOnly apragya_session cookie, and land the user in their single tenant or ask which one.",
+   "sideEffect": "none today; server route writes a session row and an audit event",
+   "authorization": "public",
+   "validation": "validateEmail + non-empty password (src/lib/validation.ts:25). Any password is accepted."
+  },
+  {
+   "id": "OP-AUTH-LOGIN-SSO",
+   "entity": "UserIdentity",
+   "action": "execute",
+   "surface": "/login",
+   "sourceFile": "src/screens/Login.tsx",
+   "sourceLine": 44,
+   "currentBehaviour": "onSso('google'|'microsoft') calls signIn({email: `you@${provider}.com`, provider}) — a hardcoded address. No OAuth redirect, no PKCE, no state parameter, no id_token. Everyone who clicks Google becomes the same account.",
+   "requiredBehaviour": "A real OAuth/OIDC authorization-code flow with state + PKCE, linking a UserIdentity row. No provider contract exists in this repo.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-AUTH-FORGOT-PASSWORD",
+   "entity": "AuthToken",
+   "action": "execute",
+   "surface": "/login → /forgot-password",
+   "sourceFile": "src/screens/Login.tsx",
+   "sourceLine": 99,
+   "currentBehaviour": "A plain <a href=\"/forgot-password\">. No such route or page slug exists, so the catch-all calls notFound() and the user lands on the 404 page.",
+   "requiredBehaviour": "Build the screen against the existing POST /api/v1/auth/password/forgot, which already issues a 1-hour token and enqueues an 'email.password_reset' outbox row with a per-hour idempotency key.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-AUTH-PASSWORD-RESET",
+   "entity": "AuthToken",
+   "action": "execute",
+   "surface": "(no route)",
+   "sourceFile": "src/app/api/v1/auth/password/reset/route.ts",
+   "sourceLine": 10,
+   "currentBehaviour": "Server route exists and works (consumes the token, resets the password, revokes every session, clears the cookie). No UI reaches it.",
+   "requiredBehaviour": "A /reset-password screen that reads the token from the query string.",
+   "authorization": "public (token-bearing)",
+   "validation": "passwordField — the same policy as registration."
+  },
+  {
+   "id": "OP-AUTH-EMAIL-VERIFY",
+   "entity": "User",
+   "action": "transition",
+   "surface": "(no route)",
+   "sourceFile": "src/app/api/v1/auth/verify/route.ts",
+   "sourceLine": 8,
+   "currentBehaviour": "Server route exists; registration already enqueues an 'email.verify' outbox row with a 24h token. No UI, and no screen ever shows verified/unverified status.",
+   "requiredBehaviour": "A /verify screen plus an unverified banner somewhere in /app.",
+   "authorization": "public (token-bearing)"
+  },
+  {
+   "id": "OP-AUTH-REGISTER-SUBMIT",
+   "entity": "User",
+   "action": "create",
+   "surface": "/register",
+   "sourceFile": "src/screens/Register.tsx",
+   "sourceLine": 45,
+   "currentBehaviour": "Validates 6 fields, checks a honeypot, then calls signUp({fullName, email, organization}) — the password and the terms acceptance are DISCARDED. signUp awaits 550ms, mints a client-side UUID, writes localStorage, and returns. Navigates to /onboarding (preserving ?intent). No tenant, membership, company or audit row is created.",
+   "requiredBehaviour": "POST /api/v1/auth/register (already implemented) then POST /api/v1/tenants to create the tenant, its primary company and an owner membership in one transaction.",
+   "sideEffect": "server route enqueues 'email.verify'",
+   "authorization": "public",
+   "validation": "fullName /^[A-Za-z ]+$/; email regex; organization /^[A-Za-z0-9 ]+$/ optional; password must satisfy all 5 rules (8+, upper, lower, digit, special); confirm must match; terms checkbox must be ticked."
+  },
+  {
+   "id": "OP-AUTH-REGISTER-SSO",
+   "entity": "User",
+   "action": "create",
+   "surface": "/register",
+   "sourceFile": "src/screens/Register.tsx",
+   "sourceLine": 77,
+   "currentBehaviour": "signUp({fullName: 'New User', email: `you@${provider}.com`, provider}) then navigate('/onboarding'). Bypasses every validation, the terms checkbox and the honeypot.",
+   "requiredBehaviour": "Real OIDC; terms acceptance must still be captured.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-AUTH-TERMS-ACCEPT",
+   "entity": "User",
+   "action": "update",
+   "surface": "/register",
+   "sourceFile": "src/screens/Register.tsx",
+   "sourceLine": 217,
+   "currentBehaviour": "setAgreed(boolean). Gate-checks submission and is then thrown away — no terms version, no timestamp, no IP.",
+   "requiredBehaviour": "Persist accepted_terms_version + accepted_at + ip on the user, since the legal pages are versioned content.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-AUTH-REGISTER-HONEYPOT",
+   "entity": "User",
+   "action": "create",
+   "surface": "/register",
+   "sourceFile": "src/screens/Register.tsx",
+   "sourceLine": 60,
+   "currentBehaviour": "A visually-hidden 'website' input; if filled, onSubmit returns silently after validation has already run. Client-side only, so it stops nothing that posts directly.",
+   "requiredBehaviour": "Server-side rate limiting and bot scoring on the register endpoint.",
+   "authorization": "public"
+  },
+  {
+   "id": "OP-AUTH-SESSION-READ",
+   "entity": "Session",
+   "action": "read",
+   "surface": "every /app route, /onboarding, /studio",
+   "sourceFile": "src/routes/Protected.tsx",
+   "sourceLine": 20,
+   "currentBehaviour": "useAuth() reads localStorage in an effect; renders 'Loading workspace…' until ready, then <Navigate to='/login'> if there is no session, or to '/onboarding' when requireOnboarding && !session.onboarding. Anyone can forge a session by writing the localStorage key.",
+   "requiredBehaviour": "GET /api/v1/auth/session (already implemented) reading the httpOnly cookie, with server-side redirects in the route segment rather than a client-side guard.",
+   "authorization": "authenticated"
+  },
+  {
+   "id": "OP-AUTH-SIGNOUT",
+   "entity": "Session",
+   "action": "delete",
+   "surface": "/app/account",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 196,
+   "currentBehaviour": "signOut() → persist(null) → localStorage.removeItem('apragya.session'). The workspace blob ('apragya.workspace') is deliberately left behind, so the next person to sign in on that browser inherits the previous tenant's installs, credits, notifications, audit trail and every app record.",
+   "requiredBehaviour": "POST /api/v1/auth/logout (already implemented — revokes server-side, then clears the cookie) and clear all client caches.",
+   "sideEffect": "none today",
+   "authorization": "authenticated"
+  },
+  {
+   "id": "OP-ONB-STEP-NEXT",
+   "entity": "OnboardingProfile",
+   "action": "transition",
+   "surface": "/onboarding (steps Workspace → Industry → Apps)",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 31,
+   "currentBehaviour": "next() validates the current step then setStep(step+1). Step state is useState only — refreshing restarts at step 0 with all answers lost. Validation errors render in the workspace-name Field on step 0 and as loose text on step 1; step 2 has no validation.",
+   "requiredBehaviour": "Persist the draft profile after each step so the wizard is resumable.",
+   "authorization": "authenticated",
+   "validation": "Step 0: workspaceName non-blank. Step 1: industry chosen. Step 2: none — zero apps is allowed."
+  },
+  {
+   "id": "OP-ONB-STEP-BACK",
+   "entity": "OnboardingProfile",
+   "action": "transition",
+   "surface": "/onboarding",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 197,
+   "currentBehaviour": "On step 0 navigates to '/' leaving a signed-in session with no onboarding; every /app route then bounces back to /onboarding. Otherwise setStep(step-1). The step-0 error is not cleared on back.",
+   "requiredBehaviour": "Either allow skipping onboarding or make leaving it explicit.",
+   "authorization": "authenticated"
+  },
+  {
+   "id": "OP-ONB-WORKSPACE-NAME-SET",
+   "entity": "OnboardingProfile",
+   "action": "update",
+   "surface": "/onboarding step 1",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 102,
+   "currentBehaviour": "setWorkspaceName — setState. Seeded from session.user.organization. No length cap and no character rule (unlike the registration org field, which enforces /^[A-Za-z0-9 ]+$/).",
+   "requiredBehaviour": "Write tenants.name and regenerate the slug; max 120 chars per the server DTO.",
+   "authorization": "tenant owner"
+  },
+  {
+   "id": "OP-ONB-TEAMSIZE-SET",
+   "entity": "OnboardingProfile",
+   "action": "update",
+   "surface": "/onboarding step 1",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 113,
+   "currentBehaviour": "setTeamSize(label) — setState, defaults to teamSizes[1] ('2–10'). Stored as a display string and never read again anywhere in the codebase.",
+   "requiredBehaviour": "Store a band code on the tenant; decide whether it drives seat defaults.",
+   "authorization": "tenant owner"
+  },
+  {
+   "id": "OP-ONB-INDUSTRY-SET",
+   "entity": "OnboardingProfile",
+   "action": "update",
+   "surface": "/onboarding step 2",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 141,
+   "currentBehaviour": "setIndustry(label) — setState. Stored as a display string. The copy above it claims a pipeline is preloaded; nothing is.",
+   "requiredBehaviour": "Store industry_id; if the preload claim is kept, it must create real pipeline/agent rows.",
+   "authorization": "tenant owner"
+  },
+  {
+   "id": "OP-ONB-APP-TOGGLE",
+   "entity": "TenantAppInstallation",
+   "action": "update",
+   "surface": "/onboarding step 3",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 171,
+   "currentBehaviour": "toggleApp(code) — setState over an array pre-seeded with ['CRM','HR']. All 15 enterprise apps are selectable, including the gated MFG, IDP and PAY. No quota check, no plan check, no count shown.",
+   "requiredBehaviour": "Filter or badge gated apps against the tenant's plan and enforce the app quota here as well as in the marketplace.",
+   "authorization": "app.install",
+   "validation": "none — selecting 15 apps against an advertised quota of 3–5 is allowed."
+  },
+  {
+   "id": "OP-ONB-COMPLETE",
+   "entity": "OnboardingProfile",
+   "action": "create",
+   "surface": "/onboarding step 3 → 'Open my workspace'",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 48,
+   "currentBehaviour": "apps.forEach(install) — one localStorage write, one audit row and one notification per app, in a loop, non-atomically. Then completeOnboarding({workspaceName, industry, teamSize, apps: <display NAMES>}) writes the session blob with completedAt. Then navigate('/app', {replace:true}). Gated apps install freely; APP_QUOTA is never consulted; a thrown error mid-loop leaves a half-installed tenant.",
+   "requiredBehaviour": "One transactional call: create/settle the tenant, write the onboarding profile, insert the installation rows, seed the credit pool and trial, emit one audit event and one notification.",
+   "sideEffect": "none external",
+   "authorization": "tenant owner + app.install",
+   "validation": "Only steps 0 and 1 are validated; the final submit re-validates nothing."
+  },
+  {
+   "id": "OP-ONB-INTENT-ECHO",
+   "entity": "SignupIntent",
+   "action": "read",
+   "surface": "/onboarding step 3",
+   "sourceFile": "src/screens/Onboarding.tsx",
+   "sourceLine": 187,
+   "currentBehaviour": "Renders 'Queued for your first run: \"<intent>\"' from the query string. Nothing is queued and the value is dropped on navigation to /app.",
+   "requiredBehaviour": "Create a real queued job, or remove the claim.",
+   "authorization": "authenticated"
+  },
+  {
+   "id": "OP-APP-MKTPL-LIST",
+   "entity": "CatalogApp",
+   "action": "list",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 212,
+   "currentBehaviour": "useMemo over the three constant arrays, filtered by a substring match on `${name} ${blurb} ${category} ${kind}`. Five tabs: Enterprise Apps (15), Web Apps (2), Mobile Apps (1), Agents (hardcoded count 0), Enterprise Agents (60).",
+   "requiredBehaviour": "Query catalog_apps joined to the tenant's installations, filtered by surface.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-APP-MKTPL-TAB",
+   "entity": "CatalogApp",
+   "action": "list",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 291,
+   "currentBehaviour": "setTab. The 'Agents' tab has a hardcoded count of 0 and always renders <EmptyCatalog/> ('No apps available yet — check back later or contact your administrator') while the public site advertises '50+ agents'.",
+   "requiredBehaviour": "Either populate a standalone-agent catalog or remove the tab.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-APP-MKTPL-SEARCH",
+   "entity": "CatalogApp",
+   "action": "list",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 251,
+   "currentBehaviour": "setQuery — client substring filter on every keystroke, no debounce.",
+   "requiredBehaviour": "Indexed search.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-APP-MKTPL-SORT",
+   "entity": "CatalogApp",
+   "action": "list",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 260,
+   "currentBehaviour": "'Latest' (the array's literal order — no date field exists), 'Most installed' (sorts on the editorial installs constant), 'A–Z' (localeCompare).",
+   "requiredBehaviour": "'Latest' needs published_at; 'Most installed' needs a real install counter.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-APP-MKTPL-VIEW-TOGGLE",
+   "entity": "CatalogApp",
+   "action": "read",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 272,
+   "currentBehaviour": "setView('grid'|'list') — setState, not remembered across navigations or reloads.",
+   "requiredBehaviour": "Optional per-user preference.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-APP-MKTPL-INSTALL",
+   "entity": "TenantAppInstallation",
+   "action": "create",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 79,
+   "currentBehaviour": "setBusy(true) → await setTimeout(800) (comment: 'The live product quotes a 10–20s install; compressed here') → install(code). install() pushes the code onto the array (no-op if present), prepends an 'app.installed' audit row and prepends a notification '<name> Installed — <name> has been installed successfully. You can access it from the Enterprise sidebar.' All in localStorage. APP_QUOTA is never checked, so a tenant can install all 15 against an advertised 5.",
+   "requiredBehaviour": "POST an installation, enforce the plan's app quota and gating server-side, provision the app's schema/sample data, emit one audit event and one per-user notification, and increment the catalog install counter.",
+   "sideEffect": "none today",
+   "authorization": "app.install",
+   "validation": "none — no quota, no gating, no plan check."
+  },
+  {
+   "id": "OP-APP-MKTPL-UNINSTALL",
+   "entity": "TenantAppInstallation",
+   "action": "delete",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 56,
+   "currentBehaviour": "uninstall(code) — filters the code out of the array and prepends an 'app.uninstalled' audit row. No confirmation dialog. Every record that app owns (tickets, assets, posDocs, rfps, appRecords…) stays in the workspace blob and silently reappears if the app is reinstalled. The app also disappears from the sidebar immediately.",
+   "requiredBehaviour": "Confirm, then decide explicitly between archive-and-retain and purge; either way set uninstalled_at rather than deleting the row.",
+   "authorization": "app.uninstall",
+   "validation": "none"
+  },
+  {
+   "id": "OP-APP-MKTPL-DISABLE",
+   "entity": "TenantAppInstallation",
+   "action": "transition",
+   "surface": "/app/marketplace",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 45,
+   "currentBehaviour": "toggleAppDisabled(code) pushes/removes the code in disabledApps and writes an 'app.disabled'/'app.enabled' audit row. disabledApps is read in exactly one place — this button's own label. The sidebar still lists the app, GenericPortal still renders it, and its Run buttons still fire and still spend credits.",
+   "requiredBehaviour": "Disabling must actually suspend the app's bound agents and schedules and mark its surfaces read-only.",
+   "authorization": "app.uninstall",
+   "validation": "none"
+  },
+  {
+   "id": "OP-APP-MKTPL-UPGRADE",
+   "entity": "Subscription",
+   "action": "read",
+   "surface": "/app/marketplace (gated apps: MFG, IDP, PAY, EVT, RQA, POD)",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 65,
+   "currentBehaviour": "Renders a '⚡ Upgrade' <Link to=\"/app/account\"> with the title 'This app is above your current plan'. /app/account has no upgrade control — only a read-only plan card and a 'Compare plans →' link back to the marketing anchor /#pricing.",
+   "requiredBehaviour": "An upgrade flow that knows the app's minimum plan and the tenant's current plan. Neither value exists.",
+   "authorization": "billing.manage"
+  },
+  {
+   "id": "OP-APP-MKTPL-ABOUT",
+   "entity": "CatalogAgent",
+   "action": "read",
+   "surface": "/app/marketplace (grid cards)",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 144,
+   "currentBehaviour": "setAbout(true) opens a dialog listing agentsByAppCode.get(code) — name and blurb only. Web/mobile apps and PPTX resolve to no agents and show 'This app ships without agents of its own.'",
+   "requiredBehaviour": "Read bundled agents from the catalog.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-APP-MKTPL-AGENT-BROWSE",
+   "entity": "CatalogAgent",
+   "action": "list",
+   "surface": "/app/marketplace → Enterprise Agents tab",
+   "sourceFile": "src/screens/app/Marketplace.tsx",
+   "sourceLine": 309,
+   "currentBehaviour": "Groups the 60 constant agents by app code and renders them read-only. The 'FIN' group (3 agents) has no matching app, so its header falls back to a generic 🤖 icon. No install, enable or configure control.",
+   "requiredBehaviour": "Agents should be installable/bindable, or the tab should say they arrive with their app.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-OVW-READ",
+   "entity": "Tenant",
+   "action": "read",
+   "surface": "/app (Overview)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 271,
+   "currentBehaviour": "Reads useAuth().session for the first name and greets by local clock hour. Everything else reads the workspace blob.",
+   "requiredBehaviour": "Server-rendered from the tenant's real state.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-2FA-ENABLE",
+   "entity": "TwoFactorEnrollment",
+   "action": "transition",
+   "surface": "/app (2FA banner)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 34,
+   "currentBehaviour": "setTwoFactor('on') — one localStorage write. No secret, no QR code, no verification code, no recovery codes, no audit row. /app/account then reports Two-factor auth: 'Enabled' in green.",
+   "requiredBehaviour": "A real enrolment: issue an mfa_enroll token (the purpose already exists in auth_tokens), show the secret once, require a verifying code, issue recovery codes, then require the factor at login.",
+   "sideEffect": "none",
+   "authorization": "authenticated (self)",
+   "validation": "none"
+  },
+  {
+   "id": "OP-OVW-2FA-SNOOZE",
+   "entity": "TwoFactorEnrollment",
+   "action": "transition",
+   "surface": "/app (2FA banner)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 40,
+   "currentBehaviour": "setTwoFactor('snoozed') — the banner never returns, because the only render condition is twoFactor === 'pending' and nothing ever moves it back.",
+   "requiredBehaviour": "Store snoozed_until and re-raise the banner when it passes.",
+   "authorization": "authenticated (self)"
+  },
+  {
+   "id": "OP-OVW-TRIAL-READ",
+   "entity": "Subscription",
+   "action": "read",
+   "surface": "/app (Trial card)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 51,
+   "currentBehaviour": "Renders the constants TRIAL_DAYS (13) and MONTHLY_CREDITS (1000) plus installed.length/APP_QUOTA (5) and a hardcoded '+ 2 included'. 'Trial' is both the plan name and the status pill. The number never changes for any tenant on any day.",
+   "requiredBehaviour": "Derive days-left from subscription.trial_ends_at, credits from the current CreditPool, and app slots from the plan's maxEnterpriseApps.",
+   "authorization": "billing.read"
+  },
+  {
+   "id": "OP-OVW-MANAGE-PLAN",
+   "entity": "Subscription",
+   "action": "read",
+   "surface": "/app (Trial card)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 94,
+   "currentBehaviour": "'Manage plan →' <Link to=\"/app/account\">, which offers no plan management.",
+   "requiredBehaviour": "A billing surface, or relabel to 'View plan'.",
+   "authorization": "billing.read"
+  },
+  {
+   "id": "OP-OVW-CHECKLIST-READ",
+   "entity": "OnboardingChecklistState",
+   "action": "read",
+   "surface": "/app (Get the most out of Apragya)",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 2181,
+   "currentBehaviour": "useMemo builds 5 tasks; 'done' is artifacts.length>0, installed.length>0, and three raw booleans. Because a fresh tenant ships with CRM and HR pre-installed, 'Install an enterprise app' is ticked before the user does anything. The copy claims 'Tasks tick off automatically as you go'.",
+   "requiredBehaviour": "Derive each task from a real fact; seed-installed apps should not satisfy the task.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-CHECKLIST-ALLOCATE",
+   "entity": "CreditAllocation",
+   "action": "create",
+   "surface": "/app (checklist row 'Allocate credits to yourself')",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 141,
+   "currentBehaviour": "setFlag('creditsAllocated') — flips one boolean and strikes the row through. No credits move, no amount is entered, no allocation record is written, no audit row.",
+   "requiredBehaviour": "Open an allocation dialog, write a CreditAllocation against the current pool, and audit it.",
+   "authorization": "billing.manage",
+   "validation": "none"
+  },
+  {
+   "id": "OP-OVW-CHECKLIST-INVITE",
+   "entity": "Invitation",
+   "action": "create",
+   "surface": "/app (checklist row 'Invite a teammate')",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 142,
+   "currentBehaviour": "setFlag('invitedTeammate') — flips one boolean. The row promises \"Send an invite — they'll join your workspace in one click.\" No email is collected, no invitation row is created, no mail is queued, even though POST /api/v1/members already does all three.",
+   "requiredBehaviour": "Collect an email and role, call POST /api/v1/members, and derive the tick from a pending invitation.",
+   "sideEffect": "should enqueue an invitation email via the outbox",
+   "authorization": "member.invite",
+   "validation": "none today; the server route requires emailField + role enum."
+  },
+  {
+   "id": "OP-OVW-CHECKLIST-NAVIGATE",
+   "entity": "OnboardingChecklistState",
+   "action": "read",
+   "surface": "/app (checklist rows 'agent', 'app', 'copilot')",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 143,
+   "currentBehaviour": "navigate(task.to) for the two rows that define one (/app/build/vibe-studio, /app/marketplace). The 'Try the AI Copilot' row defines neither an action nor a `to`, so clicking it does nothing at all.",
+   "requiredBehaviour": "Give the copilot row a target (it should open the dock, which already listens for the 'apragya:copilot' window event).",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-CHECKLIST-DISMISS",
+   "entity": "OnboardingChecklistState",
+   "action": "update",
+   "surface": "/app (checklist ✕)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 111,
+   "currentBehaviour": "setFlag('dismissedChecklist') — permanent and irreversible; no control anywhere restores the card.",
+   "requiredBehaviour": "Store dismissed_at and offer a way back.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-TAB-SELECT",
+   "entity": "CatalogApp",
+   "action": "read",
+   "surface": "/app (dashboard context tabs)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 199,
+   "currentBehaviour": "setTab('overview'|'CRM'|'HR'). The app tabs are hardcoded to CRM and HR — installing any other app never adds a tab (src/screens/app/Overview.tsx:188).",
+   "requiredBehaviour": "Derive tabs from the tenant's installations.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-PERIOD-SELECT",
+   "entity": "Run",
+   "action": "read",
+   "surface": "/app (Today/MTD/QTD/YTD)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 229,
+   "currentBehaviour": "setPeriod(...) updates state and the button's pressed styling, but `period` is never passed to AppMetricsPanel and never read anywhere else. A dead control.",
+   "requiredBehaviour": "Pass the period into the metrics query, or remove the control.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-RUNS-RANGE",
+   "entity": "Run",
+   "action": "read",
+   "surface": "/app (Runs range filter)",
+   "sourceFile": "src/screens/app/dashboardPanels.tsx",
+   "sourceLine": 70,
+   "currentBehaviour": "setRange('This month'|'30 days'|'Today'|'All time'); OverviewPanel derives a `since` Date and filters runs client-side by startedAt.",
+   "requiredBehaviour": "Server-side range query.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-RUNS-RANGE-DATES",
+   "entity": "Run",
+   "action": "read",
+   "surface": "/app (Runs range filter)",
+   "sourceFile": "src/screens/app/dashboardPanels.tsx",
+   "sourceLine": 84,
+   "currentBehaviour": "Two <input type=\"date\"> elements with aria-labels 'Range start' and 'Range end', no value, no onChange and no consumer. Typing in them changes nothing. Dead controls.",
+   "requiredBehaviour": "Wire them to a custom range, or remove them.",
+   "authorization": "tenant.read",
+   "validation": "none"
+  },
+  {
+   "id": "OP-OVW-METRICS-READ",
+   "entity": "Run",
+   "action": "read",
+   "surface": "/app (Overview panel stat row)",
+   "sourceFile": "src/screens/app/dashboardPanels.tsx",
+   "sourceLine": 121,
+   "currentBehaviour": "Apps installed = installed.length with sub `${appQuota - installed.length} slots remaining` (goes negative past 5 apps). Total agents = flatMap of installed apps' agent name arrays, with the sub 'N active' repeating the same number. Runs = filtered local array. Pending reviews = the 2 constant approvals minus decided. Queue = hardcoded '0' / '0 queued · 0 processing'. Credits usage = creditsUsed/creditsTotal.",
+   "requiredBehaviour": "Real aggregates; the queue tile needs a job queue or should be removed.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-APP-METRICS-READ",
+   "entity": "CatalogApp",
+   "action": "read",
+   "surface": "/app → CRM / HR tab",
+   "sourceFile": "src/screens/app/dashboardPanels.tsx",
+   "sourceLine": 370,
+   "currentBehaviour": "Returns a hardcoded array: CRM → Deals won 'US$0', New leads '0', Open pipeline 'US$0', Win rate '0.0%'; HR → Active headcount, Joiners, Leavers, Attrition, all '0'. A literal caption 'Amounts in USD. Last updated <now>' makes stale zeros look freshly computed.",
+   "requiredBehaviour": "Aggregate the app's real records; money as numeric(18,4) with the tenant's currency, not a 'US$' string prefix.",
+   "authorization": "record.read"
+  },
+  {
+   "id": "OP-OVW-PRINT",
+   "entity": "Tenant",
+   "action": "export",
+   "surface": "/app (dashboard toolbar)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 244,
+   "currentBehaviour": "window.print().",
+   "requiredBehaviour": "Acceptable, though a PDF export would need a server renderer.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-OVW-ALERT-SETTINGS",
+   "entity": "Notification",
+   "action": "read",
+   "surface": "/app (dashboard toolbar 🔔)",
+   "sourceFile": "src/screens/app/Overview.tsx",
+   "sourceLine": 243,
+   "currentBehaviour": "Button labelled and titled 'Alert settings' navigates to /app/inbox, which is a notification list with no settings of any kind.",
+   "requiredBehaviour": "Build notification preferences, or relabel the control.",
+   "authorization": "settings.manage"
+  },
+  {
+   "id": "OP-OVW-QUICKLINKS",
+   "entity": "Tenant",
+   "action": "read",
+   "surface": "/app (Quick Actions, builders, jump cards, AI tools)",
+   "sourceFile": "src/screens/app/dashboardPanels.tsx",
+   "sourceLine": 205,
+   "currentBehaviour": "Static <Link> lists from builderTiles, quickTools and jumpCards. Two of them ('Invite a teammate', 'Invite members') and one ('Allocate Credits') point at /app/account, which provides neither capability.",
+   "requiredBehaviour": "Point at surfaces that implement the action.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-INBOX-READ",
+   "entity": "Notification",
+   "action": "list",
+   "surface": "/app/inbox",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 13,
+   "currentBehaviour": "Reads notifications and approvals from the workspace blob. Three stat tiles: pending approvals, unread count, and 'Total today' which is simply pending + unread with no date filter at all.",
+   "requiredBehaviour": "Per-user notification query with real pagination; 'today' must mean today.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-INBOX-MARK-READ",
+   "entity": "Notification",
+   "action": "update",
+   "surface": "/app/inbox",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 104,
+   "currentBehaviour": "markNotificationRead(id) sets read:true in the array and rewrites localStorage. The whole row is one big button, so there is no way to open a notification without marking it read, and no way to mark it unread again.",
+   "requiredBehaviour": "Set read_at for the current user; separate 'open' from 'mark read'; support undo.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-INBOX-MARK-ALL-READ",
+   "entity": "Notification",
+   "action": "update",
+   "surface": "/app/inbox",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 90,
+   "currentBehaviour": "markAllNotificationsRead() maps read:true over every row. The control only renders while unreadCount > 0; otherwise the header shows the inert text 'Full notifications →' styled like a link but wrapped in a <span> with no target.",
+   "requiredBehaviour": "Bulk update scoped to the current user; remove or wire the dead 'Full notifications' affordance.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-INBOX-NOTIFICATION-CREATE",
+   "entity": "Notification",
+   "action": "create",
+   "surface": "(producers only)",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 977,
+   "currentBehaviour": "Exactly two producers exist: install() ('<app> Installed') and decideApproval() ('<agent> <decision>'). The generic notify(title, body) is exposed on the context and dependency-tracked but is never called from any screen. The list is truncated to the newest 50 on every write.",
+   "requiredBehaviour": "A typed notification service with categories, per-user fan-out and a deep link; retention by archived_at rather than array truncation.",
+   "authorization": "system",
+   "validation": "none"
+  },
+  {
+   "id": "OP-INBOX-APPROVAL-PEEK",
+   "entity": "Approval",
+   "action": "list",
+   "surface": "/app/inbox (Pending Approvals section)",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 15,
+   "currentBehaviour": "Filters the two module-constant approvals by whether a decision exists in the approvals map. Each row links to /app/approvals; the agent name and summary are rendered as plain strings.",
+   "requiredBehaviour": "Query real pending approvals scoped to the tenant and the reviewer's permissions.",
+   "authorization": "approval.read"
+  },
+  {
+   "id": "OP-INBOX-BADGE",
+   "entity": "Notification",
+   "action": "read",
+   "surface": "every /app route (top bar)",
+   "sourceFile": "src/components/AppShell.tsx",
+   "sourceLine": 20,
+   "currentBehaviour": "unreadCount = notifications.filter(!read).length, rendered as a badge on a link to /app/inbox. Tenant-wide, not per-user.",
+   "requiredBehaviour": "Per-user unread count, ideally pushed.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-ACC-PROFILE-READ",
+   "entity": "User",
+   "action": "read",
+   "surface": "/app/account",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 136,
+   "currentBehaviour": "Renders session.user.fullName and .email read-only, the literal string 'Org Admin' as Role, and the 2FA flag. There is no edit control for name, email or password, no avatar, no delete-account, no session list.",
+   "requiredBehaviour": "Editable profile, role read from the membership, password change, active-session management, account deletion.",
+   "authorization": "authenticated (self)"
+  },
+  {
+   "id": "OP-ACC-PLAN-READ",
+   "entity": "Subscription",
+   "action": "read",
+   "surface": "/app/account",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 170,
+   "currentBehaviour": "Three read-only rows: 'Trial — 13 days left', credits used/total, apps installed/quota. Followed by 'Compare plans →' linking out to the public /#pricing anchor. No upgrade, no downgrade, no payment method, no invoices, no billing address, no cancel.",
+   "requiredBehaviour": "Real billing: current plan, next renewal, payment method, invoice history, upgrade/downgrade, cancel.",
+   "authorization": "billing.read / billing.manage"
+  },
+  {
+   "id": "OP-ACC-MEMBER-MANAGE",
+   "entity": "Membership",
+   "action": "list",
+   "surface": "/app/account (missing)",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 128,
+   "currentBehaviour": "No member list, no invite form, no role editor, no remove control — despite three links across the dashboard pointing here to invite, and despite GET/POST /api/v1/members and PATCH/DELETE /api/v1/members/[id] all being implemented server-side.",
+   "requiredBehaviour": "Build the members surface on the existing endpoints; the service already refuses to remove or demote a tenant's last owner.",
+   "authorization": "member.read / member.invite / member.manage / member.remove"
+  },
+  {
+   "id": "OP-ACC-THEME-SET",
+   "entity": "User",
+   "action": "update",
+   "surface": "/app/account (Appearance)",
+   "sourceFile": "src/screens/app/workspace.tsx",
+   "sourceLine": 166,
+   "currentBehaviour": "<ThemeSwitch/> writes the preference to localStorage. The copy correctly says 'Saved on this browser'.",
+   "requiredBehaviour": "Fine as-is.",
+   "authorization": "authenticated (self)"
+  },
+  {
+   "id": "OP-COPILOT-ASK",
+   "entity": "CreditLedgerEntry",
+   "action": "execute",
+   "surface": "every /app route (Copilot dock)",
+   "sourceFile": "src/components/CopilotDock.tsx",
+   "sourceLine": 26,
+   "currentBehaviour": "setFlag('usedCopilot') fires FIRST (so the checklist ticks even when the spend fails), then spend(2). If funded, appends a canned paragraph claiming 'Anything I change is audit-logged under your name, and consequential actions pause for your approval first'. If not funded, appends 'Your AI Credits pool is empty for this cycle. Allocate more from Manage plan…' — a path that does not exist. Nothing is sent anywhere, no audit row is written, and the thread is lost on unmount.",
+   "requiredBehaviour": "A real assistant endpoint with a persisted conversation, a credit ledger entry per call, and an audit row per action taken.",
+   "sideEffect": "debits 2 credits from the local counter",
+   "authorization": "credit.spend",
+   "validation": "Non-empty after trim."
+  },
+  {
+   "id": "OP-COPILOT-OPEN",
+   "entity": "Notification",
+   "action": "read",
+   "surface": "every /app route",
+   "sourceFile": "src/components/CopilotDock.tsx",
+   "sourceLine": 94,
+   "currentBehaviour": "setOpen toggle, plus a window 'apragya:copilot' event listener so other surfaces can raise the dock.",
+   "requiredBehaviour": "Fine as-is.",
+   "authorization": "authenticated"
+  },
+  {
+   "id": "OP-WS-SPEND",
+   "entity": "CreditPool",
+   "action": "update",
+   "surface": "(shared by Copilot and Prompt Lab)",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1020,
+   "currentBehaviour": "spend(n) compares against creditsLeft captured from the previous render, returns false if short, else increments creditsUsed. Not atomic: two rapid calls can both read the same stale balance and overspend. No ledger, no actor, no reason.",
+   "requiredBehaviour": "A server-side atomic debit against the pool row inside a transaction, writing a CreditLedgerEntry.",
+   "authorization": "credit.spend"
+  },
+  {
+   "id": "OP-WS-RECORD-RUN",
+   "entity": "Run",
+   "action": "create",
+   "surface": "/app/[slug] (GenericPortal 'Run' buttons) and other app surfaces",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1059,
+   "currentBehaviour": "Builds a Run from the shared sampleTrace (always 6 credits, 3260 ms, status 'success'), prepends it, truncates to 25, writes an 'agent.run' audit row — and adds the credits DIRECTLY to creditsUsed without going through spend(), so the pool cap is bypassed and creditsLeft can go negative.",
+   "requiredBehaviour": "Execute the agent, persist real steps, and debit through the same guarded path as every other spend.",
+   "sideEffect": "debits credits, bypassing the balance check",
+   "authorization": "job.run + credit.spend",
+   "validation": "none"
+  },
+  {
+   "id": "OP-WS-LOAD",
+   "entity": "Tenant",
+   "action": "read",
+   "surface": "every /app route (WorkspaceProvider mount)",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 912,
+   "currentBehaviour": "Reads localStorage 'apragya.workspace', JSON.parses it, runs migrate() (shallow spread over `empty`, plus legacy app-code remapping CR→CRM, CM→CTR, IA/AP/PR→P2P, SL→POS, IN→INV, PY→PAY), and rewrites storage when the version differs. Any parse failure silently discards the entire tenant's data and returns `empty`. The blob is not keyed by user or tenant, so two accounts on one browser share one workspace.",
+   "requiredBehaviour": "Server-owned tenant state keyed by tenant_id; migrations in SQL, once, not on every mount.",
+   "authorization": "tenant.read"
+  },
+  {
+   "id": "OP-WS-PERSIST",
+   "entity": "Tenant",
+   "action": "update",
+   "surface": "every mutation in /app",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 940,
+   "currentBehaviour": "Every single mutation JSON.stringifies the ENTIRE workspace (installs, credits, notifications, audit, plus every app's records) and rewrites one localStorage key, swallowing quota errors silently. There is no concurrency control, so two open tabs clobber each other; reload() exists only because of that.",
+   "requiredBehaviour": "Per-entity writes against the database with optimistic concurrency (the server already has a `versioned` DTO helper).",
+   "authorization": "varies"
+  },
+  {
+   "id": "OP-WS-AUDIT-WRITE",
+   "entity": "AuditEvent",
+   "action": "create",
+   "surface": "install, uninstall, disable/enable, approvals, companies, policies, runners, connections, portal, compliance, runs",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 173,
+   "currentBehaviour": "auditEvent() builds a row with a client UUID, the literal actor 'owner', role 'Org_admin', status 'Success', an empty ip, and a random UUID resourceId when the caller omits one. Rows are prepended inline by each mutation; only logAudit() caps the list (at 500), so the inline writers grow it without bound. A fresh tenant is seeded with two identical 'trial.started' rows timestamped at module-evaluation time.",
+   "requiredBehaviour": "Write to the existing append-only audit_events table with a real actor id, request id, IP, outcome and a redacted before/after detail payload.",
+   "sideEffect": "should be the SIEM export source",
+   "authorization": "system (never client-supplied)",
+   "validation": "none"
+  },
+  {
+   "id": "OP-NAV-SIDEBAR-READ",
+   "entity": "TenantAppInstallation",
+   "action": "read",
+   "surface": "every /app route (sidebar)",
+   "sourceFile": "src/components/AppSidebar.tsx",
+   "sourceLine": 169,
+   "currentBehaviour": "Filters marketApps by installed, sorts by name, and maps each to a route from a hardcoded appRoutes table (7 entries) falling back to /app/<code lowercased>. disabledApps is ignored, so a disabled app is indistinguishable from an enabled one. Renders 'Trial · 13d' and the literal role 'Org Admin'.",
+   "requiredBehaviour": "Navigation derived from installations with their status, and route paths stored on the catalog row.",
+   "authorization": "app.read"
+  },
+  {
+   "id": "OP-NAV-GENERIC-PORTAL",
+   "entity": "CatalogApp",
+   "action": "read",
+   "surface": "/app/[slug] (any installed app without a bespoke surface)",
+   "sourceFile": "src/screens/app/GenericPortal.tsx",
+   "sourceLine": 18,
+   "currentBehaviour": "Matches the slug to an app code case-insensitively; if not installed, shows 'App not installed'. Otherwise renders four hardcoded stat tiles (Records 0, Bound agents N, Runs this month 0, Pending reviews 0), the bundled agents, and an empty-state. Each agent has a 'Run' button calling recordRun, which spends credits and writes a fabricated trace.",
+   "requiredBehaviour": "Real record counts and real agent execution.",
+   "authorization": "app.read + job.run"
+  }
+ ],
+ "surfaces": [
+  {
+   "route": "/",
+   "title": "Landing",
+   "screenFile": "src/screens/Landing.tsx",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "default",
+    "interactive (pricing toggle, FAQ accordion, capability tabs, pipeline tabs)",
+    "reduced-motion respected in ProductPreview"
+   ],
+   "statesMissing": [
+    "content from a data source",
+    "real pricing/currency",
+    "error",
+    "empty"
+   ]
+  },
+  {
+   "route": "/marketplace",
+   "title": "Public Marketplace",
+   "screenFile": "src/screens/PublicMarketplace.tsx",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "list",
+    "filter",
+    "search",
+    "empty search result"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "pagination",
+    "real install path (the Install button is a link to /register)"
+   ]
+  },
+  {
+   "route": "/vibe-studio, /agent-studio, /business-suite, /enterprise-apps, /prompt-lab, /trust, /integrations",
+   "title": "Product pages",
+   "screenFile": "src/lib/pages/product.ts + src/screens/ProductPage.tsx",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static render from a compiled constant",
+    "404 on unknown slug"
+   ],
+   "statesMissing": [
+    "CMS-backed content",
+    "draft/publish",
+    "locale",
+    "link validation"
+   ]
+  },
+  {
+   "route": "/vibe-studio/{web-app-builder, mobile-app-builder, web-rpa, business-solution-agents, chat-with-docs, document-builder, spreadsheet-builder, presentation-builder, website-builder}",
+   "title": "Vibe Studio skill pages",
+   "screenFile": "src/lib/pages/vibeSkills.ts",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static render (9 pages generated from one table)"
+   ],
+   "statesMissing": [
+    "3 of the 12 appData skills have no page, so the footer and the catalog disagree"
+   ]
+  },
+  {
+   "route": "/about, /partners, /docs, /blog, /help-center, /solutions, /compare, /free, /legal/privacy, /legal/terms, /legal/cookies",
+   "title": "Company, resource and legal pages",
+   "screenFile": "src/lib/pages/info.ts + src/lib/pages/moreContent.ts",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static render",
+    "'notice' placeholder blocks on /solutions, /compare, /blog"
+   ],
+   "statesMissing": [
+    "real legal documents (all three legal pages say they are summaries and point at apragya.ai for the operative text)",
+    "versioning of accepted terms"
+   ]
+  },
+  {
+   "route": "/contact-sales",
+   "title": "Contact Sales",
+   "screenFile": "src/lib/pages/info.ts",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static render",
+    "honest notice that nothing is submitted"
+   ],
+   "statesMissing": [
+    "the form itself",
+    "validation",
+    "submit",
+    "confirmation",
+    "persistence"
+   ]
+  },
+  {
+   "route": "/contact-support",
+   "title": "Support",
+   "screenFile": "src/lib/pages/info.ts",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "static render",
+    "honest notice that submission is stubbed"
+   ],
+   "statesMissing": [
+    "form",
+    "ticket creation",
+    "SLA routing"
+   ]
+  },
+  {
+   "route": "/login",
+   "title": "Sign in",
+   "screenFile": "src/screens/Login.tsx",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "field validation",
+    "submitting/loading spinner",
+    "form-level error branch (unreachable)"
+   ],
+   "statesMissing": [
+    "actual password verification",
+    "real SSO",
+    "lockout feedback",
+    "unverified-email state",
+    "MFA challenge",
+    "the /forgot-password route it links to"
+   ]
+  },
+  {
+   "route": "/register",
+   "title": "Create your workspace",
+   "screenFile": "src/screens/Register.tsx",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "6-field validation",
+    "live password-strength meter",
+    "honeypot",
+    "intent echo",
+    "submitting state",
+    "error branch"
+   ],
+   "statesMissing": [
+    "password is never stored or sent",
+    "no tenant/company/membership created",
+    "terms acceptance not persisted",
+    "duplicate-email conflict",
+    "email verification"
+   ]
+  },
+  {
+   "route": "/onboarding",
+   "title": "Onboarding wizard (Workspace → Industry → Apps)",
+   "screenFile": "src/screens/Onboarding.tsx",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "3 steps",
+    "per-step validation for steps 0 and 1",
+    "progress bar",
+    "intent echo",
+    "writes localStorage and installs the chosen apps"
+   ],
+   "statesMissing": [
+    "resumable draft (a refresh loses everything)",
+    "gating and quota enforcement",
+    "atomic completion",
+    "the industry pipeline preload it promises",
+    "loading/error"
+   ]
+  },
+  {
+   "route": "/forgot-password",
+   "title": "Forgot password (linked, not built)",
+   "screenFile": "src/screens/Login.tsx:99 — link target has no route or page slug",
+   "verdict": "FAKE",
+   "statesImplemented": [],
+   "statesMissing": [
+    "the entire screen — the link resolves to the 404 page even though the server endpoint exists"
+   ]
+  },
+  {
+   "route": "/app",
+   "title": "Workspace Overview",
+   "screenFile": "src/screens/app/Overview.tsx + src/screens/app/dashboardPanels.tsx",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "greeting",
+    "2FA banner",
+    "trial card",
+    "checklist with derived + flag tasks",
+    "runs range filter",
+    "empty states for runs and activity"
+   ],
+   "statesMissing": [
+    "real trial countdown",
+    "real credit period",
+    "quota enforcement",
+    "per-app metrics (hardcoded zeros)",
+    "the Today/MTD/QTD/YTD control is inert",
+    "the two date inputs are inert",
+    "queue tile is hardcoded",
+    "seats tile is hardcoded 1/1"
+   ]
+  },
+  {
+   "route": "/app/marketplace",
+   "title": "In-app Marketplace",
+   "screenFile": "src/screens/app/Marketplace.tsx",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "5 tabs",
+    "search",
+    "3 sorts",
+    "grid/list",
+    "install with a busy state",
+    "uninstall",
+    "disable/enable",
+    "about dialog",
+    "empty search",
+    "empty catalog"
+   ],
+   "statesMissing": [
+    "quota enforcement",
+    "plan-aware gating",
+    "uninstall confirmation",
+    "record cleanup on uninstall",
+    "disable actually disabling anything",
+    "loading/error",
+    "the Agents tab is permanently empty"
+   ]
+  },
+  {
+   "route": "/app/inbox",
+   "title": "Inbox",
+   "screenFile": "src/screens/app/workspace.tsx (Inbox)",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "3 stat tiles",
+    "pending approvals list",
+    "notification list",
+    "unread highlight",
+    "mark one read",
+    "mark all read",
+    "two empty states"
+   ],
+   "statesMissing": [
+    "per-user scoping",
+    "categories/filters",
+    "pagination",
+    "deep links from a notification",
+    "mark-unread",
+    "'Total today' is not date-scoped",
+    "the 'Full notifications →' affordance is a dead span"
+   ]
+  },
+  {
+   "route": "/app/account",
+   "title": "Account & plan",
+   "screenFile": "src/screens/app/workspace.tsx (Account)",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "read-only profile",
+    "theme switch",
+    "read-only plan summary",
+    "sign out"
+   ],
+   "statesMissing": [
+    "edit profile",
+    "change password",
+    "manage 2FA",
+    "members/invites (three dashboard links point here for it)",
+    "credit allocation (a dashboard link points here for it)",
+    "upgrade/downgrade (the marketplace 'Upgrade' CTA points here)",
+    "payment method",
+    "invoices",
+    "active sessions",
+    "delete account"
+   ]
+  },
+  {
+   "route": "/app/[slug]",
+   "title": "Generic app portal (install target for apps with no bespoke surface)",
+   "screenFile": "src/screens/app/GenericPortal.tsx",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "not-installed state",
+    "app header",
+    "bundled agent list",
+    "per-agent Run button",
+    "empty-records state"
+   ],
+   "statesMissing": [
+    "real record counts (all four tiles are hardcoded)",
+    "real agent execution",
+    "disabled-app state"
+   ]
+  }
+ ],
+ "falseSuccessCopy": [
+  {
+   "file": "src/screens/app/workspace.tsx",
+   "line": 154,
+   "text": "Two-factor auth: Enabled",
+   "why": "Rendered whenever twoFactor === 'on', which a single unauthenticated button click sets (src/screens/app/Overview.tsx:34). No secret is generated, no code is verified, no recovery codes are issued, and login never asks for a second factor. The account is told it is protected when nothing changed."
+  },
+  {
+   "file": "src/screens/app/Overview.tsx",
+   "line": 28,
+   "text": "Enabling two-factor auth takes about 60 seconds and blocks every stolen-password attack we see.",
+   "why": "Sets a boolean in localStorage. Nothing is enrolled and nothing is blocked."
+  },
+  {
+   "file": "src/screens/app/Overview.tsx",
+   "line": 141,
+   "text": "Allocate credits to yourself — Give your account tokens before running an AI tool.",
+   "why": "Clicking the row calls setFlag('creditsAllocated') and strikes the task through. No credits move, no amount is chosen, no allocation record exists."
+  },
+  {
+   "file": "src/screens/app/Overview.tsx",
+   "line": 142,
+   "text": "Invite a teammate — Send an invite — they'll join your workspace in one click.",
+   "why": "setFlag('invitedTeammate') only. No email is collected, no invitation row is created, no mail is queued — even though POST /api/v1/members already does all of it."
+  },
+  {
+   "file": "src/screens/app/Overview.tsx",
+   "line": 123,
+   "text": "A few quick wins to get your team running. Tasks tick off automatically as you go.",
+   "why": "Two of five tasks are derived from real state; three are booleans set by clicking the row. 'Install an enterprise app' is additionally pre-ticked on every new tenant because CRM and HR ship installed."
+  },
+  {
+   "file": "src/screens/app/Overview.tsx",
+   "line": 71,
+   "text": "13 days left in trial",
+   "why": "TRIAL_DAYS is a module constant. It shows 13 on day one and on day ninety, and contradicts the '14-day free trial' advertised on the landing page and the '14d Free trial' stat on /register."
+  },
+  {
+   "file": "src/screens/app/Overview.tsx",
+   "line": 91,
+   "text": "Apps {installed}/{5} + 2 included",
+   "why": "'+ 2 included' is a hardcoded string with nothing behind it, and APP_QUOTA (5) is never enforced — install() has no quota check, so the counter happily reads 15 / 5."
+  },
+  {
+   "file": "src/screens/app/dashboardPanels.tsx",
+   "line": 122,
+   "text": "{appQuota - installed.length} slots remaining",
+   "why": "Goes negative once more than five apps are installed, because nothing stops the sixth install."
+  },
+  {
+   "file": "src/screens/app/dashboardPanels.tsx",
+   "line": 152,
+   "text": "Members — 1 / 1 seats — Active users in your org",
+   "why": "Both numbers are literals. It contradicts 'Invite your team — 5 free seats during trial' (src/lib/content.ts:54) and the plans' 10/25-user limits."
+  },
+  {
+   "file": "src/screens/app/dashboardPanels.tsx",
+   "line": 157,
+   "text": "Invite members →",
+   "why": "Links to /app/account, which has no member list and no invite control."
+  },
+  {
+   "file": "src/screens/app/dashboardPanels.tsx",
+   "line": 166,
+   "text": "Allocate Credits →",
+   "why": "Links to /app/account, which has no allocation control."
+  },
+  {
+   "file": "src/screens/app/dashboardPanels.tsx",
+   "line": 389,
+   "text": "Amounts in USD. Last updated {new Date().toLocaleString('en-GB')}.",
+   "why": "Stamps a live timestamp on four hardcoded zeros, making stale placeholder metrics read as a fresh computation."
+  },
+  {
+   "file": "src/lib/workspace.tsx",
+   "line": 981,
+   "text": "{name} has been installed successfully. You can access it from the Enterprise sidebar.",
+   "why": "The install is one entry appended to a localStorage array after an 800ms setTimeout. No tenant provisioning, no schema, no sample data, and the notification is tenant-global rather than addressed to anyone."
+  },
+  {
+   "file": "src/screens/app/Marketplace.tsx",
+   "line": 46,
+   "text": "Disabling keeps the app installed but stops its agents",
+   "why": "disabledApps is read in exactly one place — this button's own label. The app stays in the sidebar, its portal still renders, and its Run buttons still fire and still spend credits."
+  },
+  {
+   "file": "src/screens/app/Marketplace.tsx",
+   "line": 89,
+   "text": "Installing…",
+   "why": "An 800ms setTimeout with a source comment admitting the real product takes 10–20 seconds. /enterprise-apps repeats the '10–20 seconds' claim as if provisioning happens."
+  },
+  {
+   "file": "src/screens/app/Marketplace.tsx",
+   "line": 69,
+   "text": "⚡ Upgrade (title: 'This app is above your current plan')",
+   "why": "Links to /app/account, which offers no upgrade. Nothing records what the tenant's current plan is, and gated apps carry no minimum-plan reference, so no upgrade could be offered even in principle. Onboarding installs the same gated apps with no gate at all."
+  },
+  {
+   "file": "src/screens/Onboarding.tsx",
+   "line": 133,
+   "text": "We preload the agent pipeline built for your industry — triggers, decisions, and integrations included.",
+   "why": "The industry selection is written to a localStorage string and read back only to name the primary company. No pipeline, trigger, decision or integration is created, and the 5 landing-page pipelines do not map to the 7 industry options."
+  },
+  {
+   "file": "src/screens/Onboarding.tsx",
+   "line": 187,
+   "text": "Queued for your first run: \"{intent}\"",
+   "why": "The intent is a query-string parameter that is echoed and then discarded on navigation to /app. No job, queue or record exists."
+  },
+  {
+   "file": "src/screens/Register.tsx",
+   "line": 111,
+   "text": "We'll pick up where you left off: \"{intent}\"",
+   "why": "Same value, echoed a second time. It is never stored and is lost on a page refresh."
+  },
+  {
+   "file": "src/screens/Register.tsx",
+   "line": 163,
+   "text": "We'll create your organisation now and make you its admin. Skip if you'll set it up later.",
+   "why": "signUp() stores the string on a localStorage user object. No tenant, no primary company, no owner membership and no audit row are created, despite POST /api/v1/tenants doing exactly that transactionally."
+  },
+  {
+   "file": "src/screens/Login.tsx",
+   "line": 117,
+   "text": "Protected by enterprise SSO • Audit-logged sessions",
+   "why": "There is no SSO (the buttons sign in as a hardcoded you@google.com address), and no session is recorded or audited — the whole session is a localStorage object with no token."
+  },
+  {
+   "file": "src/screens/Login.tsx",
+   "line": 38,
+   "text": "That email and password combination did not work.",
+   "why": "Unreachable. The password is validated only for non-emptiness and is never passed to signIn(), which accepts any address with any password and fabricates a user when it does not recognise the email."
+  },
+  {
+   "file": "src/screens/Login.tsx",
+   "line": 99,
+   "text": "Forgot password?",
+   "why": "An <a href=\"/forgot-password\"> with no matching route or page slug — it lands on the 404 page, while a working POST /api/v1/auth/password/forgot sits unused."
+  },
+  {
+   "file": "src/screens/PublicMarketplace.tsx",
+   "line": 121,
+   "text": "Install",
+   "why": "A button that is a <Link to=\"/register\">. Which listing was clicked is discarded, so nothing is installed after signup either."
+  },
+  {
+   "file": "src/components/CopilotDock.tsx",
+   "line": 39,
+   "text": "Anything I change is audit-logged under your name, and consequential actions pause for your approval first.",
+   "why": "The Copilot changes nothing, writes no audit row and raises no approval. It debits 2 credits and returns a fixed paragraph."
+  },
+  {
+   "file": "src/components/CopilotDock.tsx",
+   "line": 40,
+   "text": "Your AI Credits pool is empty for this cycle. Allocate more from Manage plan, or ask an admin to top up.",
+   "why": "'Manage plan' leads to /app/account, which has no allocation or top-up control, and there is no cycle — creditsUsed never resets."
+  },
+  {
+   "file": "src/components/VippyWidget.tsx",
+   "line": 22,
+   "text": "On the live site Vippy answers \"{text}\" from Apragya's own docs. Once you're signed in, the same assistant answers from your tenant's data and can take actions for you.",
+   "why": "No retrieval, no network call, no persistence. The same sentence is returned for every question."
+  },
+  {
+   "file": "src/screens/Landing.tsx",
+   "line": 622,
+   "text": "Start with a 14-day free trial, then free forever for up to 3 users.",
+   "why": "No trial record, no free tier, no seat counting and no billing exist. The runtime trial constant is 13 days and never counts down, and the three pricing cards contain no 'free forever' plan — that fourth tier is described only on /free."
+  },
+  {
+   "file": "src/screens/Landing.tsx",
+   "line": 705,
+   "text": "14-day trial · no card · cancel anytime",
+   "why": "There is no payment method, no subscription and no cancellation path anywhere in the product."
+  },
+  {
+   "file": "src/screens/Landing.tsx",
+   "line": 233,
+   "text": "\"We replaced four tools in the first month. The part that sold our compliance lead was that every agent action is logged with who, what and before-and-after — nothing runs silently.\" — Operations lead, BFSI · 180 employees",
+   "why": "An attributed customer testimonial hardcoded in the JSX. The audit row it describes has no before/after field at all (src/lib/workspace.tsx:161) and its actor is the literal string 'owner'."
+  },
+  {
+   "file": "src/lib/landingData.ts",
+   "line": 165,
+   "text": "99.9% Uptime SLA · SOC 2 Type II controls in place (certification in progress), GDPR-aligned, AES-256 encrypted. Never used to train models.",
+   "why": "Compliance and availability claims with nothing behind them in the repository. Must not be used to infer any implementation."
+  },
+  {
+   "file": "src/lib/landingData.ts",
+   "line": 152,
+   "text": "SSO / SAML / OIDC — Okta, Azure AD, Google Workspace, or any SAML 2.0 / OIDC provider.",
+   "why": "No SSO code exists. The only 'SSO' is two buttons that sign in as you@google.com / you@microsoft.com."
+  },
+  {
+   "file": "src/lib/landingData.ts",
+   "line": 156,
+   "text": "Audit Trail — Every state-changing action logged. SIEM export ready.",
+   "why": "The client audit array is capped, actor-less and IP-less, and there is no export of any kind."
+  },
+  {
+   "file": "src/lib/landingData.ts",
+   "line": 222,
+   "text": "Admins can top up or set per-user allocations, and usage alerts fire before the pool runs dry. Usage is visible in the admin dashboard in near-real-time.",
+   "why": "No top-up, no per-user allocation, no alerting. The pool is one integer that only ever increases."
+  },
+  {
+   "file": "src/lib/landingData.ts",
+   "line": 70,
+   "text": "94% Qualification accuracy · 98% Line-item extraction accuracy · ~40 sec Capture to posting · 100% Decisions audit-logged",
+   "why": "Precise performance figures for pipelines that do not exist in the product."
+  },
+  {
+   "file": "src/lib/pages/info.ts",
+   "line": 153,
+   "text": "How do I invite my team? Admins invite from the workspace settings; five seats are free during trial.",
+   "why": "There is no workspace-settings invite surface, and the dashboard meter says 1 / 1 seats."
+  },
+  {
+   "file": "src/lib/pages/product.ts",
+   "line": 262,
+   "text": "RBAC — Matrix roles down to sub-features. Custom roles per tenant. Admin bypass never leaks paid capabilities.",
+   "why": "A four-role permission map does exist server-side (src/server/tenancy/permissions.ts) but no client surface reads it: the Account page and the sidebar both print the literal string 'Org Admin', and every control is shown to everyone."
+  },
+  {
+   "file": "src/screens/app/Marketplace.tsx",
+   "line": 190,
+   "text": "No apps available yet — Check back later or contact your administrator",
+   "why": "Shown permanently on the 'Agents' tab, whose count is hardcoded to 0, while the public site and this same page's hero advertise 50+ installable agents."
+  },
+  {
+   "file": "src/screens/Landing.tsx",
+   "line": 601,
+   "text": "Chennai-Based Fronseye Tech Launches Apragya AI — India's First Horizontal AI-Native ERP Platform for Modern Teams … with 50 ready-to-deploy agents",
+   "why": "A dated press release rendered as a real newsroom item; the agent catalog contains 60 entries, none of them deployable."
+  }
+ ],
+ "openQuestions": [
+  "Trial length and anchor: marketing says 14 days (Landing hero, pricing footnote, /register stat), the runtime constant TRIAL_DAYS is 13 and never decrements. What is the real length, what does it start from (user signup or tenant creation), and what happens at expiry — downgrade to the free tier, read-only, or lock-out?",
+  "Credit allowance: MONTHLY_CREDITS is 1000 for everyone, while Starter advertises 2,000/month and Pro 5,000 + add-ons. Which allowance applies during trial? Does the pool reset on a calendar month or the billing anniversary, and do unused credits roll over?",
+  "App quota: APP_QUOTA is 5 and unenforced; Starter says 'Install up to 3 enterprise apps' and Pro says 'All enterprise apps'; Overview renders a hardcoded '+ 2 included'. What is the trial quota, and do the two seed apps (CRM, HR) count against it?",
+  "Gated apps: MFG, IDP, PAY, EVT, RQA and POD carry gated:true with no plan reference, and onboarding installs them regardless. Which plan unlocks each, and should gating be a minimum-plan foreign key or an explicit entitlement table?",
+  "Seats: 'free forever for up to 3 users' (/free, Landing), '5 free seats during trial' (trustPoints, /help-center), 'Up to 10 users' (Starter), 'Up to 25 users' (Pro), and a hardcoded '1 / 1 seats' meter. Which applies when, and is the seat count hard-enforced at invite time or merely billed?",
+  "Per-plan build caps — Max Web Apps 3/5, Max Mobile Apps 2/3, Max RPA Bots 3/5 — are advertised but no counter exists anywhere in the codebase. What object is being counted, and against which entity?",
+  "Currency: all pricing is in ₹ (INR) with the symbol baked into display strings, while the tenant/company default is USD and the in-app dashboards say 'Amounts in USD'. Which currency does billing charge in, and is the billing currency independent of the tenant's reporting currency?",
+  "Is there a fourth 'Free' plan row? Three cards render on the landing page (Starter, Pro, Enterprise) but /free describes a distinct free-forever tier. Does it need its own plan record with its own limits?",
+  "Two-factor: what factor is intended (TOTP, WebAuthn, SMS)? Is it per-user or enforceable tenant-wide by an admin? How long should 'Remind me later' snooze before the banner returns? None of this is inferable — the auth_tokens table has an 'mfa_enroll' purpose but no code path uses it.",
+  "SSO: which identity providers are actually in scope, is SSO configured per tenant (by email domain) or chosen per user, and does it use JIT provisioning as /trust claims? There is no OAuth/OIDC code to infer a provider contract from.",
+  "Identity linking: User.provider is a single scalar ('password' | 'google' | 'microsoft'). Can one account hold several linked identities, and can a password be added to a provider-only account?",
+  "Onboarding vocabularies: industry and teamSize are stored as display labels. Should they become reference tables with stable ids, and is the industry list (7 entries, duplicated in two files) authoritative?",
+  "Onboarding's industry pipeline preload: the wizard promises preloaded triggers, decisions and integrations. What does that actually create — agent bindings, schedules, connector stubs? The 5 landing-page pipelines are unrelated marketing data and do not map to the 7 industries.",
+  "The hero prompt (?intent=): should it be persisted as a lead/first-run job, who consumes it after onboarding, and does an abandoned signup's prompt need to be retained (and for how long, given it may contain business data)?",
+  "OnboardingProfile.apps stores app display NAMES while install() takes app CODES. Which is canonical, and should the profile store installation references instead of a name array?",
+  "Catalog install counts (2…169 per app) and staff-pick figures ('4.9' rating, '2.4k installs'): are these global marketplace counters, per-tenant counts, or editorial numbers? There is no review or install-event entity to compute either from.",
+  "Does uninstalling an app purge its tenant records, archive them, or retain them for reinstall? Today uninstall leaves every record behind and they silently reappear on reinstall.",
+  "What should 'Disable' actually do — pause bound agents only, or also hide the app's surfaces and block record writes? Today it changes one button's label and nothing else.",
+  "Notifications: only app-install and approval-decision produce one. What are the real categories (the Inbox header mentions @mentions, the dashboard mentions alerts), do they need per-user fan-out with per-user read state, and what retention applies? Today they are tenant-global, share one read flag and are truncated to 50.",
+  "The Inbox 'Total today' tile adds pending approvals to unread notifications with no date filter. What window is intended, and in whose timezone — the tenant's or the viewer's?",
+  "Audit actor: the client shape stores the literal string 'owner' with an empty IP, while audit_events expects an actor_user_id, actor_kind and IP. Who is the actor for system-generated events, and where does the IP come from in a Next.js deployment?",
+  "Role labels: the UI prints 'Org Admin' everywhere while the server model is owner | admin | member | viewer. Which server role does 'Org Admin' mean, and what labels should the other three show?",
+  "Billing: there is no payment provider, subscription, invoice or cancellation anywhere. Is one in scope, and does 'no credit card' mean only that the trial needs none while conversion does?",
+  "Credit spend attribution: spend() takes only an amount. What reasons, reference types and per-user attribution does the ledger need, and should a failed or cancelled run be refunded?",
+  "Contact Sales and Contact Support both state in-page that nothing is submitted. What fields do the real forms carry, where do submissions go, and should a support enquiry create a Ticket in the Support & Ticketing app or land in an external system?",
+  "Marketing content: 29 pages, the pricing table, the FAQ set, staff picks and the app/agent catalog are all compiled-in TS constants. Should they move to a CMS (implying draft/publish, locale and link validation), or stay in code and be treated as build-time data?",
+  "Compliance and availability claims on the marketing pages — SOC 2 Type II, GDPR alignment, AES-256, 99.9% uptime SLA, HIPAA, region pinning, VPC/on-prem, SIEM export, 'never used to train models' — have no implementation in this repository. None of these should be inferred into a schema or a behaviour; they need product and legal confirmation before anything is built against them.",
+  "Legal: all three legal pages state they are summaries and that the operative documents live at apragya.ai. Terms acceptance is collected at registration and discarded — should an accepted-version and timestamp be recorded, and does a new version require re-acceptance?"
+ ]
+}

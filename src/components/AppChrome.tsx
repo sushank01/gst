@@ -112,8 +112,10 @@ export function Chip({
  * "everything" option, so a toolbar reads the same as the live product while
  * the control actually opens and holds a choice.
  */
-export function Select({ label, options = [] }: { label: string; options?: readonly string[] }) {
-  const [value, setValue] = useState(label)
+export function Select({ label, options = [], value: controlled, onChange }: { label: string; options?: readonly string[]; value?: string; onChange?: (value: string) => void }) {
+  const [local, setLocal] = useState(label)
+  const value = controlled ?? local
+  const setValue = (next: string) => { setLocal(next); onChange?.(next) }
 
   return (
     <select
@@ -129,7 +131,7 @@ export function Select({ label, options = [] }: { label: string; options?: reado
   )
 }
 
-export function SearchBox({ placeholder }: { placeholder: string }) {
+export function SearchBox({ placeholder, value, onChange }: { placeholder: string; value?: string; onChange?: (value: string) => void }) {
   return (
     <div className="relative min-w-[12rem] flex-1">
       <span aria-hidden className="absolute top-1/2 left-3 -translate-y-1/2 text-fg-muted">
@@ -137,6 +139,8 @@ export function SearchBox({ placeholder }: { placeholder: string }) {
       </span>
       <input
         placeholder={placeholder}
+        value={value}
+        onChange={(event) => onChange?.(event.target.value)}
         aria-label={placeholder}
         className="w-full rounded-xl border border-line bg-surface py-2 pr-3 pl-8 text-[13px] text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none"
       />

@@ -157,7 +157,9 @@ function Group({ group, collapsed }: { group: NavGroup; collapsed: boolean }) {
 export function AppSidebar({
   collapsed,
   onToggleCollapsed,
+  embedded = false,
 }: {
+  embedded?: boolean
   collapsed: boolean
   onToggleCollapsed: () => void
 }) {
@@ -179,8 +181,8 @@ export function AppSidebar({
 
   return (
     <aside
-      className={`relative flex h-dvh shrink-0 flex-col border-r border-line bg-surface transition-[width] ${
-        collapsed ? 'w-[60px]' : 'w-[208px]'
+      className={`relative flex shrink-0 flex-col border-r border-line bg-surface transition-[width] ${
+        embedded ? 'h-[65dvh] w-full' : collapsed ? 'h-dvh w-[60px]' : 'h-dvh w-[208px]'
       }`}
     >
       <div className={`px-3 pt-4 pb-2.5 text-center ${collapsed ? 'px-2' : ''}`}>

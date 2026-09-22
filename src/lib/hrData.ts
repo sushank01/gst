@@ -10,7 +10,7 @@
 export type HrField =
   | { kind: 'text'; label: string; required?: boolean; placeholder?: string; span?: number }
   | { kind: 'textarea'; label: string; required?: boolean; placeholder?: string }
-  | { kind: 'select'; label: string; value: string; required?: boolean; hint?: string; span?: number }
+  | { kind: 'select'; label: string; value: string; options?: readonly string[]; required?: boolean; hint?: string; span?: number }
   | { kind: 'number'; label: string; value: string; span?: number }
   | { kind: 'date'; label: string; required?: boolean; offsetDays?: number; span?: number }
   | { kind: 'checkbox'; label: string; checked?: boolean }

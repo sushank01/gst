@@ -5,7 +5,7 @@ import { Button } from '../../../components/ui'
 import { Icon } from '../../../components/Icon'
 import { currencies, currencySymbol, expenseCategories, money, reportViews } from '../../../lib/travelExpenseData'
 import { useWorkspace, type ExpenseReport } from '../../../lib/workspace'
-import { Dialog, EmptyBlock, Label, Panel, Stat, inputClass } from './shell'
+import { Dialog, EmptyBlock, Label, Panel, Stat, inputClass } from '../../../components/EnterpriseUi'
 
 const statusTone: Record<ExpenseReport['status'], string> = {
   Draft: 'tone-slate',
@@ -49,9 +49,8 @@ export function DashboardPane() {
     return `${days.toFixed(1)}d`
   }, [expenseReports])
 
-  const nextPayable = new Date(Date.now() + 86_400_000)
-    .toISOString()
-    .slice(0, 10)
+  // Read once per mount: recomputing during render makes the value drift.
+  const [nextPayable] = useState(() => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10))
 
   const pipeline = [
     { label: 'Draft', status: 'Draft' as const },
@@ -298,7 +297,7 @@ export function CardsPane() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
-      const lines = String(reader.result).trim().split(/\r?\n/).slice(1)
+      const lines = (typeof reader.result === 'string' ? reader.result : '').trim().split(/\r?\n/).slice(1)
       const rows = lines
         .map((line) => line.split(','))
         .filter((cells) => cells.length >= 3)
@@ -733,9 +732,10 @@ export function ApprovalInboxPane() {
 export function ReportsPane() {
   const { expenseReports, reimbursementRuns } = useWorkspace()
   const [view, setView] = useState<string>('spend')
-  const today = new Date()
-  const [to, setTo] = useState(today.toISOString().slice(0, 10))
-  const [from, setFrom] = useState(new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10))
+  // Read the clock once, lazily, inside the initialiser: calling it during
+  // render gives a different default on every re-render.
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10))
+  const [from, setFrom] = useState(() => new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10))
 
   const inRange = expenseReports.filter((item) => {
     const at = item.createdAt.slice(0, 10)

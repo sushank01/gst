@@ -1,0 +1,3122 @@
+{
+ "domain": "Pitch Pilot (RFP intake → extraction → knowledge base → templates → brand kit → deck)",
+ "entities": [
+  {
+   "name": "Rfp",
+   "sourceType": "Rfp",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:321-332",
+   "purpose": "An inbound client RFP as it moves from arrival to a won/lost decision. Today the only writer is NewRfp.extract() (panes.tsx:272-289) and loadPitchSample() (workspace.tsx:1906-1959); there is NO read/detail/edit surface at all, so every field except prospect/summary/schema is effectively write-once with a hardcoded value.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Extracting",
+    "Your turn",
+    "Drafting",
+    "Out for client",
+    "Won",
+    "Lost"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() client-side (workspace.tsx:1821). Must become a server-generated PK; a client-supplied id is not trustworthy."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. No tenant key exists anywhere today — the whole workspace lives under one localStorage key 'apragya.workspace' (workspace.tsx:68), so every browser profile is its own de-facto tenant. Needs FK to tenant + index (tenant_id, stage) and RLS."
+    },
+    {
+     "name": "companyId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. The platform has a Company/intercompany model (workspace.tsx:97-100) that Pitch Pilot does not participate in. Open question whether an RFP is bid by a specific legal entity."
+    },
+    {
+     "name": "prospect",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Free text. Falls back to the uploaded filename with a trailing .pdf stripped (panes.tsx:278) — so 'Acme-RFP-final' becomes a prospect name. Should split into prospect_name text NOT NULL + prospect_company_id uuid NULL FK to the CRM party table."
+    },
+    {
+     "name": "summary",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Machine-written string literal `Extracted from ${file.name}` (panes.tsx:279) that asserts an extraction which never ran. Real column should be nullable and populated by the extraction run, not by the create call."
+    },
+    {
+     "name": "stage",
+     "tsType": "string",
+     "sqlType": "text NOT NULL REFERENCES pitch_rfp_stage(code)",
+     "nullable": false,
+     "notes": "Declared as bare `string` in workspace.tsx:326, but the vocabulary lives in pitchData.ts:30 as `rfpStages` and is cast back with `item.stage as RfpStage` (panes.tsx:32). Exactly 6 values: Extracting | Your turn | Drafting | Out for client | Won | Lost. inFlightStages (pitchData.ts:35) = first four. Always written as 'Your turn' by extract() (panes.tsx:280); only sample data produces the other five. Prefer an enum or FK + CHECK, plus a partial index on in-flight stages."
+    },
+    {
+     "name": "vertical",
+     "tsType": "string",
+     "sqlType": "text NOT NULL REFERENCES pitch_vertical(code)",
+     "nullable": false,
+     "notes": "Hardcoded to verticals[0] = 'Government / Municipal' on every real create (panes.tsx:281). Vocabulary is the 7-item `verticals` array (pitchData.ts:37-45). Stored as the display label, not a key — a display-name relationship."
+    },
+    {
+     "name": "estimate",
+     "tsType": "number",
+     "sqlType": "numeric(18,4)",
+     "nullable": false,
+     "notes": "MONEY. Currently a bare JS number, always 0 on real creates (panes.tsx:282); only sample rows carry 180000/320000/95000/60000. Rendered as `$ ${value.toLocaleString('en-US')}` (panes.tsx:19, 45, 97, 245, 708) so USD is assumed in the formatter and stored nowhere. Must be numeric(18,4), never float/double."
+    },
+    {
+     "name": "estimateCurrency",
+     "tsType": "NEW",
+     "sqlType": "char(3)",
+     "nullable": false,
+     "notes": "NEW. Required companion to estimate. No currency is persisted anywhere in Pitch Pilot; the '$' is a literal in JSX. Default must be a tenant/company setting, not a constant."
+    },
+    {
+     "name": "schema",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "RELATIONSHIP GAP. Stores the schema's DISPLAY NAME, not its id — `schemas.find(i => i.id === schema)?.name ?? 'Auto-detect'` (panes.tsx:283). So the literal strings 'Auto-detect', 'Design & Development', 'Software Development', 'Services & Consulting', 'Government / Municipal', or a user-typed custom name land in the column. Renaming a custom schema silently orphans every RFP. Replace with extraction_schema_id uuid FK + extraction_schema_version int."
+    },
+    {
+     "name": "deadline",
+     "tsType": "string",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "Written as '' by both writers (panes.tsx:284, workspace.tsx:1920/1931/1942/1953) and never read or rendered anywhere. The dashboard's 'No deadlines this week' (panes.tsx:56) is a hardcoded string, not a query over this column. date vs timestamptz is an open question (submission cutoffs usually carry a local time + issuing-authority timezone)."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "new Date().toISOString() client-side (workspace.tsx:1821). Never rendered in any Pitch surface. Server default now() required."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW. updateRfp() exists (workspace.tsx:1827-1835) but has ZERO callers, and it does not stamp a modified time."
+    },
+    {
+     "name": "decidedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. Win rate (panes.tsx:118-123) and the promised 'cycle time' (panes.tsx:700) cannot be computed or windowed without it."
+    },
+    {
+     "name": "ownerUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. 'My queue' (panes.tsx:81) and 'Your turn' (panes.tsx:43) are labelled per-user but filter only on stage — every user of the tenant sees the identical queue."
+    },
+    {
+     "name": "lossReason",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. Stage 'Lost' exists with no reason capture; analytics promises nothing about it but a win-rate surface normally needs it. Vocabulary is an open question — do not invent one."
+    },
+    {
+     "name": "solicitationNumber",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. The Government / Municipal stock schema extracts 'Solicitation number' and 'Issuing authority' (pitchData.ts:76) but there is no column to land any extracted value in — see ExtractedFieldValue."
+    },
+    {
+     "name": "submittedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW. 'Out for client' (sent, awaiting reply — panes.tsx:44) and 'your first sent deck' (panes.tsx:131) both imply a send event that is recorded nowhere."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "ExtractionSchema",
+     "via": "schema: string (display NAME, e.g. 'Government / Municipal' or 'Auto-detect')",
+     "gap": "Name-as-key. panes.tsx:283 resolves the picked id back to a name before storing. 'Auto-detect' is not a schema at all, it is a sentinel that matches no row. Custom schemas can be renamed (no UI yet, but updateCustomSchema accepts a name patch) which would orphan the reference. Needs extraction_schema_id FK."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "CrmCompany",
+     "via": "prospect: string (free-text display name)",
+     "gap": "No linkage at all. The same client typed two ways produces two unrelated pipelines, and nothing joins an RFP to the CRM lead/deal it came from."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "PitchVertical",
+     "via": "vertical: string (display label)",
+     "gap": "Stores 'Government / Municipal' etc. as text from a module constant array; no catalog table, so a tenant cannot add a vertical and a relabel breaks every filter in RfpInbox (panes.tsx:160)."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "RfpStageDefinition",
+     "via": "stage: string (display label)",
+     "gap": "Stage labels with spaces are compared by string equality in five places (panes.tsx:32-37, 159, 693). A label change is a silent data migration."
+    },
+    {
+     "kind": "hasMany",
+     "target": "RfpFile",
+     "via": "NOT LINKED — the File object is dropped on the floor",
+     "gap": "panes.tsx:272-289 never reads file bytes. Only file.name survives, and only inside the summary string."
+    },
+    {
+     "kind": "hasMany",
+     "target": "ExtractionRun",
+     "via": "none",
+     "gap": "The 'extraction' is `await new Promise(r => setTimeout(r, 900))` (panes.tsx:275). No run, no status, no retry, no failure path."
+    },
+    {
+     "kind": "hasMany",
+     "target": "RfpStageEvent",
+     "via": "none",
+     "gap": "Stage is a single mutable string with no history, so cycle time and stage-conversion analytics are unavailable."
+    },
+    {
+     "kind": "hasMany",
+     "target": "ProposalDeck",
+     "via": "none",
+     "gap": "Deck generation is promised in three places (BrandKit.tsx:37, 203-205; panes.tsx:517-519) and implemented nowhere."
+    }
+   ]
+  },
+  {
+   "name": "RfpFile",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:300-321 (the only place a File is touched)",
+   "purpose": "The uploaded RFP binary. Today it exists solely as a React `File` in component state (panes.tsx:261) and is discarded when extract() resets it (panes.tsx:287). Nothing is persisted — not the bytes, not the size, not the MIME type.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "uploaded",
+    "scanning",
+    "clean",
+    "quarantined",
+    "parse_failed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "PK."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Required for object-key isolation; tenant-crossed object ids are the classic failure here."
+    },
+    {
+     "name": "rfpId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → Rfp.id, ON DELETE CASCADE."
+    },
+    {
+     "name": "filename",
+     "tsType": "string (File.name)",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "The ONLY attribute of the file that survives today, and only embedded in Rfp.summary (panes.tsx:279) and as the prospect fallback (panes.tsx:278)."
+    },
+    {
+     "name": "storageKey",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Object-store key. UNIQUE."
+    },
+    {
+     "name": "contentType",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "UI declares accept=\"application/pdf\" on the browse input (panes.tsx:317) but the drop handler (panes.tsx:302-306) accepts ANY dropped file with no check. Server-side MIME sniffing required."
+    },
+    {
+     "name": "byteSize",
+     "tsType": "NEW",
+     "sqlType": "bigint",
+     "nullable": false,
+     "notes": "Copy says 'Max 50 MB' (panes.tsx:313); nothing measures or rejects. Enforce at presign and at complete."
+    },
+    {
+     "name": "pageCount",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Needed for extraction cost/progress; unknown today."
+    },
+    {
+     "name": "checksumSha256",
+     "tsType": "NEW",
+     "sqlType": "bytea",
+     "nullable": false,
+     "notes": "For dedup and for proving the stored object matches what was uploaded."
+    },
+    {
+     "name": "scanStatus",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "uploaded | scanning | clean | quarantined | parse_failed. No scan exists today."
+    },
+    {
+     "name": "uploadedByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "No actor is recorded on any Pitch write."
+    },
+    {
+     "name": "uploadedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": ""
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Rfp",
+     "via": "NEW rfpId",
+     "gap": "No persistence of any kind exists today."
+    }
+   ]
+  },
+  {
+   "name": "ExtractionSchema",
+   "sourceType": "CustomSchema + stockSchemas",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:350 and /Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:57-78",
+   "purpose": "The named set of fields the extractor is supposed to pull from an RFP. Four ship as frozen module constants and are rendered read-only (panes.tsx:653-656); tenant-created ones live in the localStorage blob as `{id, name, fields: string[]}`. The two are merged for display with a synthetic `stock` boolean (panes.tsx:588-591) that is NOT persisted.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "Stock schemas use human slugs ('design','software','services','government' — pitchData.ts:59/64/69/74) while custom ones use crypto.randomUUID() (workspace.tsx:1893). Two different id spaces in one list."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. NULL for the four seeded stock rows (global), NOT NULL for tenant rows. Unique (tenant_id, lower(name))."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Auto-generated as `Custom schema ${customSchemas.length + 1}` (panes.tsx:617) — collides as soon as the list length repeats. No rename UI exists even though updateCustomSchema would accept one."
+    },
+    {
+     "name": "isStock",
+     "tsType": "boolean (synthetic, not stored)",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "Computed at render time (panes.tsx:589-590) and used only to decide read-only vs editable. Must be a real column; also governs whether a tenant may fork it."
+    },
+    {
+     "name": "version",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "NEW. Editing a field is a live mutation on every keystroke (panes.tsx:661-665), so an RFP extracted last week cannot be reconciled with the schema as it is now. Extraction must pin a version."
+    },
+    {
+     "name": "isArchived",
+     "tsType": "NEW",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW. There is no delete control for custom schemas; hard delete would orphan Rfp.schema name strings anyway."
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW. CustomSchema stores no timestamps at all — unlike KbDoc/PitchTemplate which at least carry addedAt."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "createdByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "ExtractionSchemaField",
+     "via": "fields: string[] (positional array in one JSON blob)",
+     "gap": "Fields are bare display strings in an array; order is array index, there is no id, no data type, no required flag, no description, and duplicates/blank strings are accepted (panes.tsx:658-667 writes whatever is typed, including '')."
+    },
+    {
+     "kind": "hasMany",
+     "target": "Rfp",
+     "via": "Rfp.schema name string",
+     "gap": "Reverse of the Rfp gap: no FK, so 'how many RFPs use this schema' is a string LIKE query."
+    }
+   ]
+  },
+  {
+   "name": "ExtractionSchemaField",
+   "sourceType": "NEW (normalizes CustomSchema.fields / stockSchemas[].fields)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:61,66,71,76 and /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:650-679",
+   "purpose": "One field the extractor pulls. Exists today only as an element of a string[]. The 22 distinct stock labels are: Client name, Scope of work, Deliverables, Timeline, Budget range, Brand guidelines, Platforms, Integrations, Team size, Milestones, Security requirements, Engagement type, Duration, Day rate, Named staff, Outcomes, Issuing authority, Solicitation number, Submission deadline, Compliance matrix, Bond, Evaluation criteria. New custom schemas seed with ['Client name'] and grow by appending the literal 'New field' (panes.tsx:617, 676).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "PK. Today a field has no identity, so renaming it is indistinguishable from delete+create."
+    },
+    {
+     "name": "schemaId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → ExtractionSchema.id ON DELETE CASCADE."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "The whole of the current model. React key is `${field}-${index}` (panes.tsx:652), which collides for duplicate labels."
+    },
+    {
+     "name": "position",
+     "tsType": "number (array index)",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "Implicit in the array; must be explicit. Unique (schema_id, position)."
+    },
+    {
+     "name": "dataType",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. OPEN: the source gives no types, yet 'Budget range', 'Day rate' and 'Bond' are money, 'Submission deadline' is a date, 'Team size' is an integer, 'Compliance matrix' is tabular. Do not guess — see openQuestions."
+    },
+    {
+     "name": "isRequired",
+     "tsType": "NEW",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW. Nothing in the prototype distinguishes a must-have field from a nice-to-have, but 'missing fields' is an explicit product concern."
+    },
+    {
+     "name": "promptHint",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. What tells the extractor where to look. Not inferable from source."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "ExtractionSchema",
+     "via": "NEW schemaId",
+     "gap": "Currently a positional string in a JSON array."
+    }
+   ]
+  },
+  {
+   "name": "ExtractionRun",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:272-289",
+   "purpose": "The durable job that parses an RfpFile against a pinned ExtractionSchema version. Today the entire concept is `setBusy(true); await new Promise(r => setTimeout(r, 900))` — a 900 ms spinner (panes.tsx:274-275) that produces no output, cannot fail, cannot be retried, cannot be cancelled and does not survive a page reload. The 'Extracting' stage (pitchData.ts:30) is reachable only by loading sample data.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "queued",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "PK."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "rfpId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → Rfp.id."
+    },
+    {
+     "name": "rfpFileId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → RfpFile.id."
+    },
+    {
+     "name": "schemaId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NULL when the request was 'Auto-detect' and detection has not resolved yet."
+    },
+    {
+     "name": "schemaVersion",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Pinned at start so later schema edits do not retro-change what was extracted."
+    },
+    {
+     "name": "requestedSchemaId",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Captures the literal picker value including the 'auto' sentinel (panes.tsx:263, 267)."
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "queued | running | succeeded | failed | cancelled. The UI has exactly one state today: a boolean `busy` (panes.tsx:264) that is local to the component."
+    },
+    {
+     "name": "progressPercent",
+     "tsType": "NEW",
+     "sqlType": "smallint",
+     "nullable": true,
+     "notes": "No progress exists; the button just spins."
+    },
+    {
+     "name": "errorCode",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "There is no failure path at all — extract() cannot reject."
+    },
+    {
+     "name": "errorMessage",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "attempt",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "For retry/idempotency; a double-click today fires two addRfp calls and creates two RFP rows."
+    },
+    {
+     "name": "startedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "finishedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "durationMs",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "The prototype's only number is the literal 900."
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "The dashboard shows 'AI spend this month' from the shared pool (panes.tsx:137) but extraction spends nothing — spend() (workspace.tsx:1020) is never called by any Pitch surface."
+    },
+    {
+     "name": "requestedByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Rfp",
+     "via": "NEW",
+     "gap": "No job record exists."
+    },
+    {
+     "kind": "hasMany",
+     "target": "ExtractedFieldValue",
+     "via": "NEW",
+     "gap": "Extraction produces zero output today."
+    }
+   ]
+  },
+  {
+   "name": "ExtractedFieldValue",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:56-78 (the fields that are supposed to be filled)",
+   "purpose": "One value the extractor pulled for one schema field, with its provenance and the reviewer's correction. This is the entire point of the product and there is no representation of it anywhere in the prototype — not in the Rfp type, not in workspace state, not on any screen. The 'Your turn' stage exists to review these values, and no review surface exists.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "suggested",
+    "accepted",
+    "corrected",
+    "rejected",
+    "missing"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "rfpId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → Rfp.id."
+    },
+    {
+     "name": "extractionRunId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → ExtractionRun.id."
+    },
+    {
+     "name": "schemaFieldId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → ExtractionSchemaField.id. Unique (extraction_run_id, schema_field_id)."
+    },
+    {
+     "name": "valueText",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Raw extracted span text."
+    },
+    {
+     "name": "valueNumeric",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "For 'Budget range', 'Day rate', 'Bond'. Money must never be float."
+    },
+    {
+     "name": "valueCurrency",
+     "tsType": "NEW",
+     "sqlType": "char(3)",
+     "nullable": true,
+     "notes": "An RFP can be denominated in a currency other than the tenant's."
+    },
+    {
+     "name": "valueDate",
+     "tsType": "NEW",
+     "sqlType": "date",
+     "nullable": true,
+     "notes": "For 'Submission deadline' / 'Timeline'."
+    },
+    {
+     "name": "confidence",
+     "tsType": "NEW",
+     "sqlType": "numeric(5,4)",
+     "nullable": true,
+     "notes": "0..1. Needed for 'Your turn' triage."
+    },
+    {
+     "name": "reviewStatus",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "suggested | accepted | corrected | rejected | missing."
+    },
+    {
+     "name": "reviewedByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "reviewedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "sourcePage",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Source-span citation."
+    },
+    {
+     "name": "sourceSpan",
+     "tsType": "NEW",
+     "sqlType": "jsonb",
+     "nullable": true,
+     "notes": "Bounding box / character offsets so a reviewer can jump to the evidence."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "ExtractionRun",
+     "via": "NEW",
+     "gap": "Concept absent from the prototype."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "ExtractionSchemaField",
+     "via": "NEW",
+     "gap": "Fields have no ids today, so values could not be keyed to them even if they existed."
+    }
+   ]
+  },
+  {
+   "name": "RfpStageEvent",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:1827-1835 (updateRfp, zero callers)",
+   "purpose": "Append-only history of stage transitions. Required by the two analytics surfaces that already ship: win rate (panes.tsx:118-123) and the promised cycle time (panes.tsx:700). Today Rfp.stage is a single overwritable string and updateRfp — the only function that could change it — is never called from any screen, so no user can move an RFP out of 'Your turn'.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Extracting",
+    "Your turn",
+    "Drafting",
+    "Out for client",
+    "Won",
+    "Lost"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "rfpId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → Rfp.id. Index (rfp_id, occurred_at)."
+    },
+    {
+     "name": "fromStage",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NULL for the creation event."
+    },
+    {
+     "name": "toStage",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "CHECK against the 6-value vocabulary."
+    },
+    {
+     "name": "reason",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "actorUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NULL when the system moved it (e.g. extraction completing 'Extracting' → 'Your turn')."
+    },
+    {
+     "name": "occurredAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": ""
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Rfp",
+     "via": "NEW",
+     "gap": "No history is kept; the prototype overwrites."
+    }
+   ]
+  },
+  {
+   "name": "KnowledgeDocument",
+   "sourceType": "KbDoc",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:334",
+   "purpose": "A case study / team bio / methodology doc the drafter is supposed to retrieve from. The screen copy says 'The AI RAGs against this when drafting RFQ answers' (panes.tsx:389-390) but the record is `{id, title, category, addedAt}` — a title and a category chip. There is NO file input on this surface: the 'Upload your first document' button (panes.tsx:446) opens a dialog containing a text field and a select (panes.tsx:453-476).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "pending",
+    "indexing",
+    "indexed",
+    "index_failed"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() client-side (workspace.tsx:1841)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "title",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Trimmed, non-empty enforced only by disabling the submit button (panes.tsx:484, 486). No length cap, no uniqueness."
+    },
+    {
+     "name": "category",
+     "tsType": "string",
+     "sqlType": "text NOT NULL REFERENCES pitch_kb_category(code)",
+     "nullable": false,
+     "notes": "Slug from kbCategories (pitchData.ts:47-54): case_studies | team_bios | methodology | pricing | references | other. Stored as the slug — better than the Rfp.vertical/stage name-strings — but there is no catalog table and the label+emoji live in a module constant. Defaults to kbCategories[0].id = 'case_studies' (panes.tsx:377)."
+    },
+    {
+     "name": "addedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "ISO string (workspace.tsx:1841). Never rendered — the row shows only title + category (panes.tsx:429-438)."
+    },
+    {
+     "name": "storageKey",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. There is no file behind a KB document at all."
+    },
+    {
+     "name": "contentType",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "byteSize",
+     "tsType": "NEW",
+     "sqlType": "bigint",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "extractedText",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. Nothing to retrieve against today."
+    },
+    {
+     "name": "indexStatus",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. pending | indexing | indexed | index_failed."
+    },
+    {
+     "name": "indexedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "addedByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. removeKbDoc (workspace.tsx:1847-1850) writes no audit row either, unlike addKbDoc."
+    },
+    {
+     "name": "isArchived",
+     "tsType": "NEW",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW. Remove is an unconfirmed hard delete from the array (panes.tsx:435)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "KbCategory",
+     "via": "category: string slug",
+     "gap": "Slug is correct in shape but the catalog is a module constant with an emoji column and no table; a tenant cannot add a category."
+    },
+    {
+     "kind": "hasMany",
+     "target": "KnowledgeChunk",
+     "via": "none",
+     "gap": "Retrieval is claimed in UI copy and has no data model behind it."
+    }
+   ]
+  },
+  {
+   "name": "PitchTemplate",
+   "sourceType": "PitchTemplate",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:336",
+   "purpose": "The firm's branded .pptx whose masters every generated deck is supposed to inherit (panes.tsx:516-519). The uploader stores the FILENAME ONLY: `if (file) addPitchTemplate(file.name)` (panes.tsx:506). The bytes are never read and the input is immediately cleared (panes.tsx:507).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "string",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "crypto.randomUUID() (workspace.tsx:1859)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW."
+    },
+    {
+     "name": "name",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Literally File.name. Two uploads of the same file produce two indistinguishable rows."
+    },
+    {
+     "name": "isDefault",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "First upload wins (`prev.pitchTemplates.length === 0`, workspace.tsx:1859). setDefaultTemplate rewrites the flag on every row (workspace.tsx:1870). BUG: removePitchTemplate (workspace.tsx:1875-1878) can delete the default and leaves the tenant with zero defaults, silently re-triggering the 'No active template set' banner (panes.tsx:529). Needs a partial unique index (tenant_id) WHERE is_default."
+    },
+    {
+     "name": "addedAt",
+     "tsType": "string",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "ISO string; never rendered."
+    },
+    {
+     "name": "storageKey",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. The actual .pptx object. Absent today."
+    },
+    {
+     "name": "contentType",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "NEW. Input declares accept=\".pptx\" (panes.tsx:525, 575) — an extension hint the browser does not enforce and the app does not verify."
+    },
+    {
+     "name": "byteSize",
+     "tsType": "NEW",
+     "sqlType": "bigint",
+     "nullable": false,
+     "notes": "NEW. No size limit is stated or applied on this surface."
+    },
+    {
+     "name": "version",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "NEW. Re-uploading a corrected template must not silently change decks already produced."
+    },
+    {
+     "name": "slideMasterSummary",
+     "tsType": "NEW",
+     "sqlType": "jsonb",
+     "nullable": true,
+     "notes": "NEW. 'inherits its masters, fonts, and dimensions' (panes.tsx:517-518) requires the template to actually be parsed."
+    },
+    {
+     "name": "uploadedByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "isArchived",
+     "tsType": "NEW",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW. Remove is an unconfirmed, unaudited hard delete (panes.tsx:558)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "ProposalDeck",
+     "via": "none",
+     "gap": "Nothing consumes the template because nothing generates a deck."
+    }
+   ]
+  },
+  {
+   "name": "BrandKit",
+   "sourceType": "BrandKit",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:338-348 (defaults at /Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:81-91)",
+   "purpose": "Singleton per workspace holding firm identity, three deck colors and the CTA contact strip. It is the one Pitch surface that genuinely persists what the user typed. It has NO id and NO tenant key — it is a bare object on the persisted blob (workspace.tsx:136, 840).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. No identifier at all today."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "NEW. UNIQUE — one kit per tenant. Open question whether a multi-company tenant needs one kit per company."
+    },
+    {
+     "name": "firmName",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Defaults to '' (pitchData.ts:82). Rendered on the cover preview with a '{{Firm Name}}' placeholder fallback (BrandKit.tsx:120). No length cap."
+    },
+    {
+     "name": "logoUrl",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "DUAL-MODE AND DANGEROUS. Either an https:// URL typed into a text field (BrandKit.tsx:92-98) or a full base64 `data:` URL produced by FileReader.readAsDataURL (BrandKit.tsx:86-88) that is written into the single localStorage blob. Copy promises 'up to 4 MB' (BrandKit.tsx:100) and nothing checks size; an oversize image blows the localStorage quota, whose failure is swallowed by an empty catch (workspace.tsx:945-947), so Save appears to succeed and the logo is gone on reload. Must become logo_asset_id uuid FK to an object-store row plus an optional external URL column."
+    },
+    {
+     "name": "primary",
+     "tsType": "string",
+     "sqlType": "char(7)",
+     "nullable": false,
+     "notes": "Hex, default '#1E3A8A' (pitchData.ts:84). Two inputs write it: a native color picker and a free-text hex box with NO validation (BrandKit.tsx:134-150) — typing 'blue' persists 'blue'. Needs a CHECK on ^#[0-9A-Fa-f]{6}$."
+    },
+    {
+     "name": "accent",
+     "tsType": "string",
+     "sqlType": "char(7)",
+     "nullable": false,
+     "notes": "Default '#F59E0B' (pitchData.ts:85). Same unvalidated dual input."
+    },
+    {
+     "name": "dark",
+     "tsType": "string",
+     "sqlType": "char(7)",
+     "nullable": false,
+     "notes": "Default '#0F172A' (pitchData.ts:86). Same. No contrast check despite these painting deck text."
+    },
+    {
+     "name": "contactName",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default ''. No validation."
+    },
+    {
+     "name": "contactTitle",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default ''."
+    },
+    {
+     "name": "contactEmail",
+     "tsType": "string",
+     "sqlType": "citext",
+     "nullable": false,
+     "notes": "Default ''. Plain `<input>` with no type=\"email\", no pattern, no validation (BrandKit.tsx:182-187) — 'not an email' saves fine. Note src/lib/validation.ts exists and is not used here."
+    },
+    {
+     "name": "contactPhone",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Default ''. No format/E.164 normalisation (BrandKit.tsx:191-196). Placeholder shows '+91 98…' while money elsewhere is formatted en-US/USD."
+    },
+    {
+     "name": "updatedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": "NEW. The 'All saved' indicator (BrandKit.tsx:38) is a JSON.stringify equality check against in-memory state, not a persisted save time."
+    },
+    {
+     "name": "updatedByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. The audit row records resourceId 'PP', not the actor's kit (workspace.tsx:1886)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "nothing — it is an unkeyed object on the shared blob",
+     "gap": "No tenant key, no id, no row identity. Every browser profile has exactly one."
+    }
+   ]
+  },
+  {
+   "name": "ProposalDeck",
+   "sourceType": "NEW",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx:203-205 and /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:516-519",
+   "purpose": "The generated, versioned, downloadable pitch deck — the product's headline promise ('Turn every inbound RFP into a branded pitch deck', appData.ts:68). NOTHING in src generates, stores, versions or downloads a deck. The Brand Kit tip instructs the user to go to 'RFQ Editor → Generate PPT Deck'; grep over the whole repo finds no RFQ Editor route, component or handler.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "draft",
+    "rendering",
+    "ready",
+    "render_failed",
+    "sent"
+   ],
+   "fields": [
+    {
+     "name": "id",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "rfpId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "FK → Rfp.id."
+    },
+    {
+     "name": "templateId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "FK → PitchTemplate.id. NULL means the 'built-in navy/amber defaults' path the banner describes (panes.tsx:532-533)."
+    },
+    {
+     "name": "brandKitSnapshot",
+     "tsType": "NEW",
+     "sqlType": "jsonb",
+     "nullable": false,
+     "notes": "The Brand Kit as of render time. The tip explicitly promises 'regenerate … the new firm name + palette show up immediately' (BrandKit.tsx:203-205), which only makes sense if each render pins a snapshot."
+    },
+    {
+     "name": "version",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "Unique (rfp_id, version)."
+    },
+    {
+     "name": "status",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "draft | rendering | ready | render_failed | sent."
+    },
+    {
+     "name": "storageKey",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "The rendered .pptx object. A metadata row is not a deck."
+    },
+    {
+     "name": "byteSize",
+     "tsType": "NEW",
+     "sqlType": "bigint",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "renderMs",
+     "tsType": "NEW",
+     "sqlType": "integer",
+     "nullable": true,
+     "notes": "Real measured processing time; needed to size the execution platform."
+    },
+    {
+     "name": "creditsCharged",
+     "tsType": "NEW",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": ""
+    },
+    {
+     "name": "sentAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "'Time saved this month' and 'your first sent deck' (panes.tsx:130-131) both hang off a send event that does not exist."
+    },
+    {
+     "name": "createdByUserId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": ""
+    },
+    {
+     "name": "createdAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": false,
+     "notes": ""
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Rfp",
+     "via": "NEW",
+     "gap": "Entire concept missing from the prototype."
+    },
+    {
+     "kind": "belongsTo",
+     "target": "PitchTemplate",
+     "via": "NEW",
+     "gap": "Templates store no bytes, so even a real renderer has nothing to inherit from."
+    }
+   ]
+  },
+  {
+   "name": "RfpStageDefinition",
+   "sourceType": "rfpStages / inFlightStages",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:29-35",
+   "purpose": "Catalog of the six stages plus the in-flight flag. Today two module constants (`rfpStages` as const, `inFlightStages`) that are compared by string equality across five call sites.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Extracting",
+    "Your turn",
+    "Drafting",
+    "Out for client",
+    "Won",
+    "Lost"
+   ],
+   "fields": [
+    {
+     "name": "code",
+     "tsType": "RfpStage",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "PK. Today the code IS the display label including spaces ('Your turn', 'Out for client'). Introduce a stable snake_case code and keep the label separately."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "What the filter select and the row chip render (panes.tsx:218, 243)."
+    },
+    {
+     "name": "position",
+     "tsType": "number (array index)",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "Ordering is array order in pitchData.ts:30."
+    },
+    {
+     "name": "isInFlight",
+     "tsType": "boolean (membership in inFlightStages)",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "True for Extracting/Your turn/Drafting/Out for client (pitchData.ts:35). Drives 'In flight' count and 'Pipeline value' (panes.tsx:32, 35, 42, 45)."
+    },
+    {
+     "name": "isDecided",
+     "tsType": "NEW",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW. Won/Lost are detected by two inline literal comparisons (panes.tsx:36, 693) rather than by a flag."
+    },
+    {
+     "name": "isWon",
+     "tsType": "NEW",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "NEW. Same — `item.stage === 'Won'` inline (panes.tsx:37)."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Rfp",
+     "via": "Rfp.stage display label",
+     "gap": "Name-as-key."
+    }
+   ]
+  },
+  {
+   "name": "PitchVertical",
+   "sourceType": "verticals",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:37-45",
+   "purpose": "Catalog of the seven industry verticals used for the inbox filter and (always) for the hardcoded vertical on a new RFP.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "Government / Municipal",
+    "Healthcare",
+    "Financial services",
+    "Retail",
+    "Education",
+    "Technology",
+    "Non-profit"
+   ],
+   "fields": [
+    {
+     "name": "code",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "PK. NEW — today only the label exists. Note 'Government / Municipal' is ALSO a stock schema name (pitchData.ts:75), which conflates two different vocabularies in one string."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "The whole of the current model (a string[])."
+    },
+    {
+     "name": "position",
+     "tsType": "number (array index)",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "verticals[0] is the hardcoded default on every real create (panes.tsx:281), so array order is load-bearing."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. NULL = global seed. Open question whether tenants may add verticals."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Rfp",
+     "via": "Rfp.vertical display label",
+     "gap": "Name-as-key."
+    }
+   ]
+  },
+  {
+   "name": "KbCategory",
+   "sourceType": "kbCategories",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:47-54",
+   "purpose": "Catalog of the six knowledge-base categories. The only Pitch vocabulary that already uses slugs rather than labels.",
+   "tenantScoped": false,
+   "companyScoped": false,
+   "statusVocabulary": [
+    "case_studies",
+    "team_bios",
+    "methodology",
+    "pricing",
+    "references",
+    "other"
+   ],
+   "fields": [
+    {
+     "name": "code",
+     "tsType": "string (id)",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "PK. case_studies | team_bios | methodology | pricing | references | other."
+    },
+    {
+     "name": "label",
+     "tsType": "string",
+     "sqlType": "text",
+     "nullable": false,
+     "notes": "Case studies, Team bios, Methodology, Pricing, References, Other."
+    },
+    {
+     "name": "icon",
+     "tsType": "string (emoji)",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "Literal emoji characters rendered as decorative chips (panes.tsx:419). Keep as data, not as a code path."
+    },
+    {
+     "name": "position",
+     "tsType": "number (array index)",
+     "sqlType": "integer",
+     "nullable": false,
+     "notes": "kbCategories[0] is the dialog's default selection (panes.tsx:377)."
+    },
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. NULL = global seed."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "KnowledgeDocument",
+     "via": "KbDoc.category slug",
+     "gap": "Slug is fine; the missing piece is the table itself and per-tenant extensibility."
+    }
+   ]
+  },
+  {
+   "name": "PitchSettings",
+   "sourceType": "NEW (replaces monthlyAiBudget)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/pitchData.ts:93",
+   "purpose": "Per-tenant Pitch Pilot configuration. Today the only setting is `export const monthlyAiBudget = 1000` — a module constant rendered on the dashboard as a dollar budget (panes.tsx:138).",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "PK."
+    },
+    {
+     "name": "monthlyAiBudget",
+     "tsType": "number (module constant 1000)",
+     "sqlType": "numeric(18,4)",
+     "nullable": true,
+     "notes": "MONEY-ish. Rendered as '$ 1000' next to creditsUsed, but the platform's MONTHLY_CREDITS is also 1000 (workspace.tsx:65) and creditsUsed is a CREDIT count, not dollars — the surface mixes the two units under one '$' sign. NULL = no cap."
+    },
+    {
+     "name": "budgetCurrency",
+     "tsType": "NEW",
+     "sqlType": "char(3)",
+     "nullable": true,
+     "notes": "NEW. Required if the budget is money; omit if it is credits. See openQuestions."
+    },
+    {
+     "name": "defaultVerticalCode",
+     "tsType": "NEW",
+     "sqlType": "text",
+     "nullable": true,
+     "notes": "NEW. Replaces the hardcoded verticals[0] (panes.tsx:281)."
+    },
+    {
+     "name": "defaultSchemaId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": true,
+     "notes": "NEW. Replaces the 'auto' sentinel default (panes.tsx:263)."
+    },
+    {
+     "name": "maxRfpUploadBytes",
+     "tsType": "NEW",
+     "sqlType": "bigint",
+     "nullable": false,
+     "notes": "NEW. The '50 MB' in panes.tsx:313 is copy, not config, and is enforced nowhere."
+    },
+    {
+     "name": "maxLogoBytes",
+     "tsType": "NEW",
+     "sqlType": "bigint",
+     "nullable": false,
+     "notes": "NEW. The '4 MB' in BrandKit.tsx:100 is copy, not config, and is enforced nowhere."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "belongsTo",
+     "target": "Tenant",
+     "via": "NEW",
+     "gap": "Currently a hardcoded module constant shared by every tenant."
+    }
+   ]
+  },
+  {
+   "name": "PitchSampleDataState",
+   "sourceType": "pitchSampleLoaded (boolean on the persisted blob)",
+   "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:138, 842, 1906-1964",
+   "purpose": "Tracks whether demo RFPs are loaded, driving a tenant-wide banner (PitchPilot.tsx:57-67) and the Load/Clear toggle (BrandKit.tsx:214-220). Both operations are destructive and unaudited: loadPitchSample REPLACES the whole rfps array with four canned rows, and clearPitchSample empties rfps, kbDocs AND pitchTemplates outright.",
+   "tenantScoped": true,
+   "companyScoped": false,
+   "fields": [
+    {
+     "name": "tenantId",
+     "tsType": "NEW",
+     "sqlType": "uuid",
+     "nullable": false,
+     "notes": "PK."
+    },
+    {
+     "name": "sampleLoaded",
+     "tsType": "boolean",
+     "sqlType": "boolean",
+     "nullable": false,
+     "notes": "workspace.tsx:1910 / 1962."
+    },
+    {
+     "name": "loadedAt",
+     "tsType": "NEW",
+     "sqlType": "timestamptz",
+     "nullable": true,
+     "notes": "NEW."
+    },
+    {
+     "name": "sampleRfpIds",
+     "tsType": "NEW",
+     "sqlType": "uuid[]",
+     "nullable": true,
+     "notes": "NEW. Essential: without recording WHICH rows are samples, 'Clear sample data' can only do what it does today — delete everything, including records the user created."
+    }
+   ],
+   "relations": [
+    {
+     "kind": "hasMany",
+     "target": "Rfp",
+     "via": "nothing — samples are indistinguishable from real rows",
+     "gap": "Sample rows carry no marker, so clearing them is implemented as a wholesale wipe of three collections."
+    }
+   ]
+  }
+ ],
+ "operations": [
+  {
+   "id": "OP-PP-APP-ENTITLEMENT-CHECK",
+   "entity": "Tenant",
+   "action": "read",
+   "surface": "/app/pitch-pilot (all sections)",
+   "sourceFile": "src/screens/app/pitch/PitchPilot.tsx",
+   "sourceLine": 40,
+   "currentBehaviour": "Client-side gate: `if (!app || !installed.includes('PP'))` renders a 'Pitch Pilot is not installed' panel. `installed` comes from localStorage, so editing the blob grants access. No server check exists because there is no server.",
+   "requiredBehaviour": "Server-side entitlement check on every Pitch route handler and API call; the UI gate becomes a convenience only.",
+   "apiMethodPath": "GET /api/v1/pitch/entitlement",
+   "authorization": "Authenticated member of the tenant with the PP app entitlement",
+   "validation": "Tenant context bound from session, never from a query param",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-NAV-SECTION",
+   "entity": "None",
+   "action": "read",
+   "surface": "/app/pitch-pilot/[[...section]]",
+   "sourceFile": "src/screens/app/pitch/PitchPilot.tsx",
+   "sourceLine": 37,
+   "currentBehaviour": "Navigates. Section is the first path segment; unknown segments silently fall back to PitchDashboard (`panes[section] ?? PitchDashboard`, line 38) rather than 404ing.",
+   "requiredBehaviour": "Unknown sections return a real 404 instead of impersonating the dashboard.",
+   "apiMethodPath": "n/a (routing)",
+   "authorization": "Same as entitlement check",
+   "validation": "Section must be one of '', inbox, new, kb, templates, schema, brand, analytics",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-NAV-INBOX-BADGE",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot (left rail)",
+   "sourceFile": "src/screens/app/pitch/PitchPilot.tsx",
+   "sourceLine": 106,
+   "currentBehaviour": "Renders `rfps.length` as a badge on the RFP Inbox nav item whenever > 0. Counts EVERY RFP including Won and Lost, so a badge that reads like 'new/unhandled' never decreases.",
+   "requiredBehaviour": "Badge should be a server-computed count of the actionable subset (e.g. stage='Your turn' for the current user), not the total.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps/counts",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-NAV-BACK-TO-APPS",
+   "entity": "None",
+   "action": "read",
+   "surface": "/app/pitch-pilot (left rail)",
+   "sourceFile": "src/screens/app/pitch/PitchPilot.tsx",
+   "sourceLine": 72,
+   "currentBehaviour": "Navigates to /app.",
+   "requiredBehaviour": "Unchanged.",
+   "apiMethodPath": "n/a",
+   "authorization": "Authenticated",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-MARKETPLACE-LINK",
+   "entity": "None",
+   "action": "read",
+   "surface": "/app/pitch-pilot (not-installed state)",
+   "sourceFile": "src/screens/app/pitch/PitchPilot.tsx",
+   "sourceLine": 47,
+   "currentBehaviour": "Navigates to /app/marketplace.",
+   "requiredBehaviour": "Unchanged; the install itself is a marketplace-domain operation.",
+   "apiMethodPath": "n/a",
+   "authorization": "Authenticated",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-SAMPLE-BANNER-READ",
+   "entity": "PitchSampleDataState",
+   "action": "read",
+   "surface": "/app/pitch-pilot (all sections, banner)",
+   "sourceFile": "src/screens/app/pitch/PitchPilot.tsx",
+   "sourceLine": 57,
+   "currentBehaviour": "Reads pitchSampleLoaded from localStorage and shows a tenant-wide banner. Not dismissible.",
+   "requiredBehaviour": "Server-read flag; banner should be dismissible per user.",
+   "apiMethodPath": "GET /api/v1/pitch/settings",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-TILES",
+   "entity": "Rfp",
+   "action": "list",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 41,
+   "currentBehaviour": "Reads the entire rfps array from localStorage and computes four tiles client-side: In flight (inFlightStages membership), Your turn, Out for client, and Pipeline value = sum of `estimate` over in-flight rows. No pagination, no server aggregate, no currency.",
+   "requiredBehaviour": "Server-side aggregate scoped to tenant (and to company once that exists), returning counts plus a money total with an explicit currency.",
+   "apiMethodPath": "GET /api/v1/pitch/dashboard/summary",
+   "authorization": "Tenant member; per-user scoping for 'Your turn' once owners exist",
+   "validation": "Stage vocabulary validated against the catalog",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-PIPELINE-VALUE",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 35,
+   "currentBehaviour": "`inFlight.reduce((t, i) => t + i.estimate, 0)` then rendered as `$ ${toLocaleString('en-US')}`. Floating-point addition of untyped numbers, USD assumed by the formatter, and always 0 for user-created RFPs because extract() hardcodes estimate: 0.",
+   "requiredBehaviour": "numeric(18,4) SUM grouped by currency; mixed-currency pipelines must not be silently added together.",
+   "apiMethodPath": "GET /api/v1/pitch/dashboard/summary",
+   "authorization": "Tenant member",
+   "validation": "Reject aggregation across currencies without an explicit FX snapshot",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-QUEUE-LIST",
+   "entity": "Rfp",
+   "action": "list",
+   "surface": "/app/pitch-pilot ('My queue')",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 91,
+   "currentBehaviour": "Filters rfps for stage === 'Your turn' and renders prospect + summary + estimate as plain spans. Rows are NOT clickable — there is no RFP detail route anywhere in the app. Titled 'My queue' but scoped to the whole tenant.",
+   "requiredBehaviour": "Owner-scoped, paginated, each row links to an RFP detail/review surface.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps?stage=your_turn&owner=me",
+   "authorization": "Tenant member; owner filter from session",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-WINRATE",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 118,
+   "currentBehaviour": "`Math.round(won.length / decided.length * 100)` over all time, with '—' when nothing is decided. No date window, no vertical breakdown, no denominator definition.",
+   "requiredBehaviour": "Server aggregate with an explicit period window and a documented denominator; requires decidedAt on Rfp.",
+   "apiMethodPath": "GET /api/v1/pitch/analytics/win-rate",
+   "authorization": "Tenant member",
+   "validation": "Period bounds validated; division-by-zero returns null not NaN",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-TIME-SAVED",
+   "entity": "ProposalDeck",
+   "action": "read",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 130,
+   "currentBehaviour": "Renders the literal string '0 hrs'. Nothing is measured; the subtitle 'Telemetry starts after your first sent deck' describes telemetry that does not exist and a send event that cannot occur.",
+   "requiredBehaviour": "Either compute from real deck-production timings against a defined manual baseline, or remove the tile. Do not invent a baseline.",
+   "apiMethodPath": "GET /api/v1/pitch/analytics/time-saved",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-AI-SPEND",
+   "entity": "PitchSettings",
+   "action": "read",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 137,
+   "currentBehaviour": "Renders `$ {creditsUsed}` (the PLATFORM-WIDE shared credit counter from workspace.tsx:81) against `$ {monthlyAiBudget}` (a module constant = 1000, pitchData.ts:93). Pitch Pilot never calls spend(), so this number never moves because of anything done in this app, and credits are displayed with a dollar sign.",
+   "requiredBehaviour": "Per-app, per-period usage from an immutable credit ledger, with the unit (credits vs currency) stated correctly and the budget read from tenant settings.",
+   "apiMethodPath": "GET /api/v1/pitch/usage?period=current_month",
+   "authorization": "Tenant member; budget edit requires admin",
+   "validation": "Unit and currency explicit in the response",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-NEW-RFP-LINK",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 59,
+   "currentBehaviour": "Navigates to /app/pitch-pilot/new.",
+   "requiredBehaviour": "Unchanged.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member with create permission",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-VIEWALL-LINK",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 84,
+   "currentBehaviour": "Navigates to /app/pitch-pilot/inbox. Does NOT carry the 'Your turn' filter across, so 'View all' from the queue lands on an unfiltered list.",
+   "requiredBehaviour": "Preserve the queue's filter in the query string.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-EMPTY-UPLOAD-LINK",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot (empty queue state)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 105,
+   "currentBehaviour": "Navigates to /app/pitch-pilot/new. Shown whenever 'Your turn' is empty, even if the tenant has many RFPs in other stages — copy reads 'No active RFPs yet.' which is then false.",
+   "requiredBehaviour": "Distinguish 'no RFPs at all' from 'nothing assigned to you right now'.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-COSTCENTER-LINK",
+   "entity": "None",
+   "action": "read",
+   "surface": "/app/pitch-pilot",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 141,
+   "currentBehaviour": "Navigates to /app/account.",
+   "requiredBehaviour": "Deep-link to the cost centre filtered to the Pitch Pilot app and current period.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member; billing detail may require admin",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DASH-DEADLINE-SUMMARY",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot (header)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 56,
+   "currentBehaviour": "Renders the hardcoded literal 'No deadlines this week' next to a live `{rfps.length} active RFPs` count. Rfp.deadline is always '' and is never queried.",
+   "requiredBehaviour": "Real query over deadline within the current week, in the tenant's timezone; 'active' must exclude Won/Lost.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps?deadline_within=7d",
+   "authorization": "Tenant member",
+   "validation": "Timezone-aware week boundary",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-INBOX-LIST",
+   "entity": "Rfp",
+   "action": "list",
+   "surface": "/app/pitch-pilot/inbox",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 237,
+   "currentBehaviour": "Renders the entire localStorage array after in-memory filtering. No pagination, no sort control, no default ordering other than insertion order (newest first because addRfp prepends, workspace.tsx:1821). Rows expose prospect, summary, stage chip, vertical, estimate — and nothing is clickable.",
+   "requiredBehaviour": "Server list with cursor pagination, explicit sort, and rows that open an RFP detail surface.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps",
+   "authorization": "Tenant member; rows filtered by tenant on the server",
+   "validation": "limit/cursor/sort whitelisted",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-INBOX-SEARCH",
+   "entity": "Rfp",
+   "action": "list",
+   "surface": "/app/pitch-pilot/inbox",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 162,
+   "currentBehaviour": "setState only, then a client-side `${prospect} ${summary}`.toLowerCase().includes(query.toLowerCase()) over the full in-memory array. Not debounced, not persisted in the URL, does not search schema/vertical/extracted values.",
+   "requiredBehaviour": "Server-side search with a trigram or full-text index, query mirrored into the URL so the view is shareable and restorable.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps?q=",
+   "authorization": "Tenant member",
+   "validation": "Length cap on q; no raw LIKE interpolation",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-INBOX-FILTER-STAGE",
+   "entity": "Rfp",
+   "action": "list",
+   "surface": "/app/pitch-pilot/inbox",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 210,
+   "currentBehaviour": "setState only; client-side equality filter. Options are the literal 'All stages' plus the 6 rfpStages labels, compared as display strings (line 159).",
+   "requiredBehaviour": "Server filter on a stage code column; option list from the stage catalog.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps?stage=",
+   "authorization": "Tenant member",
+   "validation": "stage must be a known code; unknown value is a 400, not an empty list",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-INBOX-FILTER-VERTICAL",
+   "entity": "Rfp",
+   "action": "list",
+   "surface": "/app/pitch-pilot/inbox",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 221,
+   "currentBehaviour": "setState only; client-side equality filter on the vertical display label (line 160). Because every user-created RFP is hardcoded to 'Government / Municipal', this filter is meaningless outside sample data.",
+   "requiredBehaviour": "Server filter on a vertical code; the create flow must let the user set the vertical in the first place.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps?vertical=",
+   "authorization": "Tenant member",
+   "validation": "vertical must be a known code",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-INBOX-EXPORT-CSV",
+   "entity": "Rfp",
+   "action": "export",
+   "surface": "/app/pitch-pilot/inbox",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 165,
+   "currentBehaviour": "Triggers a client-side Blob download named 'rfp-inbox.csv'. Hand-rolls the CSV with naive template quoting — `\"${r.prospect}\",\"${r.summary}\",${r.stage},...` — so it does NOT use the repo's own csvCell()/downloadCsv() helpers (src/lib/csv.ts). Consequences: an embedded double-quote or newline corrupts the file, stage/vertical are emitted unquoted despite containing spaces and a slash, there is NO formula-injection guard (a prospect named '=cmd|...' exports as a live formula), and the money column is a bare number with no currency. Exports exactly what the client happens to hold.",
+   "requiredBehaviour": "Server-generated export over the permission-scoped, filtered query snapshot, using csvCell() formula escaping, an explicit currency column, and an expiring signed download URL.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps/export",
+   "authorization": "Tenant member with export permission; rows re-filtered server-side",
+   "validation": "Filter payload validated; row cap or async job above a threshold",
+   "sideEffect": "File download"
+  },
+  {
+   "id": "OP-PP-INBOX-NEW-RFP-LINK",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot/inbox",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 193,
+   "currentBehaviour": "Navigates to /app/pitch-pilot/new.",
+   "requiredBehaviour": "Unchanged.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member with create permission",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-INBOX-ROW-OPEN",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot/inbox (row)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 238,
+   "currentBehaviour": "NO-OP. The row is an `<li>` of spans with no link, no button and no handler. There is no RFP detail route in src/app at all, so an RFP can never be opened after it is created — despite the create button being labelled 'Extract & Open'.",
+   "requiredBehaviour": "Row opens an RFP detail surface showing the file, the extracted fields with confidence and source spans, the stage control and the deck history.",
+   "apiMethodPath": "GET /api/v1/pitch/rfps/{id}",
+   "authorization": "Tenant member; 404 (not 403) for other tenants' ids",
+   "validation": "id is a uuid",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-RFP-FILE-BROWSE",
+   "entity": "RfpFile",
+   "action": "create",
+   "surface": "/app/pitch-pilot/new",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 315,
+   "currentBehaviour": "setState only — `setFile(event.target.files?.[0] ?? null)`. accept=\"application/pdf\" is a browser hint; no MIME verification, no size check against the advertised 50 MB, no upload. The File object lives in component state and dies on navigation.",
+   "requiredBehaviour": "Authorized presigned upload with server-side MIME sniffing, size enforcement, checksum and virus scan before the RFP row is usable.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps/files/presign then POST /api/v1/pitch/rfps/files/{id}/complete",
+   "authorization": "Tenant member with create permission",
+   "validation": "contentType=application/pdf verified server-side; byteSize <= tenant limit; checksum matches",
+   "sideEffect": "Object-store write"
+  },
+  {
+   "id": "OP-PP-RFP-FILE-DROP",
+   "entity": "RfpFile",
+   "action": "create",
+   "surface": "/app/pitch-pilot/new (drop zone)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 302,
+   "currentBehaviour": "setState only. WORSE than the browse input: `dataTransfer.files?.[0]` is accepted with NO type filter at all, so a .exe or a 2 GB video sets `file` and enables the Extract button, directly contradicting the 'PDF only · Max 50 MB' caption two lines below.",
+   "requiredBehaviour": "Same validation path as browse; reject non-PDF and oversize client-side with a visible error AND server-side.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps/files/presign",
+   "authorization": "Tenant member with create permission",
+   "validation": "Extension + magic-byte check; size check; multi-file drop rejected or queued explicitly",
+   "sideEffect": "Object-store write"
+  },
+  {
+   "id": "OP-PP-RFP-PROSPECT-INPUT",
+   "entity": "Rfp",
+   "action": "create",
+   "surface": "/app/pitch-pilot/new",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 328,
+   "currentBehaviour": "setState only. Caption promises 'We'll auto-detect from the document if blank' (line 327); the actual fallback is `file.name.replace(/\\.pdf$/i, '')` (line 278) — the filename, never the document.",
+   "requiredBehaviour": "Optional override of an extractor-detected client name; blank means 'pending detection', not 'use the filename'.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps",
+   "authorization": "Tenant member with create permission",
+   "validation": "Trim, length cap, optional match against existing CRM parties for dedup suggestion",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-RFP-SCHEMA-SELECT",
+   "entity": "ExtractionSchema",
+   "action": "read",
+   "surface": "/app/pitch-pilot/new",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 344,
+   "currentBehaviour": "setState only. Options are built at render from the 'auto' sentinel + the 4 stock constants + the tenant's customSchemas (lines 266-270). The selected id is then thrown away and only the NAME is stored on the RFP (line 283).",
+   "requiredBehaviour": "Persist extraction_schema_id + version on the RFP; 'Auto-detect' resolves to a real schema id once detection completes.",
+   "apiMethodPath": "GET /api/v1/pitch/schemas",
+   "authorization": "Tenant member",
+   "validation": "Schema must belong to the tenant or be a stock schema",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-RFP-CANCEL",
+   "entity": "Rfp",
+   "action": "create",
+   "surface": "/app/pitch-pilot/new",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 361,
+   "currentBehaviour": "setFile(null) ONLY. Does not clear the typed prospect name, does not reset the schema choice, does not navigate away. Labelled 'Cancel' but behaves as 'Remove attached file'.",
+   "requiredBehaviour": "Either discard the whole draft (and any presigned upload) and navigate back, or relabel the control.",
+   "apiMethodPath": "DELETE /api/v1/pitch/rfps/files/{id} (abandoned upload)",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "Orphaned-object cleanup"
+  },
+  {
+   "id": "OP-PP-RFP-EXTRACT-SUBMIT",
+   "entity": "Rfp",
+   "action": "create",
+   "surface": "/app/pitch-pilot/new",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 272,
+   "currentBehaviour": "THE CORE FAKE. `setBusy(true)`, `await new Promise(r => setTimeout(r, 900))`, then addRfp(...) writes one row to localStorage via useWorkspace().addRfp and resets the form. The file is never read, uploaded, parsed or stored. Every field is fabricated: prospect = typed value or filename-minus-.pdf; summary = the literal `Extracted from ${file.name}`; stage = 'Your turn'; vertical = verticals[0]; estimate = 0; schema = the picked schema's NAME string; deadline = ''. No navigation follows despite the button reading 'Extract & Open ▶'. Double-clicking creates duplicate RFPs (no idempotency key).",
+   "requiredBehaviour": "Create the RFP + RfpFile, enqueue a durable ExtractionRun, return 202 with a job URL, and navigate to the RFP detail surface showing live extraction progress. Stage starts at 'Extracting' and moves to 'Your turn' only when the run succeeds.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps",
+   "authorization": "Tenant member with create permission",
+   "validation": "Idempotency-Key required; file must exist, be clean and belong to the tenant; schema id validated; reject unknown fields",
+   "sideEffect": "Enqueues an extraction job; charges credits on settle"
+  },
+  {
+   "id": "OP-PP-RFP-EXTRACTION-RUN",
+   "entity": "ExtractionRun",
+   "action": "execute",
+   "surface": "/app/pitch-pilot/new → (no detail surface exists)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 275,
+   "currentBehaviour": "`await new Promise((resolve) => setTimeout(resolve, 900))`. A 900 ms spinner. No job record, no progress, no cancel, no retry, no failure state, no persistence across reload, and no output of any kind.",
+   "requiredBehaviour": "Durable, resumable, checkpointed job: parse/OCR the PDF, extract each schema field with confidence and source spans, handle corrupted/oversize/encrypted PDFs and prompt-injection text in the source document, and record real duration and cost.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps/{id}/extractions, GET /api/v1/pitch/extractions/{runId}",
+   "authorization": "Tenant member; job worker authenticated as the tenant's service context",
+   "validation": "Run pinned to a schema version; attempt cap; cancellation honoured",
+   "sideEffect": "Document parsing; credit reserve/settle/refund"
+  },
+  {
+   "id": "OP-PP-RFP-EXTRACTION-PROGRESS",
+   "entity": "ExtractionRun",
+   "action": "read",
+   "surface": "MISSING — no surface exists",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 264,
+   "currentBehaviour": "The only state is a component-local `busy` boolean that disappears on unmount. The 'Extracting' stage exists in the vocabulary but is reachable only by loading sample data, and nothing polls anything.",
+   "requiredBehaviour": "Poll or stream job status; surviving a reload, a tab close and a server restart.",
+   "apiMethodPath": "GET /api/v1/pitch/extractions/{runId}",
+   "authorization": "Tenant member",
+   "validation": "runId scoped to tenant",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-RFP-EXTRACTION-REVIEW",
+   "entity": "ExtractedFieldValue",
+   "action": "update",
+   "surface": "MISSING — 'Your turn' has no review screen",
+   "sourceFile": "src/lib/pitchData.ts",
+   "sourceLine": 30,
+   "currentBehaviour": "NO-OP / absent. The whole point of the 'Your turn' stage is reviewer correction of extracted fields, and there is no screen, no data model and no handler for it anywhere in src.",
+   "requiredBehaviour": "Reviewer sees each extracted field with its confidence and source span, accepts/corrects/rejects it, and the corrections are versioned and attributed.",
+   "apiMethodPath": "PATCH /api/v1/pitch/rfps/{id}/extracted-fields/{fieldId}",
+   "authorization": "Tenant member with review permission",
+   "validation": "Value validated against the field's dataType; optimistic concurrency via version",
+   "sideEffect": "Advances the RFP stage when all required fields are resolved"
+  },
+  {
+   "id": "OP-PP-RFP-STAGE-TRANSITION",
+   "entity": "Rfp",
+   "action": "transition",
+   "surface": "MISSING — no control anywhere",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1827,
+   "currentBehaviour": "DEAD CODE. `updateRfp(id, patch)` exists and writes a 'pitch.rfp_updated' audit row, but grep over src/screens finds ZERO callers. Consequently no user can move an RFP out of 'Your turn' — every real RFP is frozen there forever, and the Drafting / Out for client / Won / Lost stages exist only in sample data.",
+   "requiredBehaviour": "An explicit transition endpoint with an allowed-transition matrix, reason capture on Lost, an appended RfpStageEvent and decidedAt stamping.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps/{id}/transitions",
+   "authorization": "Tenant member with the permission for that transition",
+   "validation": "from→to must be in the allowed matrix; version check for concurrent editors",
+   "sideEffect": "Audit + stage history rows; possible notification"
+  },
+  {
+   "id": "OP-PP-RFP-UPDATE-ESTIMATE",
+   "entity": "Rfp",
+   "action": "update",
+   "surface": "MISSING — no control anywhere",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 282,
+   "currentBehaviour": "NO-OP / absent. estimate is hardcoded to 0 at creation and there is no edit surface, so 'Pipeline value' on the dashboard and 'Pipeline' on Analytics are structurally 0 for every RFP a user actually creates.",
+   "requiredBehaviour": "Editable money field with currency, audited, feeding the pipeline aggregates.",
+   "apiMethodPath": "PATCH /api/v1/pitch/rfps/{id}",
+   "authorization": "Tenant member with edit permission",
+   "validation": "numeric(18,4) >= 0; currency from the ISO-4217 set; reject float-formatted strings",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-RFP-UPDATE-VERTICAL",
+   "entity": "Rfp",
+   "action": "update",
+   "surface": "MISSING — no control anywhere",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 281,
+   "currentBehaviour": "NO-OP / absent. vertical is hardcoded to verticals[0] ('Government / Municipal') for every user-created RFP and can never be changed, which makes the inbox vertical filter dead for real data.",
+   "requiredBehaviour": "Selectable at creation and editable afterwards, from the vertical catalog.",
+   "apiMethodPath": "PATCH /api/v1/pitch/rfps/{id}",
+   "authorization": "Tenant member with edit permission",
+   "validation": "vertical code must exist",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-RFP-UPDATE-DEADLINE",
+   "entity": "Rfp",
+   "action": "update",
+   "surface": "MISSING — no control anywhere",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 330,
+   "currentBehaviour": "NO-OP / absent. deadline is written as '' by both writers and read by nothing. The 'Submission deadline' stock schema field has nowhere to land.",
+   "requiredBehaviour": "Set from the extracted 'Submission deadline' value, reviewer-correctable, and driving the dashboard deadline summary and reminders.",
+   "apiMethodPath": "PATCH /api/v1/pitch/rfps/{id}",
+   "authorization": "Tenant member with edit permission",
+   "validation": "Valid date; timezone convention decided (see openQuestions)",
+   "sideEffect": "May schedule reminders"
+  },
+  {
+   "id": "OP-PP-RFP-DELETE",
+   "entity": "Rfp",
+   "action": "delete",
+   "surface": "MISSING — no control anywhere",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1817,
+   "currentBehaviour": "NO-OP / absent. There is no delete or archive for an individual RFP. The ONLY way to remove one is clearPitchSample(), which wipes every RFP, every KB doc and every template in the tenant.",
+   "requiredBehaviour": "Soft-archive with audit; hard delete only through a retention/erasure path given uploaded client documents are involved.",
+   "apiMethodPath": "DELETE /api/v1/pitch/rfps/{id}",
+   "authorization": "Tenant member with delete permission",
+   "validation": "Confirmation; cascade rules for files, runs and decks",
+   "sideEffect": "Object-store retention handling"
+  },
+  {
+   "id": "OP-PP-KB-LIST",
+   "entity": "KnowledgeDocument",
+   "action": "list",
+   "surface": "/app/pitch-pilot/kb",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 428,
+   "currentBehaviour": "Renders the whole kbDocs localStorage array (filtered client-side), showing title + category label + a Remove button. addedAt is stored but never displayed. No pagination, no search, no sort.",
+   "requiredBehaviour": "Server list with pagination, search and index-status badges.",
+   "apiMethodPath": "GET /api/v1/pitch/knowledge",
+   "authorization": "Tenant member",
+   "validation": "limit/cursor whitelisted",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-KB-FILTER-CATEGORY",
+   "entity": "KnowledgeDocument",
+   "action": "list",
+   "surface": "/app/pitch-pilot/kb",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 408,
+   "currentBehaviour": "setState only; client-side equality on the category slug (line 379). Chips come from the kbCategories module constant.",
+   "requiredBehaviour": "Server filter on a category FK; chip list from the catalog table.",
+   "apiMethodPath": "GET /api/v1/pitch/knowledge?category=",
+   "authorization": "Tenant member",
+   "validation": "Category code must exist",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-KB-CATEGORY-COUNTS",
+   "entity": "KnowledgeDocument",
+   "action": "read",
+   "surface": "/app/pitch-pilot/kb",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 380,
+   "currentBehaviour": "`countFor(id)` re-filters the whole in-memory array once per chip on every render (7 passes). Fine at prototype size, wrong at scale.",
+   "requiredBehaviour": "Single server aggregate returning counts per category.",
+   "apiMethodPath": "GET /api/v1/pitch/knowledge/counts",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-KB-DIALOG-OPEN",
+   "entity": "KnowledgeDocument",
+   "action": "create",
+   "surface": "/app/pitch-pilot/kb",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 393,
+   "currentBehaviour": "setOpen(true) — opens the shared native <dialog> (components/Dialog.tsx) which does provide focus trapping, Escape and focus restoration.",
+   "requiredBehaviour": "Unchanged, but the dialog must contain a real file picker.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member with create permission",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-KB-DIALOG-OPEN-EMPTY",
+   "entity": "KnowledgeDocument",
+   "action": "create",
+   "surface": "/app/pitch-pilot/kb (empty state)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 445,
+   "currentBehaviour": "Button reads 'Upload your first document' with a download-arrow icon, and opens the SAME dialog, which contains only a text input and a category select. No file is ever chosen or uploaded.",
+   "requiredBehaviour": "A real upload flow; until then the label must not say 'Upload'.",
+   "apiMethodPath": "POST /api/v1/pitch/knowledge/files/presign",
+   "authorization": "Tenant member with create permission",
+   "validation": "MIME and size enforced server-side",
+   "sideEffect": "Object-store write"
+  },
+  {
+   "id": "OP-PP-KB-CREATE",
+   "entity": "KnowledgeDocument",
+   "action": "create",
+   "surface": "/app/pitch-pilot/kb (dialog)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 485,
+   "currentBehaviour": "Writes localStorage via useWorkspace().addKbDoc({title, category}) and appends a 'pitch.kb_added' audit row whose resourceId is the TITLE, not the id (workspace.tsx:1842). Only validation is the submit button being disabled on a blank title (line 484). No file, no content, no dedup, no size, no index — the stored record cannot be retrieved against by anything.",
+   "requiredBehaviour": "Create the document row from a completed upload, extract its text, chunk and index it, and expose index status.",
+   "apiMethodPath": "POST /api/v1/pitch/knowledge",
+   "authorization": "Tenant member with create permission",
+   "validation": "Title required + length cap; category must exist; file required; duplicate-checksum detection",
+   "sideEffect": "Text extraction + index build"
+  },
+  {
+   "id": "OP-PP-KB-DIALOG-CANCEL",
+   "entity": "KnowledgeDocument",
+   "action": "create",
+   "surface": "/app/pitch-pilot/kb (dialog)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 479,
+   "currentBehaviour": "setOpen(false) only. The typed title survives in `draft` and reappears next time the dialog opens (unlike the success path, which clears the title but keeps the category — line 487).",
+   "requiredBehaviour": "Consistent draft reset on both paths, or an explicit 'discard draft?' when the field is dirty.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-KB-REMOVE",
+   "entity": "KnowledgeDocument",
+   "action": "delete",
+   "surface": "/app/pitch-pilot/kb (row)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 435,
+   "currentBehaviour": "Immediate hard delete from the localStorage array via removeKbDoc(id) — NO confirmation dialog, NO undo, and NO audit row (workspace.tsx:1847-1850 writes no auditEvent, unlike addKbDoc).",
+   "requiredBehaviour": "Confirmed soft-archive with an audit row and index removal.",
+   "apiMethodPath": "DELETE /api/v1/pitch/knowledge/{id}",
+   "authorization": "Tenant member with delete permission",
+   "validation": "id scoped to tenant; confirmation required",
+   "sideEffect": "Index entry + object retention handling"
+  },
+  {
+   "id": "OP-PP-KB-FILE-UPLOAD",
+   "entity": "KnowledgeDocument",
+   "action": "create",
+   "surface": "MISSING — no file input on this surface",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 453,
+   "currentBehaviour": "NO-OP / absent. The dialog has a title input and a category select and nothing else.",
+   "requiredBehaviour": "Presigned upload with MIME/size checks, scan, text extraction and versioning.",
+   "apiMethodPath": "POST /api/v1/pitch/knowledge/files/presign",
+   "authorization": "Tenant member with create permission",
+   "validation": "Allowed MIME set; size cap; magic-byte verification",
+   "sideEffect": "Object-store write"
+  },
+  {
+   "id": "OP-PP-KB-INDEX-BUILD",
+   "entity": "KnowledgeDocument",
+   "action": "execute",
+   "surface": "MISSING",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 389,
+   "currentBehaviour": "NO-OP / absent. The copy states 'The AI RAGs against this when drafting RFQ answers' and there is no content, no chunking, no embedding, no retrieval and no drafting anywhere in src.",
+   "requiredBehaviour": "A real indexing job with status, re-index on content change, and citations flowing into drafted answers.",
+   "apiMethodPath": "POST /api/v1/pitch/knowledge/{id}/index",
+   "authorization": "Service context for the tenant",
+   "validation": "Only indexed documents are retrievable; retrieval respects tenant isolation",
+   "sideEffect": "Index write; credit cost"
+  },
+  {
+   "id": "OP-PP-TPL-LIST",
+   "entity": "PitchTemplate",
+   "action": "list",
+   "surface": "/app/pitch-pilot/templates",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 540,
+   "currentBehaviour": "Renders the pitchTemplates array in insertion order (addPitchTemplate APPENDS, unlike every other Pitch collection which prepends). Shows name + Default badge or 'Make default' + 'Remove'. addedAt stored, never shown.",
+   "requiredBehaviour": "Server list with size, version, uploader and upload date.",
+   "apiMethodPath": "GET /api/v1/pitch/templates",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-TPL-UPLOAD",
+   "entity": "PitchTemplate",
+   "action": "create",
+   "surface": "/app/pitch-pilot/templates",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 504,
+   "currentBehaviour": "FILENAME-ONLY. `upload(e)` takes `e.target.files?.[0]` and calls addPitchTemplate(file.name) — the string. The File object is then discarded and the input is reset (line 507). Writes localStorage + a 'pitch.template_added' audit row keyed by the NAME. accept='.pptx' is an unenforced hint; no MIME check, no size check, no parse, no duplicate detection. The first upload silently becomes the default (workspace.tsx:1859).",
+   "requiredBehaviour": "Real presigned .pptx upload, MIME + magic-byte verification, size cap, slide-master parse, versioning, and an explicit default choice rather than a side effect of being first.",
+   "apiMethodPath": "POST /api/v1/pitch/templates/presign then POST /api/v1/pitch/templates",
+   "authorization": "Tenant member with template-manage permission",
+   "validation": "application/vnd.openxmlformats-officedocument.presentationml.presentation verified server-side; size cap; parseable OOXML",
+   "sideEffect": "Object-store write"
+  },
+  {
+   "id": "OP-PP-TPL-SET-DEFAULT",
+   "entity": "PitchTemplate",
+   "action": "update",
+   "surface": "/app/pitch-pilot/templates (row)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 550,
+   "currentBehaviour": "Writes localStorage via setDefaultTemplate(id), which maps every row to `isDefault: item.id === id`. NO audit row (workspace.tsx:1866-1873), no confirmation, and no effect on anything downstream because nothing generates decks.",
+   "requiredBehaviour": "Transactional single-default guarantee (partial unique index), audited, with the change visible to concurrent editors.",
+   "apiMethodPath": "POST /api/v1/pitch/templates/{id}/set-default",
+   "authorization": "Tenant member with template-manage permission",
+   "validation": "id scoped to tenant; exactly one default per tenant enforced in the DB",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-PP-TPL-REMOVE",
+   "entity": "PitchTemplate",
+   "action": "delete",
+   "surface": "/app/pitch-pilot/templates (row)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 558,
+   "currentBehaviour": "Immediate hard delete from the array — no confirmation, no audit row. BUG: deleting the row that had isDefault leaves the tenant with ZERO defaults and no reassignment, silently flipping the 'No active template set' warning back on.",
+   "requiredBehaviour": "Confirmed archive, blocked (or reassigned) while the template is the default, audited, and refused if decks still reference it.",
+   "apiMethodPath": "DELETE /api/v1/pitch/templates/{id}",
+   "authorization": "Tenant member with template-manage permission",
+   "validation": "Refuse to leave the tenant with no default; referential check against ProposalDeck",
+   "sideEffect": "Object retention handling"
+  },
+  {
+   "id": "OP-PP-TPL-DOWNLOAD",
+   "entity": "PitchTemplate",
+   "action": "read",
+   "surface": "MISSING — no download control",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 541,
+   "currentBehaviour": "NO-OP / absent. A user cannot retrieve the template they 'uploaded' — because there is nothing to retrieve.",
+   "requiredBehaviour": "Expiring signed download URL, authorized per request.",
+   "apiMethodPath": "GET /api/v1/pitch/templates/{id}/download",
+   "authorization": "Tenant member",
+   "validation": "Short-lived signed URL; tenant-scoped object key",
+   "sideEffect": "File download"
+  },
+  {
+   "id": "OP-PP-TPL-DEFAULT-WARNING",
+   "entity": "PitchTemplate",
+   "action": "read",
+   "surface": "/app/pitch-pilot/templates",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 529,
+   "currentBehaviour": "Renders a warning banner when no row has isDefault, claiming 'decks compose with the built-in navy/amber defaults'. No deck composition exists in any form.",
+   "requiredBehaviour": "Banner should reflect a real fallback theme that a real renderer actually uses.",
+   "apiMethodPath": "n/a",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-SCHEMA-LIST",
+   "entity": "ExtractionSchema",
+   "action": "list",
+   "surface": "/app/pitch-pilot/schema",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 588,
+   "currentBehaviour": "Merges the 4 stock module constants (tagged stock:true) with the tenant's customSchemas (stock:false) into one in-memory list with a per-row field count. Stock ids are human slugs, custom ids are uuids — two id spaces in one list.",
+   "requiredBehaviour": "One server list over a schemas table with is_stock, version and RFP usage count.",
+   "apiMethodPath": "GET /api/v1/pitch/schemas",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-SCHEMA-SELECT",
+   "entity": "ExtractionSchema",
+   "action": "read",
+   "surface": "/app/pitch-pilot/schema",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 628,
+   "currentBehaviour": "setState only (setSelected). Selection is not reflected in the URL, so the editor state is lost on reload and cannot be linked to.",
+   "requiredBehaviour": "Selection in the route or query string; detail fetched from the server.",
+   "apiMethodPath": "GET /api/v1/pitch/schemas/{id}",
+   "authorization": "Tenant member",
+   "validation": "id scoped to tenant or stock",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-SCHEMA-CREATE",
+   "entity": "ExtractionSchema",
+   "action": "create",
+   "surface": "/app/pitch-pilot/schema",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 615,
+   "currentBehaviour": "Writes localStorage via addCustomSchema({ name: `Custom schema ${customSchemas.length + 1}`, fields: ['Client name'] }) and then calls setSelected(null) — so the schema it just created is NOT opened, and the editor shows 'Pick a schema on the left'. No audit row (workspace.tsx:1891-1895), no name prompt, and the count-based name collides after any removal.",
+   "requiredBehaviour": "Named on creation (or a server-unique default), audited, and opened for editing immediately.",
+   "apiMethodPath": "POST /api/v1/pitch/schemas",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Name required, unique per tenant (case-insensitive); at least one field",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-PP-SCHEMA-FIELD-EDIT",
+   "entity": "ExtractionSchemaField",
+   "action": "update",
+   "surface": "/app/pitch-pilot/schema (custom schema editor)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 661,
+   "currentBehaviour": "Writes localStorage on EVERY KEYSTROKE via updateCustomSchema(id, {fields: [...]}) — a full JSON.stringify of the entire workspace blob per character typed. No debounce, no save button, no validation: blank strings and duplicates are accepted, and there is no undo. No audit row.",
+   "requiredBehaviour": "Explicit save (or debounced autosave) of a field row, with optimistic concurrency, non-empty/unique validation and a new schema version so in-flight extractions are unaffected.",
+   "apiMethodPath": "PATCH /api/v1/pitch/schemas/{id}/fields/{fieldId}",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Label non-empty, length cap, unique within the schema; version bump",
+   "sideEffect": "Creates a new schema version"
+  },
+  {
+   "id": "OP-PP-SCHEMA-FIELD-ADD",
+   "entity": "ExtractionSchemaField",
+   "action": "create",
+   "surface": "/app/pitch-pilot/schema (custom schema editor)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 676,
+   "currentBehaviour": "Appends the literal string 'New field' to the array via updateCustomSchema. Pressing it twice creates two identical 'New field' entries whose React keys (`${field}-${index}`) differ only by index. No audit row.",
+   "requiredBehaviour": "Create a field row with a label, position, dataType and required flag.",
+   "apiMethodPath": "POST /api/v1/pitch/schemas/{id}/fields",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Label required and unique within the schema; field-count cap",
+   "sideEffect": "Creates a new schema version"
+  },
+  {
+   "id": "OP-PP-SCHEMA-FIELD-REMOVE",
+   "entity": "ExtractionSchemaField",
+   "action": "delete",
+   "surface": "MISSING — no control",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 650,
+   "currentBehaviour": "NO-OP / absent. Fields can be added and renamed but never removed — a custom schema only ever grows.",
+   "requiredBehaviour": "Remove with a warning about extractions already bound to that field.",
+   "apiMethodPath": "DELETE /api/v1/pitch/schemas/{id}/fields/{fieldId}",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Refuse to leave a schema with zero fields",
+   "sideEffect": "Creates a new schema version"
+  },
+  {
+   "id": "OP-PP-SCHEMA-FIELD-REORDER",
+   "entity": "ExtractionSchemaField",
+   "action": "update",
+   "surface": "MISSING — no control",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 651,
+   "currentBehaviour": "NO-OP / absent. Order is array order and cannot be changed.",
+   "requiredBehaviour": "Explicit position column with a reorder endpoint.",
+   "apiMethodPath": "POST /api/v1/pitch/schemas/{id}/fields/reorder",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Positions form a contiguous permutation",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-SCHEMA-RENAME",
+   "entity": "ExtractionSchema",
+   "action": "update",
+   "surface": "MISSING — no control",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 1897,
+   "currentBehaviour": "NO-OP / absent from the UI, although updateCustomSchema would accept `{name}`. A schema is therefore stuck with its auto-generated 'Custom schema N' label forever. If rename were added today it would silently orphan every Rfp.schema name string.",
+   "requiredBehaviour": "Rename allowed because RFPs reference the schema by id, not name.",
+   "apiMethodPath": "PATCH /api/v1/pitch/schemas/{id}",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Unique per tenant",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-PP-SCHEMA-DELETE",
+   "entity": "ExtractionSchema",
+   "action": "delete",
+   "surface": "MISSING — no control",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 626,
+   "currentBehaviour": "NO-OP / absent. Custom schemas can never be removed; the list grows monotonically and survives clearPitchSample (which wipes rfps/kbDocs/pitchTemplates but leaves customSchemas and brandKit).",
+   "requiredBehaviour": "Archive rather than delete, refused or warned while RFPs reference it.",
+   "apiMethodPath": "DELETE /api/v1/pitch/schemas/{id}",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Stock schemas cannot be deleted; referential check against Rfp",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-PP-SCHEMA-STOCK-READONLY",
+   "entity": "ExtractionSchema",
+   "action": "read",
+   "surface": "/app/pitch-pilot/schema (stock schema selected)",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 653,
+   "currentBehaviour": "Stock fields render as non-interactive spans with the caption 'Ships with the app. Fields are fixed.' (line 648) — directly contradicting the page's own intro 'Edit defaults or create custom schemas per service line.' (line 599).",
+   "requiredBehaviour": "Decide the product rule: either stock schemas are forkable into an editable tenant copy, or the intro copy stops promising editing.",
+   "apiMethodPath": "POST /api/v1/pitch/schemas/{id}/fork",
+   "authorization": "Tenant member with schema-manage permission",
+   "validation": "Fork creates a tenant-owned copy with is_stock=false",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-BRAND-READ",
+   "entity": "BrandKit",
+   "action": "read",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 17,
+   "currentBehaviour": "`useState(brandKit)` snapshots the context value ONCE at mount into `draft`. If brandKit changes elsewhere (another tab, a reload() call) the open editor keeps showing stale values and a Save would overwrite the newer data with no conflict detection.",
+   "requiredBehaviour": "Server fetch with a version token; concurrent edits produce a 409 rather than a silent last-write-wins.",
+   "apiMethodPath": "GET /api/v1/pitch/brand-kit",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-BRAND-SAVE",
+   "entity": "BrandKit",
+   "action": "update",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 41,
+   "currentBehaviour": "Writes localStorage via updateBrandKit(draft) and appends a 'pitch.brand_updated' audit row whose resourceId is the literal 'PP' (workspace.tsx:1886). Enabled only when `JSON.stringify(draft) !== JSON.stringify(brandKit)`. NO field validation of any kind runs. If the blob exceeds the localStorage quota (easy with a base64 logo) the write throws and is swallowed by an empty catch (workspace.tsx:945-947) — the UI then shows 'All saved' for data that was never saved.",
+   "requiredBehaviour": "Server PUT with per-field validation, a real persisted updatedAt, an actor id, and a save state driven by the server response rather than by object equality.",
+   "apiMethodPath": "PUT /api/v1/pitch/brand-kit",
+   "authorization": "Tenant member with brand-manage permission",
+   "validation": "Hex colors match ^#[0-9A-Fa-f]{6}$; email RFC-valid; phone normalised; firmName length cap; logo is an asset id",
+   "sideEffect": "Audit row"
+  },
+  {
+   "id": "OP-PP-BRAND-FIRMNAME",
+   "entity": "BrandKit",
+   "action": "update",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 55,
+   "currentBehaviour": "setState into `draft` only; persisted only when Save is pressed. No length cap, no trim.",
+   "requiredBehaviour": "Trimmed, length-capped, required before a deck can be produced.",
+   "apiMethodPath": "PUT /api/v1/pitch/brand-kit",
+   "authorization": "Tenant member with brand-manage permission",
+   "validation": "1..120 chars after trim",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-BRAND-LOGO-UPLOAD",
+   "entity": "BrandKit",
+   "action": "update",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 78,
+   "currentBehaviour": "FileReader.readAsDataURL then `set('logoUrl', String(reader.result))` — the entire image is base64-inlined into React state and, on Save, into the single shared localStorage JSON blob. accept lists png/jpeg/gif/webp (a browser hint only). The advertised 4 MB cap is never checked; base64 inflates the payload ~33%; exceeding the quota fails silently. No error branch on FileReader.onerror either.",
+   "requiredBehaviour": "Presigned upload to the object store, MIME + magic-byte verification, dimension and size caps, and a logo_asset_id reference on the brand kit.",
+   "apiMethodPath": "POST /api/v1/pitch/brand-kit/logo/presign",
+   "authorization": "Tenant member with brand-manage permission",
+   "validation": "image/png|jpeg|gif|webp verified server-side; <= configured byte cap; max dimensions",
+   "sideEffect": "Object-store write"
+  },
+  {
+   "id": "OP-PP-BRAND-LOGO-URL",
+   "entity": "BrandKit",
+   "action": "update",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 92,
+   "currentBehaviour": "setState only. The input deliberately renders empty when logoUrl is a data: URL (line 93), so after an upload the field looks blank while a value is present — and typing one character there silently replaces the uploaded image. No URL validation, no scheme restriction despite the 'https://' placeholder; an http:// or javascript: string would be stored (it is only ever used as an <img src>).",
+   "requiredBehaviour": "Validate scheme and host, fetch-and-store server-side rather than hot-linking, and make upload vs URL a single explicit choice.",
+   "apiMethodPath": "PUT /api/v1/pitch/brand-kit",
+   "authorization": "Tenant member with brand-manage permission",
+   "validation": "https only; host allowlist or server-side fetch with content-type check; SSRF protections",
+   "sideEffect": "Possible server-side fetch"
+  },
+  {
+   "id": "OP-PP-BRAND-COLOR-PICKER",
+   "entity": "BrandKit",
+   "action": "update",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 134,
+   "currentBehaviour": "setState only, for each of primary/accent/dark. `<input type=\"color\">` always yields a valid #rrggbb.",
+   "requiredBehaviour": "Unchanged, plus a contrast check against the white cover text the preview uses.",
+   "apiMethodPath": "PUT /api/v1/pitch/brand-kit",
+   "authorization": "Tenant member with brand-manage permission",
+   "validation": "Hex pattern; WCAG contrast warning",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-BRAND-COLOR-HEX-TEXT",
+   "entity": "BrandKit",
+   "action": "update",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 145,
+   "currentBehaviour": "setState only, with NO validation — the free-text box writes whatever is typed straight into primary/accent/dark. 'blue', 'nonsense' or '' all persist, and the value is then injected into inline `style={{ background: draft.primary }}` (line 109) and would flow into any deck renderer.",
+   "requiredBehaviour": "Reject or normalise non-hex input at the field and again on the server.",
+   "apiMethodPath": "PUT /api/v1/pitch/brand-kit",
+   "authorization": "Tenant member with brand-manage permission",
+   "validation": "^#[0-9A-Fa-f]{6}$ enforced client and server side",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-BRAND-CONTACT-FIELDS",
+   "entity": "BrandKit",
+   "action": "update",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 161,
+   "currentBehaviour": "Four plain text inputs (contactName, contactTitle, contactEmail, contactPhone) — setState only. contactEmail has no type=\"email\", no pattern and no use of the repo's own src/lib/validation.ts; contactPhone has no format handling. Both persist verbatim onto what is described as the client-facing CTA slide.",
+   "requiredBehaviour": "Validated email, normalised phone (E.164 or an explicit stated convention), all four required before a deck is produced.",
+   "apiMethodPath": "PUT /api/v1/pitch/brand-kit",
+   "authorization": "Tenant member with brand-manage permission",
+   "validation": "Email RFC-valid + length cap; phone normalised; name/title length caps",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-BRAND-COVER-PREVIEW",
+   "entity": "BrandKit",
+   "action": "read",
+   "surface": "/app/pitch-pilot/brand",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 109,
+   "currentBehaviour": "A hand-built div that paints draft.primary as background and draft.accent as label colour, showing the literal token '{{client_name}}'. It is a CSS approximation, not a render of any real slide master, and it ignores the uploaded .pptx template entirely.",
+   "requiredBehaviour": "Preview generated by the same renderer that produces the deck, using the active template.",
+   "apiMethodPath": "POST /api/v1/pitch/brand-kit/preview",
+   "authorization": "Tenant member",
+   "validation": "n/a",
+   "sideEffect": "Rendering cost"
+  },
+  {
+   "id": "OP-PP-SAMPLE-LOAD",
+   "entity": "PitchSampleDataState",
+   "action": "create",
+   "surface": "/app/pitch-pilot/brand (Sample data section)",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 214,
+   "currentBehaviour": "DESTRUCTIVE AND UNCONFIRMED. loadPitchSample() (workspace.tsx:1906-1959) sets pitchSampleLoaded=true and REPLACES the rfps array wholesale with four canned rows (City of Hidden Hills 180000, Meridian Health 320000, Northwind Retail 95000, Adler Foundation 60000). Any RFPs the user created are destroyed without warning, and the copy ('Load a few example RFPs to try the full flow') implies the load is additive. No audit row.",
+   "requiredBehaviour": "Refuse or explicitly confirm when tenant data exists; insert sample rows tagged as samples alongside real data; audited.",
+   "apiMethodPath": "POST /api/v1/pitch/sample-data",
+   "authorization": "Tenant admin",
+   "validation": "Confirmation required when the tenant already has RFPs",
+   "sideEffect": "Bulk insert; audit row"
+  },
+  {
+   "id": "OP-PP-SAMPLE-CLEAR",
+   "entity": "PitchSampleDataState",
+   "action": "delete",
+   "surface": "/app/pitch-pilot/brand (Sample data section)",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 217,
+   "currentBehaviour": "DESTRUCTIVE AND UNCONFIRMED. clearPitchSample() (workspace.tsx:1961-1964) sets rfps: [], kbDocs: [], pitchTemplates: [] — emptying all three collections, not just the sample rows, because samples carry no marker. brandKit and customSchemas survive. No confirmation, no undo, no audit row. The copy says it removes 'them along with any sample KB documents and templates' — but the four sample RFPs never included KB docs or templates, so everything deleted from those two collections was user-created.",
+   "requiredBehaviour": "Delete only rows tagged as samples, behind a confirmation, audited.",
+   "apiMethodPath": "DELETE /api/v1/pitch/sample-data",
+   "authorization": "Tenant admin",
+   "validation": "Only sample-tagged rows; explicit typed confirmation",
+   "sideEffect": "Bulk delete; audit row"
+  },
+  {
+   "id": "OP-PP-ANALYTICS-TILES",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "/app/pitch-pilot/analytics",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 705,
+   "currentBehaviour": "Three client-side counts over the whole array: RFPs (total), Decided (Won+Lost), Pipeline (sum of estimate over ALL rfps). Note the inconsistency: the dashboard's 'Pipeline value' sums only in-flight rows (line 35) while this 'Pipeline' sums everything including Won and Lost — two different numbers under the same word.",
+   "requiredBehaviour": "One server-defined pipeline metric used by both surfaces, with an explicit stage scope and currency.",
+   "apiMethodPath": "GET /api/v1/pitch/analytics/summary",
+   "authorization": "Tenant member",
+   "validation": "Period and stage scope explicit",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-ANALYTICS-BY-VERTICAL",
+   "entity": "Rfp",
+   "action": "read",
+   "surface": "MISSING — promised in the page's own intro",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 700,
+   "currentBehaviour": "NO-OP / absent. The intro promises 'Win rate, cycle time and pipeline by vertical' and then admits 'The live analytics surface has not been transcribed'. Only the three flat tiles render; there is no breakdown, no chart, no date filter and no control of any kind on this page.",
+   "requiredBehaviour": "Grouped aggregates by vertical with a period selector.",
+   "apiMethodPath": "GET /api/v1/pitch/analytics/by-vertical",
+   "authorization": "Tenant member",
+   "validation": "Period bounds",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-ANALYTICS-CYCLE-TIME",
+   "entity": "RfpStageEvent",
+   "action": "read",
+   "surface": "MISSING — promised in the page's own intro",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 700,
+   "currentBehaviour": "NO-OP / absent, and structurally impossible: there is no stage history and no decidedAt, so no elapsed time between any two states can be computed.",
+   "requiredBehaviour": "Median/percentile time between defined stage boundaries, computed from RfpStageEvent.",
+   "apiMethodPath": "GET /api/v1/pitch/analytics/cycle-time",
+   "authorization": "Tenant member",
+   "validation": "Start/end stage boundaries explicit",
+   "sideEffect": "none"
+  },
+  {
+   "id": "OP-PP-DECK-GENERATE",
+   "entity": "ProposalDeck",
+   "action": "execute",
+   "surface": "MISSING — instructed by Brand Kit copy, exists nowhere",
+   "sourceFile": "src/screens/app/pitch/BrandKit.tsx",
+   "sourceLine": 203,
+   "currentBehaviour": "NO-OP / absent. The tip tells the user to go to 'RFQ Editor → Generate PPT Deck'. Grep across the entire src tree finds no RFQ Editor route, component, handler or string — the instruction points at a surface that does not exist. Nothing anywhere in Pitch Pilot produces a file.",
+   "requiredBehaviour": "Grounded drafting against the indexed knowledge base, rendered through the active .pptx template with the brand kit snapshot, versioned, with a real openable binary and measured cost/duration.",
+   "apiMethodPath": "POST /api/v1/pitch/rfps/{id}/decks",
+   "authorization": "Tenant member with deck-generate permission",
+   "validation": "Requires a reviewed extraction, a brand kit and (optionally) an active template; credit reserve before execution",
+   "sideEffect": "Document rendering; credit reserve/settle/refund"
+  },
+  {
+   "id": "OP-PP-DECK-DOWNLOAD",
+   "entity": "ProposalDeck",
+   "action": "export",
+   "surface": "MISSING",
+   "sourceFile": "src/screens/app/pitch/panes.tsx",
+   "sourceLine": 517,
+   "currentBehaviour": "NO-OP / absent. No deck exists, so there is nothing to download; the only Blob download in the whole domain is the inbox CSV.",
+   "requiredBehaviour": "Expiring signed URL to the rendered .pptx (and PDF if in scope), authorized per request.",
+   "apiMethodPath": "GET /api/v1/pitch/decks/{id}/download",
+   "authorization": "Tenant member",
+   "validation": "Signed short-lived URL; tenant-scoped object key",
+   "sideEffect": "File download"
+  },
+  {
+   "id": "OP-PP-AUDIT-COVERAGE",
+   "entity": "AuditEvent",
+   "action": "create",
+   "surface": "all Pitch surfaces",
+   "sourceFile": "src/lib/workspace.tsx",
+   "sourceLine": 173,
+   "currentBehaviour": "Client-fabricated audit rows pushed onto the same localStorage array the user can edit. Actor is always the literal 'owner' with role 'Org_admin' and ip ''. Pitch writes only five actions — pitch.rfp_added (resourceId = the PROSPECT NAME), pitch.rfp_updated (id), pitch.kb_added (the TITLE), pitch.template_added (the NAME), pitch.brand_updated (the literal 'PP'). NO audit at all for removeKbDoc, setDefaultTemplate, removePitchTemplate, addCustomSchema, updateCustomSchema, loadPitchSample or clearPitchSample — including the two destructive bulk operations.",
+   "requiredBehaviour": "Append-only server-side audit deriving the real actor, role, IP and outcome, keyed by resource id (never by a display name), covering every mutation including the destructive ones.",
+   "apiMethodPath": "internal (written inside each mutation's transaction)",
+   "authorization": "Server-side only; never client-writable",
+   "sideEffect": "Audit row per mutation"
+  }
+ ],
+ "surfaces": [
+  {
+   "route": "/app/pitch-pilot",
+   "title": "Pitch Dashboard",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:29-150",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated",
+    "empty queue (with CTA)",
+    "win-rate '—' when nothing decided",
+    "sample-data banner"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "denied",
+    "stale/refresh",
+    "per-user scoping (titled 'My queue' but tenant-wide)",
+    "real time-saved metric (hardcoded '0 hrs')",
+    "real deadline summary (hardcoded 'No deadlines this week')",
+    "time-of-day greeting (hardcoded 'Good afternoon')"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/inbox",
+   "title": "RFP Inbox",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:152-257",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated list",
+    "empty (no RFPs)",
+    "empty (no filter matches — distinct copy)",
+    "export disabled when the filtered set is empty"
+   ],
+   "statesMissing": [
+    "loading",
+    "error",
+    "denied",
+    "pagination",
+    "sort",
+    "row → detail navigation (no RFP detail route exists in the app)",
+    "URL-persisted filters",
+    "stage change from the list",
+    "formula-safe / correctly quoted CSV",
+    "currency on the exported money column"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/new",
+   "title": "New RFP",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:259-371",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "idle",
+    "file chosen (name shown in the drop zone)",
+    "busy (900 ms spinner on the Extract button)",
+    "submit disabled without a file"
+   ],
+   "statesMissing": [
+    "real upload",
+    "file-type rejection (drop accepts anything)",
+    "size rejection (50 MB never checked)",
+    "upload progress",
+    "extraction progress",
+    "extraction failure + retry",
+    "navigation to the created RFP (button says 'Extract & Open')",
+    "duplicate-submit protection",
+    "vertical / estimate / deadline inputs (all hardcoded or empty)"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/kb",
+   "title": "Knowledge Base",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:373-498",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "populated",
+    "empty (with CTA)",
+    "category filter chips with live counts",
+    "add dialog with focus trap, Escape and focus restoration",
+    "submit disabled on a blank title"
+   ],
+   "statesMissing": [
+    "file upload of any kind (the 'Upload' button opens a title+category dialog)",
+    "document content, preview or download",
+    "index status",
+    "loading",
+    "error",
+    "denied",
+    "delete confirmation",
+    "search",
+    "pagination"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/templates",
+   "title": "Templates",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:500-582",
+   "verdict": "FAKE",
+   "statesImplemented": [
+    "populated",
+    "empty (with CTA)",
+    "no-default warning banner",
+    "default badge vs 'Make default' button"
+   ],
+   "statesMissing": [
+    "actual file storage (filename only)",
+    "MIME/size validation",
+    "template preview or download",
+    "versioning",
+    "delete confirmation",
+    "guard against removing the default and leaving none",
+    "loading",
+    "error",
+    "denied"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/schema",
+   "title": "Extraction Schema",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:584-689",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "schema list (stock + custom merged)",
+    "no-selection placeholder",
+    "stock read-only field list",
+    "custom editable field list",
+    "add field"
+   ],
+   "statesMissing": [
+    "newly created schema is not auto-selected",
+    "rename",
+    "delete",
+    "remove field",
+    "reorder fields",
+    "field data types / required flags",
+    "validation (blank and duplicate labels accepted)",
+    "per-keystroke writes with no save/undo",
+    "versioning",
+    "selection not reflected in the URL",
+    "loading",
+    "error",
+    "denied"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/brand",
+   "title": "Brand Kit",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx:15-224",
+   "verdict": "REAL_LOCAL",
+   "statesImplemented": [
+    "dirty vs clean save button",
+    "'All saved' indicator",
+    "logo preview with placeholder",
+    "live cover preview",
+    "sample-data load/clear toggle with context-aware copy"
+   ],
+   "statesMissing": [
+    "any field validation (hex, email, phone, URL scheme)",
+    "logo size enforcement (4 MB claimed, unchecked)",
+    "silent localStorage quota failure surfaced as an error",
+    "save confirmation from a server",
+    "conflict handling (draft snapshotted once at mount)",
+    "destructive-action confirmation on sample load/clear",
+    "loading",
+    "error",
+    "denied"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/analytics",
+   "title": "Analytics",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx:691-718",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [
+    "three static count tiles"
+   ],
+   "statesMissing": [
+    "everything the page's own intro promises: win rate, cycle time, pipeline by vertical",
+    "any control at all (no period selector, no filter, no chart)",
+    "loading",
+    "empty",
+    "error",
+    "denied",
+    "a 'Pipeline' definition consistent with the dashboard's"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot/<unknown-segment>",
+   "title": "Unknown section fallback",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/PitchPilot.tsx:38",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "silently renders the dashboard"
+   ],
+   "statesMissing": [
+    "404 for an unrecognised section"
+   ]
+  },
+  {
+   "route": "/app/pitch-pilot (app not installed)",
+   "title": "Pitch Pilot is not installed",
+   "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/PitchPilot.tsx:40-52",
+   "verdict": "PARTIAL",
+   "statesImplemented": [
+    "not-installed message with a marketplace link"
+   ],
+   "statesMissing": [
+    "server-enforced entitlement (the gate reads a client-editable localStorage array)",
+    "loading state while entitlement is unknown"
+   ]
+  },
+  {
+   "route": "MISSING: /app/pitch-pilot/rfp/{id}",
+   "title": "RFP detail / extraction review ('RFQ Editor')",
+   "screenFile": "does not exist — referenced by /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx:203-205",
+   "verdict": "SHELL_ONLY",
+   "statesImplemented": [],
+   "statesMissing": [
+    "the entire surface: extracted-field review, source spans, stage control, estimate/deadline editing, deck generation and history. The Brand Kit tip instructs users to visit 'RFQ Editor → Generate PPT Deck'; no such route, component or handler exists anywhere in src."
+   ]
+  }
+ ],
+ "falseSuccessCopy": [
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 365,
+   "text": "Extract & Open ▶",
+   "why": "Nothing is extracted (the file is never read) and nothing is opened (no navigation occurs and no RFP detail route exists). The handler is a 900 ms setTimeout followed by a localStorage write."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 296,
+   "text": "Drop the client's RFP — we'll extract fields + identify the questions to answer in your response deck.",
+   "why": "No field extraction, no question identification and no deck exist anywhere in the codebase."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 279,
+   "text": "summary: `Extracted from ${file.name}`",
+   "why": "A persisted record asserts in its own data that an extraction happened. It is a template string written at create time; no parsing occurred."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 313,
+   "text": "PDF only · Max 50 MB",
+   "why": "Neither constraint is enforced. The browse input's accept attribute is a browser hint, and the drop handler at line 302-306 accepts any file of any size and enables the submit button."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 327,
+   "text": "We'll auto-detect from the document if blank",
+   "why": "The fallback is `file.name.replace(/\\.pdf$/i, '')` (line 278) — the filename, never the document's contents."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 340,
+   "text": "Which set of fields to pull. Auto-detect picks based on document content.",
+   "why": "No detection runs. Picking 'auto' stores the literal string 'Auto-detect' in the RFP's schema column."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 389,
+   "text": "The AI RAGs against this when drafting RFQ answers — better KB → better on-brief responses.",
+   "why": "KB documents store only a title and a category. There is no file, no text, no chunking, no embedding, no retrieval and no drafting anywhere in src."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 446,
+   "text": "Upload your first document",
+   "why": "The button (with a download-arrow icon) opens a dialog containing a text input and a category select. There is no file input on the Knowledge Base surface."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 517,
+   "text": "Every generated deck inherits its masters, fonts, and dimensions — Brand Kit colors paint on top.",
+   "why": "The uploaded .pptx bytes are discarded; only file.name is stored (line 506). No deck is generated anywhere in the application."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 532,
+   "text": "No active template set — decks compose with the built-in navy/amber defaults.",
+   "why": "Nothing composes decks, with or without a template. The 'built-in navy/amber defaults' are the brandDefaults hex values used only to paint a CSS preview box."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 599,
+   "text": "Define which fields the AI pulls from RFPs. Edit defaults or create custom schemas per service line.",
+   "why": "No AI pulls anything, and the defaults cannot be edited — stock fields render as read-only spans and the detail pane says 'Ships with the app. Fields are fixed.' (lines 648, 653-656), contradicting this line on the same screen."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 131,
+   "text": "Telemetry starts after your first sent deck",
+   "why": "Paired with a hardcoded '0 hrs' (line 130). There is no telemetry, no deck and no send action, so the stated precondition can never be met and the figure can never change."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 56,
+   "text": "No deadlines this week",
+   "why": "A hardcoded string rendered beside live data, so it reads as a query result. Rfp.deadline is always '' and is never read by any code path."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 56,
+   "text": "{rfps.length} active RFPs",
+   "why": "Counts every RFP including Won and Lost, so the 'active' count never decreases when a pitch is decided."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 53,
+   "text": "Good afternoon — here's where your pitches stand 👋",
+   "why": "Hardcoded time of day; the adjacent date IS computed (line 39), which makes the static greeting read as personalised."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 104,
+   "text": "No active RFPs yet.",
+   "why": "Shown whenever the 'Your turn' subset is empty, even when the tenant has many RFPs in other stages — the statement is then simply false."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 81,
+   "text": "My queue / RFPs that need your touch",
+   "why": "Filters on stage only (line 33). There is no owner or assignee field on Rfp, so every user in the tenant sees the identical 'my' queue."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+   "line": 700,
+   "text": "Win rate, cycle time and pipeline by vertical.",
+   "why": "The page renders three flat counters. Cycle time is structurally impossible (no stage history, no decided timestamp) and there is no per-vertical breakdown. The next sentence quietly admits the surface was never built."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+   "line": 38,
+   "text": "All saved",
+   "why": "Driven purely by `JSON.stringify(draft) !== JSON.stringify(brandKit)` (line 18). It shows on first load before anything has ever been saved, and it shows after a Save whose localStorage write threw and was swallowed by an empty catch (workspace.tsx:945-947) — i.e. it asserts persistence that may not have happened."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+   "line": 100,
+   "text": "PNG, JPEG, GIF, or WebP up to 4 MB. Embedded on the cover and CTA slides of every deck.",
+   "why": "No size check exists; a large image is base64-inlined into the shared localStorage blob and can silently break the whole workspace save. And no deck has cover or CTA slides because no deck is ever produced."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+   "line": 37,
+   "text": "Every generated deck reads from here — firm name, palette, contact strip.",
+   "why": "Nothing is generated. The Brand Kit's only consumer is the CSS preview box 70 lines below."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+   "line": 203,
+   "text": "After saving, regenerate any RFP's deck (RFQ Editor → Generate PPT Deck) — the new firm name + palette show up immediately.",
+   "why": "Instructs the user to navigate to a surface that does not exist. There is no RFQ Editor route, component, handler or even string anywhere in src, and no deck generation of any kind."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+   "line": 211,
+   "text": "Sample RFPs are loaded in this tenant. Clearing removes them along with any sample KB documents and templates.",
+   "why": "clearPitchSample (workspace.tsx:1961-1964) empties rfps, kbDocs AND pitchTemplates entirely. The sample set contains no KB documents or templates at all, so everything deleted from those two collections was created by the user. The word 'sample' makes a total wipe sound targeted."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+   "line": 212,
+   "text": "Load a few example RFPs to try the full flow before your own arrive.",
+   "why": "loadPitchSample (workspace.tsx:1908-1957) REPLACES the rfps array rather than appending, so pressing it destroys every real RFP in the tenant without warning. 'Load a few' implies an additive action."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/PitchPilot.tsx",
+   "line": 106,
+   "text": "RFP Inbox badge = rfps.length",
+   "why": "A count badge on an inbox reads as unhandled/new items, but it is the lifetime total including Won and Lost, so it only ever grows."
+  },
+  {
+   "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+   "line": 68,
+   "text": "Turn every inbound RFP into a branded pitch deck. AI extracts requirements and drafts.",
+   "why": "Marketplace card for the installed app. No AI call, no requirement extraction and no drafting exists in the Pitch Pilot implementation; the sole 'AI' is setTimeout(900)."
+  }
+ ],
+ "openQuestions": [
+  "Currency: Rfp.estimate is a bare number rendered with a literal '$' via toLocaleString('en-US') (panes.tsx:19). No currency is stored anywhere in Pitch Pilot, and the Brand Kit phone placeholder is '+91 98…'. Is Pitch Pilot single-currency per tenant, per company, or per RFP? Pipeline aggregates cannot be defined until this is answered, and mixed-currency sums must not be invented.",
+  "What 'estimate' actually means: the client's stated budget, our bid amount, a weighted forecast, or a contract ceiling? It drives both 'Pipeline value' tiles and is never labelled beyond 'Total estimate, in-flight RFPs'. Nothing in the source says who sets it or when.",
+  "Stage semantics and who transitions: 'Extracting' → 'Your turn' → 'Drafting' → 'Out for client' → Won/Lost. Which transitions are system-driven (extraction completing) vs manual? Which are reversible? Is 'Out for client' a send event with an external artefact or just an internal label? updateRfp has zero callers, so the prototype gives no evidence either way.",
+  "Win-rate denominator and cycle-time boundaries: is win rate Won/(Won+Lost) over all time (what the code does) or over a period, and does it exclude RFPs abandoned without a decision? Which two stages bound the promised 'cycle time'? Do not pick one silently — it is a reported business metric.",
+  "deadline type and timezone: the column is a string that is always ''. Is a submission deadline a date, or a datetime in the issuing authority's timezone (which is how public solicitations usually work)? date vs timestamptz is a migration-level decision.",
+  "Field data types in extraction schemas: the 22 stock field labels include money ('Budget range', 'Day rate', 'Bond'), dates ('Submission deadline'), integers ('Team size') and tabular content ('Compliance matrix'), but a field is only a display string today. Do fields carry types, required flags, and validation, or is every extracted value free text? This determines whether ExtractedFieldValue needs typed columns.",
+  "Are stock schemas tenant-editable? panes.tsx:599 says 'Edit defaults', panes.tsx:648 says 'Fields are fixed'. Fork-on-edit, admin-only edit, or truly immutable? The two copy strings on one screen contradict each other.",
+  "Are `verticals` and `kbCategories` fixed platform catalogs or tenant-extensible? Both are module constants today, and Rfp.vertical is additionally the same string as one of the stock schema names ('Government / Municipal'), conflating two vocabularies.",
+  "monthlyAiBudget = 1000 units: the dashboard renders it as '$ 1000' beside creditsUsed, but MONTHLY_CREDITS is also 1000 and creditsUsed is a credit count. Is the Pitch budget denominated in credits or in currency, is it per-app or the shared tenant pool, and who sets it? No Pitch operation currently calls spend(), so there is no evidence of the intended economics.",
+  "Do Knowledge Base documents carry files at all, or are they meant to be text authored in-app? The screen says 'Upload' and the dialog offers only a title — either the file input is missing or the 'Upload' framing is wrong. This decides whether KnowledgeDocument needs an object-store row.",
+  "Deck output format and scope: .pptx only, or PDF as well? Which slides are generated (the previews mention cover, footer, CTA)? Is the deck an answer to the RFP's questions, a capability deck, or both? The product's headline feature has no implementation to infer from — and no rendering provider is named anywhere, so none may be assumed.",
+  "RFP ownership and assignment: 'My queue' and 'Your turn' imply per-user assignment, but Rfp has no owner field and there is no assignment control. Is an RFP owned by one person, a team, or unassigned until someone picks it up?",
+  "Tenant vs company scoping: the platform has Companies and intercompany pairs, and Pitch Pilot participates in neither. Are RFPs bid by a specific legal entity (which would affect the brand kit, the contact strip and the pipeline roll-up), or is Pitch Pilot tenant-level only?",
+  "Retention and residency for uploaded client RFPs and generated decks: these are third-party confidential documents. How long are the source PDFs kept, who may download them, and does a Won/Lost decision change retention? Nothing in the prototype addresses storage at all.",
+  "Sample-data semantics: should loading samples be refused when the tenant already has real RFPs, and should clearing delete only sample-tagged rows? The current implementation wipes real data under both labels, so the intended behaviour cannot be read off the code.",
+  "Does 'Out for client' imply an external share surface (a client-visible link or portal) that would need its own access model, or is the deck delivered out-of-band by email? 'Sent, awaiting reply' is the only evidence and it is ambiguous."
+ ]
+}

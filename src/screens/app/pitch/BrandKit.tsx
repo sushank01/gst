@@ -84,7 +84,7 @@ export default function BrandKitPane() {
                       if (!file) return
                       // Held as a data URL so the preview survives a reload.
                       const reader = new FileReader()
-                      reader.onload = () => set('logoUrl', String(reader.result))
+                      reader.onload = () => set('logoUrl', (typeof reader.result === 'string' ? reader.result : ''))
                       reader.readAsDataURL(file)
                     }}
                   />

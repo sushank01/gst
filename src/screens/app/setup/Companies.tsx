@@ -424,7 +424,7 @@ function ConsolidatedTab({ entities }: { entities: Company[] }) {
 export default function Companies() {
   const [params, setParams] = useSearchParams()
   const entities = useCompanies()
-  const tab = (tabs.find((item) => item.id === params.get('tab'))?.id ?? 'companies') as (typeof tabs)[number]['id']
+  const tab = (tabs.find((item) => item.id === params.get('tab'))?.id ?? 'companies')
 
   return (
     <div className="pt-2">

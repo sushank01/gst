@@ -11,7 +11,7 @@ import {
   standardGstSlabs,
 } from '../../../lib/posData'
 import { useWorkspace, type PosSettings } from '../../../lib/workspace'
-import { Dialog, Label, inputClass } from '../travel/shell'
+import { Dialog, Label, inputClass } from '../../../components/EnterpriseUi'
 
 const id = () => crypto.randomUUID()
 
@@ -521,7 +521,7 @@ function FieldsPane() {
   const { posSettings, updatePosSettings } = useWorkspace()
   const rows = posSettings.customFields
   const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState({ label: '', type: customFieldTypes[0] as string })
+  const [draft, setDraft] = useState<{ label: string; type: string }>({ label: '', type: customFieldTypes[0] })
 
   return (
     <div>

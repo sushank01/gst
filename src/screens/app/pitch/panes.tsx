@@ -14,7 +14,7 @@ import {
   type RfpStage,
 } from '../../../lib/pitchData'
 import { useWorkspace } from '../../../lib/workspace'
-import { Dialog, Label, inputClass } from '../travel/shell'
+import { Dialog, Label, inputClass } from '../../../components/EnterpriseUi'
 
 const money = (value: number) => value.toLocaleString('en-US')
 

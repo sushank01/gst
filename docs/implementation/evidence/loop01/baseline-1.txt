@@ -1,0 +1,55 @@
+### npm ci
+
+11 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+### typecheck
+
+> apragya-starting-flow@0.1.0 typecheck
+> tsc --noEmit
+
+
+### test
+> apragya-starting-flow@0.1.0 test
+> node --experimental-strip-types --test tests/*.test.ts
+
+✔ export/import preserves commas, quotes, multiline notes, Unicode and no duplicate Name header (1.03975ms)
+✔ empty, BOM, CRLF and empty last cell (0.084084ms)
+✔ reject malformed quotes and mismatched columns before importing any records (0.115167ms)
+✔ formula-like spreadsheet cells are inert text (0.071875ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 74.146625
+### build
+├ ○ /app/me/profile
+├ ○ /app/me/team-approvals
+├ ○ /app/me/timesheets
+├ ƒ /app/pitch-pilot/[[...section]]
+├ ○ /app/prompt-lab
+├ ○ /app/runners
+├ ○ /app/runs
+├ ○ /app/sales-pos
+├ ○ /app/scheduled-jobs
+├ ○ /app/setup
+├ ○ /app/setup/companies
+├ ○ /app/support-ticketing
+├ ○ /app/travel-expense
+├ ○ /login
+├ ○ /marketplace
+├ ○ /onboarding
+├ ○ /register
+├ ○ /studio
+└ ƒ /studio/workspace/[workspaceId]/home
+
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+

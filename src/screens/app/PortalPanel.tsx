@@ -1,5 +1,6 @@
 'use client'
 
+import { EmptyState } from '../../components/PageHeader'
 import type { ReactNode } from 'react'
 
 /** Shared building blocks for the portal sub-pages. */
@@ -61,14 +62,6 @@ export function DataTable({ columns, rows }: { columns: string[]; rows: (string 
   )
 }
 
-export function EmptyPanel({ icon, title, blurb }: { icon: string; title: string; blurb: string }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-line bg-surface px-6 py-14 text-center">
-      <span aria-hidden className="text-2xl">
-        {icon}
-      </span>
-      <p className="mt-3 text-sm font-semibold">{title}</p>
-      <p className="mx-auto mt-1.5 max-w-sm text-[13px] text-fg-muted">{blurb}</p>
-    </div>
-  )
+export function EmptyPanel(props: { icon: string; title: string; blurb: string }) {
+  return <EmptyState {...props} spacing="roomy" />
 }

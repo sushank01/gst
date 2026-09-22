@@ -1,5 +1,8 @@
 'use client'
 
+import { RecordList } from '../../../components/RecordList'
+import { parseCsv, recordsCsv, downloadCsv } from '../../../lib/csv'
+import { leadStatuses, leadSources, contactTypes, pipelineStages, activityTypes } from '../../../lib/crmData'
 import { useRef, useState } from 'react'
 import { RecordDialog } from '../../../components/RecordDialog'
 import type { HrModal } from '../../../lib/hrData'
@@ -19,8 +22,8 @@ export const crmModals: Record<string, HrModal> = {
       { kind: 'text', label: 'Company', span: 1 },
       { kind: 'text', label: 'Email', span: 2 },
       { kind: 'text', label: 'Phone', span: 1 },
-      { kind: 'select', label: 'Source', value: 'Website', span: 1 },
-      { kind: 'select', label: 'Status', value: 'New', span: 1 },
+      { kind: 'select', label: 'Source', value: 'Website', options: leadSources, span: 1 },
+      { kind: 'select', label: 'Status', value: 'New', options: leadStatuses.filter((item) => item !== 'All'), span: 1 },
       { kind: 'number', label: 'Score', value: '0', span: 1 },
       { kind: 'textarea', label: 'Notes' },
     ],
@@ -30,7 +33,7 @@ export const crmModals: Record<string, HrModal> = {
     submit: 'Add contact',
     fields: [
       { kind: 'text', label: 'Name', required: true, span: 2 },
-      { kind: 'select', label: 'Type', value: 'Prospect', span: 1 },
+      { kind: 'select', label: 'Type', value: 'Prospect', options: contactTypes.filter((item) => item !== 'All'), span: 1 },
       { kind: 'text', label: 'Email', span: 2 },
       { kind: 'text', label: 'Phone', span: 1 },
       { kind: 'text', label: 'Company', span: 3 },
@@ -53,7 +56,7 @@ export const crmModals: Record<string, HrModal> = {
       { kind: 'text', label: 'Name', required: true, span: 2 },
       { kind: 'text', label: 'Company', span: 1 },
       { kind: 'number', label: 'Value', value: '0', span: 1 },
-      { kind: 'select', label: 'Stage', value: 'New', span: 1 },
+      { kind: 'select', label: 'Stage', value: 'New', options: pipelineStages.map((stage) => stage.name), span: 1 },
       { kind: 'date', label: 'Close date', span: 1 },
       { kind: 'textarea', label: 'Notes' },
     ],
@@ -63,7 +66,7 @@ export const crmModals: Record<string, HrModal> = {
     submit: 'Log Activity',
     fields: [
       { kind: 'text', label: 'Subject', required: true, span: 2 },
-      { kind: 'select', label: 'Type', value: 'Call', span: 1 },
+      { kind: 'select', label: 'Type', value: 'Call', options: activityTypes, span: 1 },
       { kind: 'date', label: 'When', span: 1 },
       { kind: 'text', label: 'With', span: 2 },
       { kind: 'textarea', label: 'Outcome' },
@@ -107,7 +110,6 @@ export const crmModals: Record<string, HrModal> = {
   },
 }
 
-const csvEscape = (value: string) => `"${value.replace(/"/g, '""')}"`
 
 /**
  * Everything a CRM panel needs to make its buttons real: the records it holds,
@@ -118,7 +120,10 @@ export function useRecords(key: string) {
   const { appRecords, addAppRecord, removeAppRecord } = useWorkspace()
   const [open, setOpen] = useState<HrModal | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
-  const records = appRecords[key] ?? []
+  const [query, setQuery] = useState('')
+  const [importError, setImportError] = useState('')
+  const allRecords = appRecords[key] ?? []
+  const records = allRecords.filter((record) => [record.title, ...Object.values(record.fields)].join(' ').toLowerCase().includes(query.trim().toLowerCase()))
 
   /** Opens the entity's own dialog, or one named after the button that asked. */
   const create = (label?: string) =>
@@ -131,43 +136,33 @@ export function useRecords(key: string) {
             { kind: 'text', label: 'Name', required: true, span: 2 },
             { kind: 'textarea', label: 'Notes' },
           ],
-        } as HrModal),
+        }),
     )
 
   const exportCsv = (filename = key) => {
-    const columns = Array.from(new Set(records.flatMap((item) => Object.keys(item.fields))))
-    const csv = [
-      ['Name', ...columns].map(csvEscape).join(','),
-      ...records.map((item) =>
-        [item.title, ...columns.map((column) => item.fields[column] ?? '')].map(csvEscape).join(','),
-      ),
-    ].join('\n')
-    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `${filename}.csv`
-    link.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(filename, recordsCsv(records))
   }
 
   /** A header row plus one record per line — the shape exportCsv writes. */
   const importCsv = () => fileInput.current?.click()
 
   const readCsv = async (file: File) => {
-    const [head, ...lines] = (await file.text()).split(/\r?\n/).filter((line) => line.trim())
-    const columns = head.split(',').map((cell) => cell.replace(/^"|"$/g, '').replace(/""/g, '"'))
-    lines.forEach((line) => {
-      const cells = line.split(',').map((cell) => cell.replace(/^"|"$/g, '').replace(/""/g, '"'))
-      const fields: Record<string, string> = {}
-      columns.slice(1).forEach((column, index) => {
-        if (cells[index + 1]) fields[column] = cells[index + 1]
+    try {
+      const [columns, ...rows] = parseCsv(await file.text())
+      if (!columns?.length || columns.some((column) => !column.trim())) throw new Error('CSV needs a non-empty header.')
+      if (new Set(columns).size !== columns.length) throw new Error('CSV headers must be unique.')
+      if (rows.some((cells) => !cells[0].trim())) throw new Error('Every record needs a name in its first column.')
+      rows.forEach((cells) => {
+        const fields = Object.fromEntries(columns.slice(1).map((column, index) => [column, cells[index + 1]]))
+        addAppRecord(key, cells[0], fields)
       })
-      if (cells[0]) addAppRecord(key, cells[0], fields)
-    })
+      setImportError('')
+    } catch (error) { setImportError(error instanceof Error ? error.message : 'Unable to import CSV.') }
   }
 
   const dialog = (
     <>
+      {importError && <p role="alert" className="text-sm text-bad">{importError}</p>}
       <input
         ref={fileInput}
         type="file"
@@ -183,27 +178,9 @@ export function useRecords(key: string) {
     </>
   )
 
-  const list = (sortBy?: (a: { fields: Record<string, string> }, b: { fields: Record<string, string> }) => number) => (
-    <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
-      {[...records].sort(sortBy ?? (() => 0)).map((record) => (
-        <li key={record.id} className="flex flex-wrap items-center gap-4 px-6 py-3.5 text-[14px]">
-          <span className="min-w-[10rem] flex-1 font-medium">{record.title}</span>
-          <span className="min-w-0 flex-[2] truncate text-[13px] text-fg-muted">
-            {Object.entries(record.fields)
-              .filter(([label]) => label !== 'Name')
-              .map(([label, value]) => `${label}: ${value}`)
-              .join(' · ')}
-          </span>
-          <button
-            onClick={() => removeAppRecord(key, record.id)}
-            className="text-[13px] text-fg-muted transition hover:text-bad"
-          >
-            Delete
-          </button>
-        </li>
-      ))}
-    </ul>
+  const list = (sortBy?: (a: { fields: Record<string, string> }, b: { fields: Record<string, string> }) => number, visible = records) => (
+    <RecordList records={[...visible].sort(sortBy ?? (() => 0))} onDelete={(id) => removeAppRecord(key, id)} />
   )
 
-  return { records, create, dialog, list, exportCsv, importCsv }
+  return { records, query, setQuery, create, dialog, list, exportCsv, importCsv }
 }

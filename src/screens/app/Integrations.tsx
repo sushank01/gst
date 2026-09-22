@@ -1,5 +1,7 @@
 'use client'
 
+import { Dialog } from '../../components/Dialog'
+
 import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Link } from '../../lib/router'
@@ -21,21 +23,6 @@ function AuthChip({ auth }: { auth: Connector['auth'] }) {
   )
 }
 
-function Dialog({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" role="dialog" aria-modal>
-      <div className="max-h-[85dvh] w-full max-w-xl overflow-y-auto rounded-2xl border border-line bg-surface p-6">
-        <div className="flex items-start justify-between gap-4">
-          <h2 className="text-[18px] font-semibold">{title}</h2>
-          <button onClick={onClose} aria-label="Close" className="text-fg-muted transition hover:text-fg">
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 /** Create a connection against one registered connector. */
 function ConnectionDialog({ preset, onClose }: { preset?: string; onClose: () => void }) {
@@ -49,7 +36,7 @@ function ConnectionDialog({ preset, onClose }: { preset?: string; onClose: () =>
   const needsSecret = connector.auth === 'api_key' || connector.auth === 'basic'
 
   return (
-    <Dialog title="Add connection" onClose={onClose}>
+    <Dialog size="xl" title="Add connection" onClose={onClose}>
       <p className="mt-1.5 text-[13px] text-fg-muted">Connections are private to your tenant.</p>
 
       <div className="mt-5 grid gap-4">
@@ -137,7 +124,7 @@ function ConnectionDialog({ preset, onClose }: { preset?: string; onClose: () =>
 
 function OAuthAppsDialog({ onClose }: { onClose: () => void }) {
   return (
-    <Dialog title="OAuth Apps" onClose={onClose}>
+    <Dialog size="xl" title="OAuth Apps" onClose={onClose}>
       <p className="mt-1.5 text-[13px] leading-relaxed text-fg-muted">
         Connectors that authorise through OAuth 2.0 need a client registered with the provider before anyone in the
         tenant can connect. None are registered here — this rebuild holds no client ids or secrets.
@@ -199,7 +186,7 @@ function CustomConnectorDialog({ mode, onClose }: { mode: 'manual' | 'openapi'; 
   }
 
   return (
-    <Dialog title={mode === 'openapi' ? 'Import OpenAPI' : 'New connector'} onClose={onClose}>
+    <Dialog size="xl" title={mode === 'openapi' ? 'Import OpenAPI' : 'New connector'} onClose={onClose}>
       {mode === 'openapi' ? (
         <>
           <p className="mt-1.5 text-[13px] text-fg-muted">

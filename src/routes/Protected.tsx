@@ -12,9 +12,10 @@ export function Protected({
   children: ReactNode
   requireOnboarding?: boolean
 }) {
-  const { session } = useAuth()
+  const { session, ready } = useAuth()
   const location = useLocation()
 
+  if (!ready) return <p role="status" className="p-6 text-sm text-fg-muted">Loading workspace…</p>
   if (!session) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   if (requireOnboarding && !session.onboarding) return <Navigate to="/onboarding" replace />
 

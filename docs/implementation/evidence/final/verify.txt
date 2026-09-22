@@ -1,0 +1,325 @@
+=== npm run verify — 2026-09-21T13:07:39Z ===
+> apragya-starting-flow@0.1.0 verify
+> npm run lint && npm run typecheck && npm test && npm run build
+> apragya-starting-flow@0.1.0 lint
+> eslint .
+/Users/sushank/.codex/worktrees/ac6c/gst/src/components/Dialog.tsx
+  12:3  warning  Error: Cannot access refs during render
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/components/Dialog.tsx:12:3
+  10 |   const titleId = useId()
+  11 |   const close = useRef(onClose)
+> 12 |   close.current = onClose
+     |   ^^^^^^^^^^^^^ Cannot update ref during render
+  13 |   useEffect(() => {
+  14 |     const dialog = ref.current!
+  15 |     const previous = document.activeElement as HTMLElement | null  react-hooks/refs
+/Users/sushank/.codex/worktrees/ac6c/gst/src/components/SiteRail.tsx
+  45:19  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/components/SiteRail.tsx:45:19
+  43 |
+  44 |   // Close the flyout on outside click, Escape, or navigation.
+> 45 |   useEffect(() => setMoreOpen(false), [location.pathname])
+     |                   ^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  46 |
+  47 |   useEffect(() => {
+  48 |     if (!moreOpen) return  react-hooks/set-state-in-effect
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/auth.tsx
+  95:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/auth.tsx:95:10
+  93 |
+  94 |   useEffect(() => {
+> 95 |     void load()
+     |          ^^^^ Avoid calling setState() directly within an effect
+  96 |   }, [load])
+  97 |
+  98 |   const signUp = useCallback(  react-hooks/set-state-in-effect
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/theme.tsx
+  58:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/theme.tsx:58:5
+  56 |
+  57 |   useEffect(() => {
+> 58 |     setStored(storedPreference())
+     |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  59 |     setReady(true)
+  60 |   }, [])
+  61 |  react-hooks/set-state-in-effect
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/useResource.ts
+  43:3  warning  Error: Cannot access refs during render
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/useResource.ts:43:3
+  41 |   // request on every render — the `key` decides when to refetch.
+  42 |   const fetcherRef = useRef(fetcher)
+> 43 |   fetcherRef.current = fetcher
+     |   ^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  44 |   const hasData = useRef(false)
+  45 |
+  46 |   useEffect(() => {                                                                                                                                                                                                                                                                                                                     react-hooks/refs
+  48:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/useResource.ts:48:7
+  46 |   useEffect(() => {
+  47 |     if (!enabled) {
+> 48 |       setLoading(false)
+     |       ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  49 |       return
+  50 |     }
+  51 |     const controller = new AbortController()  react-hooks/set-state-in-effect
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx
+  938:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:938:21
+  936 | export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  937 |   const [state, setState] = useState<Persisted>(empty)
+> 938 |   useEffect(() => { setState(read()) }, [])
+      |                     ^^^^^^^^ Avoid calling setState() directly within an effect
+  939 |
+  940 |   const update = useCallback((next: Persisted | ((prev: Persisted) => Persisted)) => {
+  941 |     setState((prev) => {  react-hooks/set-state-in-effect
+/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/Marketplace.tsx
+  221:6  warning  React Hook useMemo has a missing dependency: 'matches'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  231:5  warning  React Hook useMemo has a missing dependency: 'matches'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/hr/panels.tsx
+  265:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/hr/panels.tsx:265:5
+  263 |   // Reset page-local state when navigating between pages.
+  264 |   useEffect(() => {
+> 265 |     setSubTab(page.subTabs?.[0]?.label ?? '')
+      |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  266 |     setChip(page.chips?.[0] ?? '')
+  267 |     setMode(page.modeTabs?.[0]?.label ?? '')
+  268 |     setDialogOpen(null)  react-hooks/set-state-in-effect
+✖ 10 problems (0 errors, 10 warnings)
+> apragya-starting-flow@0.1.0 typecheck
+> tsc --noEmit
+> apragya-starting-flow@0.1.0 test
+> node --experimental-strip-types --test tests/*.test.ts
+✔ register returns 201, sets an httpOnly cookie and queues verification (140.978458ms)
+✔ register rejects unknown fields rather than ignoring them (0.98825ms)
+✔ register reports per-field validation errors (0.45825ms)
+✔ a malformed body is a 400, not a crash (0.260625ms)
+✔ a body without a JSON content-type is refused (0.302583ms)
+✔ login with the wrong password is 401 with a non-committal message (39.473375ms)
+✔ login for an unknown address is identical to a wrong password (47.84875ms)
+✔ PROTECTED: the session endpoint refuses an anonymous request (0.786541ms)
+✔ PROTECTED: a forged cookie value does not authenticate (2.417959ms)
+✔ PROTECTED: business endpoints refuse an anonymous request (0.755375ms)
+✔ a signed-in user with no workspace is 403 on business endpoints, not 500 (40.489041ms)
+✔ full round trip: create a workspace, list members, invite, then sign out (57.096ms)
+✔ every response carries a request id for support and log correlation (0.204ms)
+✔ a supplied request id is echoed back (0.080583ms)
+✔ an invalid role on invite is rejected by the enum (48.85325ms)
+✔ teardown (10.701584ms)
+✔ password hashing: correct verifies, wrong does not, hashes are salted (163.761791ms)
+✔ password policy rejects short and low-entropy passwords (0.209125ms)
+✔ weaker stored parameters are detected for rehash (36.787041ms)
+✔ register creates an unverified user and a single-use verification token (2250.883333ms)
+✔ duplicate registration is refused case-insensitively (1209.369167ms)
+✔ register validates email and password and reports per field (736.701292ms)
+✔ sign-in: wrong password fails, correct password succeeds and starts a resolvable session (899.118375ms)
+✔ sign-in for an unknown address fails the same way as a wrong password (845.569ms)
+✔ a suspended user cannot sign in even with the right password (1003.025125ms)
+✔ repeated failures lock the account, and the lock expires (1198.166334ms)
+✔ sessions: revoked, expired and idle sessions all stop resolving (741.213041ms)
+✔ only the token hash is stored, never the token (589.01275ms)
+✔ suspending a user invalidates live sessions immediately (614.153125ms)
+✔ switching tenant rotates the token and kills the old one (610.281708ms)
+✔ password reset consumes its token once, works, and ends every session (772.251292ms)
+✔ an expired reset token is refused (672.506042ms)
+✔ reset for an unknown address returns null rather than an error that reveals it (586.899291ms)
+✔ changing a password requires the current one and keeps only the current session (739.380625ms)
+✔ a token cannot be consumed for the wrong purpose (512.152792ms)
+✔ sign out everywhere leaves nothing resolvable (437.678875ms)
+✔ a lead creates its person and organisation as linked records, not name strings (2420.484667ms)
+✔ two leads at the same company share one organisation record (1139.538375ms)
+✔ a duplicate email is refused rather than silently creating a second record (835.695583ms)
+✔ ISOLATION: leads never cross tenants, by list or by id (792.842542ms)
+✔ the same email may exist in two different tenants (824.458042ms)
+✔ search matches person, organisation and email; filters combine (820.870166ms)
+✔ the total reflects the filter, so the count and the rows agree (1026.747ms)
+✔ pagination does not repeat or drop rows (854.240958ms)
+✔ CONFLICT: a stale version is refused and reports the current one (604.809083ms)
+✔ archive hides from the default list, restore brings it back, history is kept (606.175708ms)
+✔ conversion creates a deal, keeps the lead, and records the stage move (618.326792ms)
+✔ a lead cannot be converted twice (590.773667ms)
+✔ the default pipeline is created on first use with ordered stages (584.060042ms)
+✔ a viewer may read but not write (630.695208ms)
+✔ every mutation writes an audit row with the real actor (651.118833ms)
+✔ the dashboard summary counts real records per status (646.296791ms)
+✔ parses the five fields, ranges, steps, lists and names (0.976625ms)
+✔ rejects malformed expressions instead of guessing (0.179083ms)
+✔ unknown timezones are rejected (19.030291ms)
+✔ hourly and daily schedules in UTC (5.212041ms)
+✔ the occurrence is strictly after the given instant (1.637625ms)
+✔ a local 09:00 tracks the zone across DST, not a fixed UTC hour (0.767542ms)
+✔ spring forward: a job at a local time that does not exist still runs (6.07875ms)
+✔ fall back: an hourly job runs once per real hour, not twice at the repeat (3.937791ms)
+✔ day-of-month and weekday are OR-ed when both are restricted (1.410209ms)
+✔ month-end schedules skip months without that day (2.778042ms)
+✔ 29 February is found in the next leap year rather than scanned forever (36.695167ms)
+✔ weekday business-hours schedules skip the weekend (0.324875ms)
+✔ occurrencesBetween is bounded and ordered (26.381292ms)
+✔ localParts reads the wall clock in the target zone (0.1235ms)
+✔ export/import preserves commas, quotes, multiline notes, Unicode and no duplicate Name header (0.818708ms)
+✔ empty, BOM, CRLF and empty last cell (0.112791ms)
+✔ reject malformed quotes and mismatched columns before importing any records (0.119ms)
+✔ formula-like spreadsheet cells are inert text (0.073833ms)
+✔ a job is claimed once, even by two workers racing (2155.9235ms)
+✔ a claim bumps the fence and sets a lease (1154.063875ms)
+✔ FENCING: a late result from a superseded worker is rejected (819.334625ms)
+✔ a heartbeat extends the lease; a stale fence cannot (833.078333ms)
+✔ checkpoints survive so a bounded step resumes rather than restarts (814.526792ms)
+✔ failures back off, then dead-letter instead of retrying forever (829.586375ms)
+✔ cancel stops a queued job (919.709417ms)
+✔ a job scheduled for later is not claimed early (876.645334ms)
+✔ a due schedule creates exactly one job per occurrence, even across two dispatchers (703.33275ms)
+✔ running the dispatcher twice for the same instant does not double-create (618.11275ms)
+✔ overlap policy skip records a missed occurrence instead of stacking runs (615.642375ms)
+✔ a long outage records missed runs rather than firing a burst (636.646625ms)
+✔ an inactive schedule produces nothing (636.025917ms)
+✔ one broken cron expression does not stop other tenants' schedules (616.999792ms)
+✔ outbox: an identical effect is enqueued once (590.833459ms)
+✔ outbox: claim, deliver, and retry with a dead letter at the end (612.743542ms)
+✔ outbox: an expired lease is released for another dispatcher (555.375125ms)
+✔ a fresh database applies every migration and records each one (2246.063666ms)
+✔ re-running migrations is a no-op, not a second apply (1237.351334ms)
+✔ editing an already-applied migration is refused (822.111667ms)
+✔ money survives the round trip exactly — no float drift (797.359542ms)
+✔ tenant cascade removes its own rows and nothing else (833.085208ms)
+✔ a tenant cannot have two primary companies (795.926666ms)
+✔ company codes and tenant slugs are case-insensitively unique (952.110916ms)
+✔ a rolled back transaction leaves nothing behind (903.183875ms)
+✔ creating a tenant makes tenant + primary company + owner membership atomically (2261.712584ms)
+✔ a user only sees tenants they are a member of (1265.580125ms)
+✔ ISOLATION: a session cannot bind to a tenant it has no membership in (901.313875ms)
+✔ ISOLATION: a company in another tenant reads as not found, not forbidden (871.68625ms)
+✔ ISOLATION: member listing never crosses tenants (899.652833ms)
+✔ ISOLATION: removing a membership in another tenant is refused (1018.50325ms)
+✔ a scope without a tenant id is refused before it reaches SQL (0.686458ms)
+✔ role permissions are additive and viewers cannot write (0.103875ms)
+✔ a viewer is refused a write by the server, whatever the UI shows (1010.656792ms)
+✔ inviting queues delivery in the same transaction and records audit (789.949791ms)
+✔ inviting an existing member is refused (661.748208ms)
+✔ accepting an invitation creates the membership once and cannot be replayed (681.75025ms)
+✔ an expired invitation is refused and marked expired (673.542584ms)
+✔ a workspace cannot lose its last owner by demotion or removal (688.188333ms)
+✔ removing a member revokes their sessions for that tenant immediately (720.51425ms)
+✔ a suspended membership loses access without deleting the row (703.675583ms)
+✔ audit detail redacts secrets even when a caller passes them (684.742417ms)
+ℹ tests 112
+ℹ suites 0
+ℹ pass 112
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 14753.201542
+> apragya-starting-flow@0.1.0 build
+> next build
+▲ Next.js 16.3.5 (Turbopack)
+✓ Running next.config.ts took 10ms
+  Creating an optimized production build ...
+✓ Compiled successfully in 691ms
+  Running TypeScript ...
+  Finished TypeScript in 736ms ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/86) ...
+  Generating static pages using 9 workers (21/86) 
+  Generating static pages using 9 workers (42/86) 
+  Generating static pages using 9 workers (64/86) 
+✓ Generating static pages using 9 workers (86/86) in 209ms
+  Finalizing page optimization ...
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├   /[...slug]
+│ ├ ● /vibe-studio
+│ ├ ● /agent-studio
+│ ├ ● /business-suite
+│ └ ● [+26 more paths]
+├ ƒ /api/v1/auth/login
+├ ƒ /api/v1/auth/logout
+├ ƒ /api/v1/auth/password/forgot
+├ ƒ /api/v1/auth/password/reset
+├ ƒ /api/v1/auth/register
+├ ƒ /api/v1/auth/session
+├ ƒ /api/v1/auth/verify
+├ ƒ /api/v1/crm/leads
+├ ƒ /api/v1/crm/leads/[id]
+├ ƒ /api/v1/crm/leads/[id]/convert
+├ ƒ /api/v1/members
+├ ƒ /api/v1/members/[id]
+├ ƒ /api/v1/tenants
+├ ƒ /api/v1/tenants/switch
+├ ○ /app
+├ ƒ /app/[slug]
+├ ○ /app/account
+├ ○ /app/admin/scheduled-jobs
+├ ○ /app/agent-portal
+├ ○ /app/approvals
+├ ○ /app/asset-management
+├ ○ /app/build/agent-studio
+├ ○ /app/build/vibe-studio
+├ ○ /app/business
+├ ○ /app/business/chat
+├ ƒ /app/business/tool/[slug]
+├ ○ /app/client-portal
+├ ○ /app/compliance-center
+├ ○ /app/crm
+├ ○ /app/governance
+├ ○ /app/guardrails
+├ ○ /app/hr
+├ ○ /app/inbox
+├ ○ /app/integrations
+├ ○ /app/marketplace
+├ ○ /app/me
+├ ○ /app/me/announcements
+├ ○ /app/me/attendance
+├ ○ /app/me/documents
+├ ○ /app/me/leaves
+├ ○ /app/me/onboarding
+├ ○ /app/me/payslips
+├ ○ /app/me/profile
+├ ○ /app/me/team-approvals
+├ ○ /app/me/timesheets
+├ ƒ /app/pitch-pilot/[[...section]]
+├ ○ /app/prompt-lab
+├ ○ /app/runners
+├ ○ /app/runs
+├ ○ /app/sales-pos
+├ ○ /app/scheduled-jobs
+├ ○ /app/setup
+├ ○ /app/setup/companies
+├ ○ /app/support-ticketing
+├ ○ /app/travel-expense
+├ ○ /login
+├ ○ /marketplace
+├ ○ /onboarding
+├ ○ /register
+├ ○ /studio
+└ ƒ /studio/workspace/[workspaceId]/home
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand

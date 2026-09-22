@@ -14,7 +14,7 @@ export default function Hr() {
       tone="bg-violet-500"
       name="HR & People Ops"
       blurb="Employee management, leave tracking, attendance, departments, and company announcements."
-      trialDaysLeft={trialDaysLeft + 1}
+      trialDaysLeft={trialDaysLeft}
       groups={hrGroups}
       defaultPage="dashboard"
     >
@@ -23,7 +23,7 @@ export default function Hr() {
         if (pageId === 'settings') return <HrSettings />
 
         const page = hrPageById.get(pageId)
-        return page ? <HrPagePanel page={page} /> : <HrDashboard />
+        return page ? <HrPagePanel key={page.id} page={page} /> : <HrDashboard />
       }}
     </AppSideChrome>
   )

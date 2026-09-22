@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Dialog } from './Dialog'
+import { useMemo, useState } from 'react'
 // The field vocabulary was first written for HR's page specs; every generic
 // create dialog in the app now shares it.
 import type { HrField, HrModal } from '../lib/hrData'
@@ -102,7 +103,7 @@ function Field({
       <label className={`block ${spanClass[field.span ?? 1]}`}>
         <Label label={field.label} required={field.required} />
         <select value={value} onChange={(event) => onChange(event.target.value)} className={inputClass}>
-          <option>{field.value}</option>
+          {(field.options ?? [field.value]).map((option) => <option key={option}>{option}</option>)}
         </select>
         {field.hint && <span className="mt-1.5 block text-[12px] leading-snug text-fg-muted">{field.hint}</span>}
       </label>
@@ -152,18 +153,10 @@ export function RecordDialog({
   recordKey: string
   onClose: () => void
 }) {
-  const closeRef = useRef<HTMLButtonElement>(null)
   const { addAppRecord } = useWorkspace()
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(modal.fields.map((field, index) => [`${field.label}-${index}`, initialValue(field)])),
   )
-
-  useEffect(() => {
-    closeRef.current?.focus()
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [onClose])
 
   const missing = useMemo(
     () =>
@@ -190,22 +183,7 @@ export function RecordDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/40 p-4">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="record-dialog-title"
-        className="my-auto w-full max-w-2xl overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl"
-      >
-        <header className="flex items-center justify-between border-b border-line px-6 py-5">
-          <h2 id="record-dialog-title" className="text-xl font-semibold">
-            {modal.title}
-          </h2>
-          <button ref={closeRef} onClick={onClose} aria-label="Close dialog" className="text-fg-muted hover:text-fg">
-            ✕
-          </button>
-        </header>
-
+    <Dialog title={modal.title} onClose={onClose} size="2xl" frame="record">
         <div className="grid gap-4 p-6 sm:grid-cols-3">
           {modal.fields.map((field, index) => (
             <Field
@@ -230,7 +208,6 @@ export function RecordDialog({
             {modal.submit}
           </button>
         </footer>
-      </div>
-    </div>
+    </Dialog>
   )
 }

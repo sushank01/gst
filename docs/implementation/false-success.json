@@ -1,0 +1,1129 @@
+[
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 365,
+  "text": "Extract & Open ▶",
+  "why": "Nothing is extracted (the file is never read) and nothing is opened (no navigation occurs and no RFP detail route exists). The handler is a 900 ms setTimeout followed by a localStorage write."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 296,
+  "text": "Drop the client's RFP — we'll extract fields + identify the questions to answer in your response deck.",
+  "why": "No field extraction, no question identification and no deck exist anywhere in the codebase."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 279,
+  "text": "summary: `Extracted from ${file.name}`",
+  "why": "A persisted record asserts in its own data that an extraction happened. It is a template string written at create time; no parsing occurred."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 313,
+  "text": "PDF only · Max 50 MB",
+  "why": "Neither constraint is enforced. The browse input's accept attribute is a browser hint, and the drop handler at line 302-306 accepts any file of any size and enables the submit button."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 327,
+  "text": "We'll auto-detect from the document if blank",
+  "why": "The fallback is `file.name.replace(/\\.pdf$/i, '')` (line 278) — the filename, never the document's contents."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 340,
+  "text": "Which set of fields to pull. Auto-detect picks based on document content.",
+  "why": "No detection runs. Picking 'auto' stores the literal string 'Auto-detect' in the RFP's schema column."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 389,
+  "text": "The AI RAGs against this when drafting RFQ answers — better KB → better on-brief responses.",
+  "why": "KB documents store only a title and a category. There is no file, no text, no chunking, no embedding, no retrieval and no drafting anywhere in src."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 446,
+  "text": "Upload your first document",
+  "why": "The button (with a download-arrow icon) opens a dialog containing a text input and a category select. There is no file input on the Knowledge Base surface."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 517,
+  "text": "Every generated deck inherits its masters, fonts, and dimensions — Brand Kit colors paint on top.",
+  "why": "The uploaded .pptx bytes are discarded; only file.name is stored (line 506). No deck is generated anywhere in the application."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 532,
+  "text": "No active template set — decks compose with the built-in navy/amber defaults.",
+  "why": "Nothing composes decks, with or without a template. The 'built-in navy/amber defaults' are the brandDefaults hex values used only to paint a CSS preview box."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 599,
+  "text": "Define which fields the AI pulls from RFPs. Edit defaults or create custom schemas per service line.",
+  "why": "No AI pulls anything, and the defaults cannot be edited — stock fields render as read-only spans and the detail pane says 'Ships with the app. Fields are fixed.' (lines 648, 653-656), contradicting this line on the same screen."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 131,
+  "text": "Telemetry starts after your first sent deck",
+  "why": "Paired with a hardcoded '0 hrs' (line 130). There is no telemetry, no deck and no send action, so the stated precondition can never be met and the figure can never change."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 56,
+  "text": "No deadlines this week",
+  "why": "A hardcoded string rendered beside live data, so it reads as a query result. Rfp.deadline is always '' and is never read by any code path."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 56,
+  "text": "{rfps.length} active RFPs",
+  "why": "Counts every RFP including Won and Lost, so the 'active' count never decreases when a pitch is decided."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 53,
+  "text": "Good afternoon — here's where your pitches stand 👋",
+  "why": "Hardcoded time of day; the adjacent date IS computed (line 39), which makes the static greeting read as personalised."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 104,
+  "text": "No active RFPs yet.",
+  "why": "Shown whenever the 'Your turn' subset is empty, even when the tenant has many RFPs in other stages — the statement is then simply false."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 81,
+  "text": "My queue / RFPs that need your touch",
+  "why": "Filters on stage only (line 33). There is no owner or assignee field on Rfp, so every user in the tenant sees the identical 'my' queue."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/panes.tsx",
+  "line": 700,
+  "text": "Win rate, cycle time and pipeline by vertical.",
+  "why": "The page renders three flat counters. Cycle time is structurally impossible (no stage history, no decided timestamp) and there is no per-vertical breakdown. The next sentence quietly admits the surface was never built."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+  "line": 38,
+  "text": "All saved",
+  "why": "Driven purely by `JSON.stringify(draft) !== JSON.stringify(brandKit)` (line 18). It shows on first load before anything has ever been saved, and it shows after a Save whose localStorage write threw and was swallowed by an empty catch (workspace.tsx:945-947) — i.e. it asserts persistence that may not have happened."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+  "line": 100,
+  "text": "PNG, JPEG, GIF, or WebP up to 4 MB. Embedded on the cover and CTA slides of every deck.",
+  "why": "No size check exists; a large image is base64-inlined into the shared localStorage blob and can silently break the whole workspace save. And no deck has cover or CTA slides because no deck is ever produced."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+  "line": 37,
+  "text": "Every generated deck reads from here — firm name, palette, contact strip.",
+  "why": "Nothing is generated. The Brand Kit's only consumer is the CSS preview box 70 lines below."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+  "line": 203,
+  "text": "After saving, regenerate any RFP's deck (RFQ Editor → Generate PPT Deck) — the new firm name + palette show up immediately.",
+  "why": "Instructs the user to navigate to a surface that does not exist. There is no RFQ Editor route, component, handler or even string anywhere in src, and no deck generation of any kind."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+  "line": 211,
+  "text": "Sample RFPs are loaded in this tenant. Clearing removes them along with any sample KB documents and templates.",
+  "why": "clearPitchSample (workspace.tsx:1961-1964) empties rfps, kbDocs AND pitchTemplates entirely. The sample set contains no KB documents or templates at all, so everything deleted from those two collections was created by the user. The word 'sample' makes a total wipe sound targeted."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/BrandKit.tsx",
+  "line": 212,
+  "text": "Load a few example RFPs to try the full flow before your own arrive.",
+  "why": "loadPitchSample (workspace.tsx:1908-1957) REPLACES the rfps array rather than appending, so pressing it destroys every real RFP in the tenant without warning. 'Load a few' implies an additive action."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/pitch/PitchPilot.tsx",
+  "line": 106,
+  "text": "RFP Inbox badge = rfps.length",
+  "why": "A count badge on an inbox reads as unhandled/new items, but it is the lifetime total including Won and Lost, so it only ever grows."
+ },
+ {
+  "domain": "Pitch",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+  "line": 68,
+  "text": "Turn every inbound RFP into a branded pitch deck. AI extracts requirements and drafts.",
+  "why": "Marketplace card for the installed app. No AI call, no requirement extraction and no drafting exists in the Pitch Pilot implementation; the sole 'AI' is setTimeout(900)."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/SalesPos.tsx",
+  "line": 125,
+  "text": "Draft, post to GL, run a 3-way match, refund, and chase outstanding.",
+  "why": "None of the four verbs exist. No control can move an invoice off Draft, no match runs, no refund executes, no chasing exists."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/SalesPos.tsx",
+  "line": 110,
+  "text": "Record shipments, post COGS, and route revenue / inventory journal entries.",
+  "why": "Creating a delivery note writes one localStorage row. There is no COGS figure, no unit cost, no journal and no inventory integration."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/SalesPos.tsx",
+  "line": 82,
+  "text": "A contract rate overrides the price list, so what is agreed is what gets invoiced.",
+  "why": "A rate contract captures only a customer name and one typed number. There is no rate, no price list, no item and no resolution step."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/SalesPos.tsx",
+  "line": 213,
+  "text": "Daily beat task auto-generates draft invoices; admins can run a sweep manually.",
+  "why": "No scheduler, cron or job exists anywhere. Only the manual button exists, and it bills every Active subscription regardless of whether anything is due."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/SalesPos.tsx",
+  "line": 237,
+  "text": "sales invoices with GL post, AR aging, payments, plus a full point-of-sale till with shift reconciliation",
+  "why": "The app header claims GL posting and payments (neither exists) and 'a full point-of-sale till' that cannot ring up a single sale."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 684,
+  "text": "Sales with this warehouse + a unit cost will post DR COGS / CR Inventory automatically.",
+  "why": "Specific double-entry postings promised on the till screen. No posting code, no unit cost field and no warehouse entity exist."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 654,
+  "text": "POS sales need an open shift so cash, card, and UPI tenders all roll up to one cashier reconciliation at end of day.",
+  "why": "There is no sale capture and no tender model. cashTaken and cardTaken are written as 0 at shift open and never incremented, so every reconciliation figure is 0."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 740,
+  "text": "Auto-refresh 30s (with a live green status dot)",
+  "why": "No interval, polling or subscription exists in the file. The dashboard only updates when React re-renders for another reason."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 130,
+  "text": "Daily total over the last {days} days",
+  "why": "The panel renders a single aggregate number, never a daily series. There is no chart and no per-day breakdown."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 972,
+  "text": "Sorted by amount owed. Ordered oldest-first within each row.",
+  "why": "Each row is a single summed figure per customer. There is no per-invoice detail inside a row and therefore no ordering of any kind."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 211,
+  "text": "USD 0 / 0 invoices (every Payment due band)",
+  "why": "Hardcoded literals in the JSX, not derived from data — the panel would still read zero with a full book of receivables."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 1075,
+  "text": "How strictly a Sales Invoice must agree with its Sales Order and Delivery Note before it can post.",
+  "why": "The policy is saved and re-read but never evaluated; the Warn/Block/Ignore action and the Require-Order/Require-Delivery switches gate nothing."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 1156,
+  "text": "Blocks invoicing anything that was never ordered. / Blocks invoicing before the goods have shipped.",
+  "why": "Both checkboxes persist a boolean that no code reads at invoice creation. Nothing is ever blocked."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 420,
+  "text": "Anything larger blocks the close until they pick a reason.",
+  "why": "closePosShift accepts any counted figure with no reason prompt, no threshold check and no blocking. The field to store a reason does not exist."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 314,
+  "text": "Points accrue on the net subtotal of every sale attached to a customer, and are spent at the till as a discount on the bill.",
+  "why": "There is no sale, no points balance, no ledger and no redemption path. The programme row stores only a rate and a point value."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 298,
+  "text": "Loyalty & tiers … plus the tier ladder customers climb on lifetime spend.",
+  "why": "The tiers array is hardcoded to [] at create and there is no UI anywhere to add, view or edit a tier."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 61,
+  "text": "Items point at a category, so changing a rate is one edit here rather than an edit on every affected item.",
+  "why": "No item or line-item entity exists in this domain, so nothing can point at a tax category — and the split is frozen into display strings at create time, so a rate cannot be edited at all."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 757,
+  "text": "Every change made here, with who made it and when — and how to undo it.",
+  "why": "There is no undo control; the `reverted` flag is never set; before/after values are not stored; and the author is the hardcoded literal 'owner' rather than the signed-in user."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 874,
+  "text": "Describe what you want in plain English … Every change is saved in Change History and can be undone.",
+  "why": "The button only opens the global Copilot dock, which spends 2 credits and returns a canned paragraph. It cannot change a single setting, and nothing can be undone."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 699,
+  "text": "Runs automatically on create",
+  "why": "Printed under every agent row. No agent runs on create or at any other time; the catalogue entry ('Quote Quality Reviewer') has no execution path."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 656,
+  "text": "Pause AI agents (all apps) / 'Paused AI agents across all apps'",
+  "why": "The flag is stored inside posSettings.agents, scoped to this app alone, so it cannot affect any other app even if agents ran."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/settings.tsx",
+  "line": 528,
+  "text": "Add extra data fields to capture information specific to your business.",
+  "why": "No create or edit form in the domain renders custom fields, so a defined field can never hold a value — while the Appearance pane reports a count of them as if they were in use."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 666,
+  "text": "Till currency: USD — Org default",
+  "why": "Presented as inherited configuration; it is a hardcoded literal. Company.currency exists in the workspace store and is never read."
+ },
+ {
+  "domain": "Sales",
+  "file": "src/screens/app/pos/panes.tsx",
+  "line": 986,
+  "text": "Only posted, unpaid invoices appear here — a draft invoice is not yet a receivable.",
+  "why": "Technically accurate but misleading as a reassurance: no invoice can ever be posted, so this pane is permanently empty by construction rather than because nothing is owed."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+  "line": 244,
+  "text": "No purchase receipts are waiting. Assets appear here once a PO is received.",
+  "why": "Presented as the result of checking purchasing. Nothing is queried — the string is hardcoded inside the onClick. No purchase order entity exists anywhere in the codebase, so no asset can ever 'appear here'."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+  "line": 195,
+  "text": "Imported {n} asset(s).",
+  "why": "Claims a successful import. Rows are only pushed into localStorage, nothing is validated against the taxonomy or stage vocabulary, and the importer's column order does not match this same screen's exporter, so a round-tripped file is silently mis-mapped while still reporting success."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+  "line": 508,
+  "text": "Request → approve → issue. An asset cannot be issued without a matching approved request.",
+  "why": "Stated as an enforced rule. The register's stage dropdown sets any asset to 'Issued' in one click with no request, no approval and no custodian (panes.tsx:307)."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+  "line": 556,
+  "text": "You can approve requests. Your request is sent for review like everyone else's — you can also decide other people's.",
+  "why": "Implies a review routing that grants the viewer approval rights. There is no permission check at all: every signed-in user sees Approve/Reject on every pending row, including their own, and one click closes the request."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+  "line": 452,
+  "text": "Everything issued to you, past and present. Only your own periods are shown — not who held the item before or after you.",
+  "why": "Claims a custody history with periods. Only a single current display-name string exists, and it is never written, so the list is permanently empty and no period was ever recorded."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+  "line": 472,
+  "text": "Your account isn't linked to an employee record, so no equipment can be issued to you. Ask an admin to link it.",
+  "why": "States a specific diagnosis and remedy. There is no employee record, no linking feature and no admin action to perform; the message is simply the empty state of a name-string comparison and would show even for a correctly configured user."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/panes.tsx",
+  "line": 774,
+  "text": "Excel",
+  "why": "Offers an Excel export. The handler is exportCsv — the identical text/csv blob, saved with a .csv extension. No XLSX is generated."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 24,
+  "text": "Every change is saved in Change History and can be undone.",
+  "why": "Promises undo. No revert path, no compensating-entry mechanism and no undo control exists anywhere; Change History rows are read-only text."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 428,
+  "text": "Every change made here, with who made it and when — and how to undo it.",
+  "why": "Claims an actor and an undo route. The actor is the hardcoded literal 'owner' with role 'Org_admin' for every row (workspace.tsx:179-180), and there is no undo. It also lists record CRUD events under the heading 'changes made here'."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 443,
+  "text": "Show reverted",
+  "why": "A control implying reverted entries exist and can be revealed. The state it sets is never read by the render, so ticking it does nothing at all."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 46,
+  "text": "Every level applies in order — level 1 decides first, and the request is only approved once the last level agrees.",
+  "why": "Describes an enforced multi-level ladder. decideAssetRequest never reads approvalLevels; a single click by anyone sets the request to Approved regardless of how many levels are configured."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 688,
+  "text": "A saved Value is locked — records already store it — so edit the Label, or remove the entry (removal is refused while records still use it). Nothing is silently orphaned.",
+  "why": "Asserts a referential-integrity guarantee that does not exist. The delete button removes the entry unconditionally with no usage check, and assets keep the dead value — silently orphaned, which is precisely what the sentence denies."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 287,
+  "text": "Switch an agent off to stop it running — and stop it spending AI Credits.",
+  "why": "Claims a runtime and billing effect. The toggle only adds the agent's display name to an array that nothing outside this settings pane ever reads, so no run is prevented and no credit is saved."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 268,
+  "text": "Runs only when someone clicks Run",
+  "why": "Refers the user to a Run control that exists on no asset surface. The label is also derived by substring-matching the agent's name rather than from any stored trigger."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 293,
+  "text": "{creditsUsed} AI Credits this month",
+  "why": "Scopes the figure to the month. creditsUsed is a lifetime running total in the workspace blob with no period boundary or reset anywhere."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 307,
+  "text": "Pause AI agents (all apps)",
+  "why": "Claims tenant-wide scope. The checkbox writes into assetSettings.agents only; the POS app keeps a separate copy of the same flag, and neither is read at run time."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 446,
+  "text": "Reset to Default",
+  "why": "Presented as a benign restore. It replaces the whole settings object with no confirmation, destroying the approval ladder, every custom-field definition and all taxonomy edits — including tag prefixes that existing asset tags were minted from — while leaving those assets pointing at values that no longer exist."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+  "line": 53,
+  "text": "Track assets as individually tagged units through their full lifecycle.",
+  "why": "Claims full lifecycle tracking. Only a mutable stage label exists: no assignment, return, transfer, repair or retirement record is ever written, and the previous stage is overwritten and lost on every change."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/AssetManagement.tsx",
+  "line": 58,
+  "text": "Trial · {trialDaysLeft} days left",
+  "why": "Implies a live countdown. TRIAL_DAYS is the constant 13 (workspace.tsx:67); the badge reads the same on day one and day thirty."
+ },
+ {
+  "domain": "Asset",
+  "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/assets/settings.tsx",
+  "line": 536,
+  "text": "Every dropdown in this app is configured here — no developer needed.",
+  "why": "Four of the nine taxonomies (models, warranty, numbering, notification) are wired to no dropdown at all, and three more (makes, mode_of_purchase, retirement_reasons) are read by no form, filter or report in the app."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/panes.tsx",
+  "line": 181,
+  "text": "Saved view: {queue · status · source}",
+  "why": "'+ Save current filter' only setStates a display string. Nothing is named or persisted, the view cannot be re-applied, and it vanishes on refresh."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/panes.tsx",
+  "line": 187,
+  "text": "Customer requests, sorted by SLA pressure.",
+  "why": "There is no sort at all. The list is whatever order the array holds (newest created first, because addTicket prepends); no SLA due time exists to sort by."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/panes.tsx",
+  "line": 277,
+  "text": "Describe the problem in any language...",
+  "why": "KB search is a lowercase substring match over title+body. No language handling, no stemming, no ranking, no translation."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/panes.tsx",
+  "line": 920,
+  "text": "First-response met / First-response %",
+  "why": "The column is computed as count of tickets where !slaBreached. No first-response timestamp is captured anywhere in the product, so the figure is not a first-response measurement."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 54,
+  "text": "Rules fire when a ticket crosses an SLA boundary (before / on / after breach).",
+  "why": "An escalation rule is two free-text fields. Nothing parses, schedules or fires anything; there is no SLA clock to cross."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 64,
+  "text": "IMAP inboxes polled every 3 minutes - new emails create tickets, replies append to the matching thread.",
+  "why": "No poller, no connection fields, no credential storage, no dedup, and no thread to append to."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 72,
+  "text": "Each channel exposes a webhook that the connector POSTs to with the customer message.",
+  "why": "No webhook URL is generated, no secret minted, and the app has no API route handlers at all."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 82,
+  "text": "Shared working calendars that SLA policies and auto-responses point at. Add a public holiday here once instead of to every policy separately.",
+  "why": "A schedule holds only a name and a free-text detail — no timezone, hours or holidays — and nothing points at it."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 91,
+  "text": "Rules are checked in priority order and the first match wins — one acknowledgement per ticket, never two. Replies to no-reply addresses, bounces and other autoresponders are skipped automatically so a mail loop can't start.",
+  "why": "Auto-response rules have no order column, no conditions, no template and no executor. None of the stated loop protection exists."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 100,
+  "text": "Move a team's live tickets to the next shift at a set time. Resolved tickets stay put, and the assignee is cleared...",
+  "why": "There is no team entity, no time field and no scheduler; no ticket has ever been moved by this feature."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 214,
+  "text": "Inbound messages that could not be turned into a ticket. Fix the cause, then retry — the original message is kept so nothing is lost.",
+  "why": "No parse-failure store and no retry control exist; nothing is kept."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 217,
+  "text": "Nothing has failed to parse. Inbound mail is landing cleanly.",
+  "why": "Hardcoded paragraph with no query behind it. It reports healthy inbound mail on an instance that receives no mail at all."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 261,
+  "text": "Nothing needs review. Every low score has been followed up.",
+  "why": "The queue is derived from Ticket.csat, which no control can ever write. The all-clear is structurally unconditional, and no follow-up can be recorded either."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 574,
+  "text": "{n} surveys queued for resolved tickets without a rating.",
+  "why": "'Send pending surveys now' only calls setNote(). Nothing is queued, no email is sent, no record is written — and because csat is never writable, every resolved ticket is counted again on every click."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 601,
+  "text": "The link is signed, expires, and works once — a second submission can't overwrite the first.",
+  "why": "No survey link, token, expiry or submission endpoint exists anywhere in the codebase."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 91,
+  "text": "Thanks — we've got your message and emailed you a copy. (default widget confirmation, src/lib/workspace.tsx:795)",
+  "why": "Default confirmation text asserts an email copy. No mail is sent by any code path, and the widget that would show this text does not exist."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 216,
+  "text": "Paste this once, just before </body> on any page that should show the widget. (install snippet)",
+  "why": "The snippet points at https://apragya.ai/api/v1/public/support-widget.js — a script this repository does not build or serve — and hardcodes data-tenant=\"acme\" for every tenant."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 818,
+  "text": "Export a report — Download the current data as CSV or Excel.",
+  "why": "The report selector only changes the filename and the Excel option produces an identical text/csv file. Exported columns are always the ticket columns regardless of the report chosen."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 867,
+  "text": "Email a report on a cadence. Each recipient gets their own copy, so the distribution list is never exposed.",
+  "why": "A schedule is created with one click, with no recipients field, a hardcoded 'weekly / every Monday' cadence, and no executor or mail transport. Nothing is ever emailed."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 929,
+  "text": "A tier picks which SLA policy applies, so a Platinum customer's urgent ticket is due sooner than a Bronze one.",
+  "why": "tierPolicies is never written by any control and SLA Policies is a plan-gated, unimplemented surface; no ticket's due time depends on a tier."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 176,
+  "text": "Indexing articles by meaning fixes that. Keyword search keeps running alongside...",
+  "why": "'Index articles' copies published article ids into an array. No text is chunked, no embedding is computed, no model is called, and KB search remains a substring match."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 986,
+  "text": "{n} of {m} published articles searchable by meaning",
+  "why": "The percentage measures only whether the button was pressed; an edited or re-worded article still counts as indexed because no content hash is stored."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/settings.tsx",
+  "line": 215,
+  "text": "They run under the tenant's guardrails and spend from the shared credit pool. (AI agents)",
+  "why": "The pane is a static catalogue read. No agent here is enabled, configured, run, metered against credits, or bound to a guardrail policy."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/panes.tsx",
+  "line": 29,
+  "text": "Your current plan (trial) doesn't include {feature}. Upgrade to unlock this feature for your organization.",
+  "why": "The gate comes from a hardcoded `gatedSections` map in src/lib/supportData.ts, not from any plan or entitlement record, so it shows for every tenant on every plan — and there is no implementation behind it to unlock."
+ },
+ {
+  "domain": "Support",
+  "file": "src/screens/app/support/SupportTicketing.tsx",
+  "line": 67,
+  "text": "Enterprise helpdesk with SLA management, ticket routing, canned responses, and CSAT.",
+  "why": "SLA management and ticket routing are plan-gated shells, CSAT can never be collected, and canned responses have no place to be used."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/business/Tool.tsx",
+  "line": 35,
+  "text": "{tool.name} produced a result for “{input}”. It cost {cost} AI Credits from the tenant pool and is tagged to your active company.",
+  "why": "Nothing was produced — the sentence is a template literal echoing the user's own input after a 700ms setTimeout. Credits ARE deducted for it. There is also no 'active company' concept anywhere in the codebase (grep confirms the phrase appears only in this file and the marketing page)."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/business/Tool.tsx",
+  "line": 70,
+  "text": "Output is soft-tagged to your active company.",
+  "why": "No company tagging exists; SuiteToolRun has no record at all, let alone a company_id."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/business/Chat.tsx",
+  "line": 42,
+  "text": "{model} answered “{prompt}”… the turn cost {n} AI Credit from the tenant pool and is logged against your account.",
+  "why": "No model was called and nothing is logged against any account. The turn is not persisted anywhere; a refresh erases it. (The same sentence does honestly admit 'This rebuild simulates the reply'.)"
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/PromptLab.tsx",
+  "line": 69,
+  "text": "When a prompt works, save it to the library and Vibe Studio and Agent Studio builds can reach for it.",
+  "why": "There is no save control in Prompt Lab and no library; no Vibe or Agent Studio surface can reference a prompt."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/PromptLab.tsx",
+  "line": 210,
+  "text": "{model} · {ms/1000}s · {tokens} tokens · {credits} credits",
+  "why": "Presented as run telemetry. The latency is 1200 + random*900 and the token count is userPrompt.length/3 + 180; no call was made. It is also rendered for the insufficient-credits result, metering a call that could not happen."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/VibeStudio.tsx",
+  "line": 17,
+  "text": "Wiring tools + guardrails / Snapshotting version 1",
+  "why": "Two of the four progress steps name work that never happens: no tool or guardrail is bound and no snapshot is written — publishArtifact later mutates the row in place."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/VibeStudio.tsx",
+  "line": 203,
+  "text": "Versioned inside your tenant. Refine it in conversation, edit the graph by hand, or publish — publishing needs the app-publish permission and creates an immutable snapshot.",
+  "why": "Four claims, four failures: the artifact is in browser-global localStorage not a tenant; there is no refine or graph-edit control; publishArtifact performs no permission check; and it creates no snapshot."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/VibeStudio.tsx",
+  "line": 197,
+  "text": "Build complete",
+  "why": "Announced after 1.8s of setTimeouts. Critically, spend(15)'s return value is ignored, so this renders even when the credit pool is empty — a build that was not funded is reported complete."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/VibeStudio.tsx",
+  "line": 222,
+  "text": "each opens its own workspace",
+  "why": "Clicking a capability card calls build(), which returns immediately if the prompt is empty. No workspace exists for any of the six capabilities."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/VibeStudio.tsx",
+  "line": 142,
+  "text": "One builder for apps, sites, mobile, decks, sheets, reports, RPA bots and agents — each with its own purpose-built workspace, using your tools, on your LLM.",
+  "why": "Eight artifact types are claimed; the capability list offers six ids and produces none of them. 'Your tools' and 'your LLM' have no configuration surface — the key chip is the constant 'Claude · SaaS Key'."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/VibeStudio.tsx",
+  "line": 145,
+  "text": "Not sure where to start? Tell me your problem - I'll ask a few quick questions and guide you to build it.",
+  "why": "First person, promising an interactive intake. There is no conversation of any kind — a single textarea submits straight to the fake build."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/studio/AgentStudio.tsx",
+  "line": 308,
+  "text": "Sent to the builder — “{prompt}” is queued in Runs.",
+  "why": "Nothing is queued and there is no builder. recordRun writes an already-COMPLETED, already-SUCCESSFUL run with a canned 6-step trace, charges 6 credits and writes an audit row saying an agent ran."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/studio/AgentStudio.tsx",
+  "line": 404,
+  "text": "Attachments become context the builder reads. Anything you send is queued in Runs, and every action it takes is recorded in the Audit Trail under your name.",
+  "why": "Only File.name is captured and it is discarded on submit; nothing is read. The audit row is written with a hardcoded user 'owner' and role 'Org_admin', not the signed-in identity, and with an empty ip."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/studio/AgentStudio.tsx",
+  "line": 151,
+  "text": "Active agents: 1",
+  "why": "Hardcoded string in the Agent Health list. No agent exists in the tenant and none can be created from this screen."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/studio/AgentStudio.tsx",
+  "line": 137,
+  "text": "Run reliability across your agents / Last 30 days / Runs passing {n}%",
+  "why": "recordRun only ever writes status 'success', so the figure is always 100% once any run exists, and the '30 days' window is never applied — the array is simply the last 25 runs."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/studio/AgentStudio.tsx",
+  "line": 489,
+  "text": "Recent Activity — Runs per day across all agents (This week)",
+  "why": "The chart body renders seven empty columns containing only day letters. There is no series, no bars and no data binding."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/studio/AgentStudio.tsx",
+  "line": 438,
+  "text": "{count} templates / {count} workflows · click one to prefill your prompt",
+  "why": "Verified: 82 templates advertised across the 7 categories, 25 actually present (sales 12/4, support 8/3, engineering 11/3, marketing 10/3, productivity 19/3, operations 16/3). Clicking also prefills only the tile's 2-3 word title, not a prompt."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/AgentStudio.tsx",
+  "line": 118,
+  "text": "Deploy publishes an immutable snapshot. In-flight runs finish on the previous version; new runs pick up the new one.",
+  "why": "There is no Deploy control on the page, no versions, and no run routing. The route itself is unreachable from the UI."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/AgentStudio.tsx",
+  "line": 129,
+  "text": "Catch regressions before they ship. Tests run as part of the build gate.",
+  "why": "The four tests are literals with fixed pass/fail; nothing executes them and no gate exists. One is permanently 'fail' and blocks nothing."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/AgentStudio.tsx",
+  "line": 48,
+  "text": "Every node, tool call, and guardrail is inspectable.",
+  "why": "The Inspector shows three constant strings identical for all six nodes; nothing is editable and no tool call or guardrail is bound to anything."
+ },
+ {
+  "domain": "Business",
+  "file": "src/components/CopilotDock.tsx",
+  "line": 14,
+  "text": "Ask questions or take actions in plain English — \"how many credits are left?\", \"install the Contracts app\", \"who approved invoice 4821?\"",
+  "why": "The dock has no tools, no record access and no install capability; every reply is the same canned paragraph. Asking anything still charges 2 credits and permanently ticks the onboarding 'Try the AI Copilot' task."
+ },
+ {
+  "domain": "Business",
+  "file": "src/components/CopilotDock.tsx",
+  "line": 39,
+  "text": "Anything I change is audit-logged under your name, and consequential actions pause for your approval first.",
+  "why": "The Copilot changes nothing, writes no audit event, and has no approval path wired to it."
+ },
+ {
+  "domain": "Business",
+  "file": "src/components/VippyWidget.tsx",
+  "line": 22,
+  "text": "Once you're signed in, the same assistant answers from your tenant's data and can take actions for you.",
+  "why": "Vippy makes no network call at all, and the signed-in Copilot it points to is equally canned."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/Onboarding.tsx",
+  "line": 187,
+  "text": "Queued for your first run: “{intent}”",
+  "why": "The landing-hero prompt is carried through /register?intent → /onboarding?intent purely to be displayed. Nothing is queued: verified by grep, no code ever writes the ?prompt= parameter that VibeStudio.tsx:103 reads."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/Runs.tsx",
+  "line": 96,
+  "text": "Traces are auditable the same way your systems of record are — who, what, when, before, after.",
+  "why": "Every run renders the identical shared sampleTrace constant (same lead #4821, same 'Assigned to Priya S.', same token counts). There is no who, no before and no after."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/business/Suite.tsx",
+  "line": 97,
+  "text": "View all →",
+  "why": "Navigates to ?category=writing — 12 tools of 102 — rather than an all-tools listing."
+ },
+ {
+  "domain": "Business",
+  "file": "src/screens/app/AgentPortal.tsx",
+  "line": 138,
+  "text": "Build one in Agent Studio, or install an app that ships with them.",
+  "why": "Shown on four filter chips (Business Solution Agents, Agents, Workflows, Automations) that are hardcoded empty. Neither Agent Studio can create any of them, so following the advice cannot change the state."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/workspace.tsx",
+  "line": 154,
+  "text": "Two-factor auth: Enabled",
+  "why": "Rendered whenever twoFactor === 'on', which a single unauthenticated button click sets (src/screens/app/Overview.tsx:34). No secret is generated, no code is verified, no recovery codes are issued, and login never asks for a second factor. The account is told it is protected when nothing changed."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Overview.tsx",
+  "line": 28,
+  "text": "Enabling two-factor auth takes about 60 seconds and blocks every stolen-password attack we see.",
+  "why": "Sets a boolean in localStorage. Nothing is enrolled and nothing is blocked."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Overview.tsx",
+  "line": 141,
+  "text": "Allocate credits to yourself — Give your account tokens before running an AI tool.",
+  "why": "Clicking the row calls setFlag('creditsAllocated') and strikes the task through. No credits move, no amount is chosen, no allocation record exists."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Overview.tsx",
+  "line": 142,
+  "text": "Invite a teammate — Send an invite — they'll join your workspace in one click.",
+  "why": "setFlag('invitedTeammate') only. No email is collected, no invitation row is created, no mail is queued — even though POST /api/v1/members already does all of it."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Overview.tsx",
+  "line": 123,
+  "text": "A few quick wins to get your team running. Tasks tick off automatically as you go.",
+  "why": "Two of five tasks are derived from real state; three are booleans set by clicking the row. 'Install an enterprise app' is additionally pre-ticked on every new tenant because CRM and HR ship installed."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Overview.tsx",
+  "line": 71,
+  "text": "13 days left in trial",
+  "why": "TRIAL_DAYS is a module constant. It shows 13 on day one and on day ninety, and contradicts the '14-day free trial' advertised on the landing page and the '14d Free trial' stat on /register."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Overview.tsx",
+  "line": 91,
+  "text": "Apps {installed}/{5} + 2 included",
+  "why": "'+ 2 included' is a hardcoded string with nothing behind it, and APP_QUOTA (5) is never enforced — install() has no quota check, so the counter happily reads 15 / 5."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/dashboardPanels.tsx",
+  "line": 122,
+  "text": "{appQuota - installed.length} slots remaining",
+  "why": "Goes negative once more than five apps are installed, because nothing stops the sixth install."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/dashboardPanels.tsx",
+  "line": 152,
+  "text": "Members — 1 / 1 seats — Active users in your org",
+  "why": "Both numbers are literals. It contradicts 'Invite your team — 5 free seats during trial' (src/lib/content.ts:54) and the plans' 10/25-user limits."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/dashboardPanels.tsx",
+  "line": 157,
+  "text": "Invite members →",
+  "why": "Links to /app/account, which has no member list and no invite control."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/dashboardPanels.tsx",
+  "line": 166,
+  "text": "Allocate Credits →",
+  "why": "Links to /app/account, which has no allocation control."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/dashboardPanels.tsx",
+  "line": 389,
+  "text": "Amounts in USD. Last updated {new Date().toLocaleString('en-GB')}.",
+  "why": "Stamps a live timestamp on four hardcoded zeros, making stale placeholder metrics read as a fresh computation."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/workspace.tsx",
+  "line": 981,
+  "text": "{name} has been installed successfully. You can access it from the Enterprise sidebar.",
+  "why": "The install is one entry appended to a localStorage array after an 800ms setTimeout. No tenant provisioning, no schema, no sample data, and the notification is tenant-global rather than addressed to anyone."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Marketplace.tsx",
+  "line": 46,
+  "text": "Disabling keeps the app installed but stops its agents",
+  "why": "disabledApps is read in exactly one place — this button's own label. The app stays in the sidebar, its portal still renders, and its Run buttons still fire and still spend credits."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Marketplace.tsx",
+  "line": 89,
+  "text": "Installing…",
+  "why": "An 800ms setTimeout with a source comment admitting the real product takes 10–20 seconds. /enterprise-apps repeats the '10–20 seconds' claim as if provisioning happens."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Marketplace.tsx",
+  "line": 69,
+  "text": "⚡ Upgrade (title: 'This app is above your current plan')",
+  "why": "Links to /app/account, which offers no upgrade. Nothing records what the tenant's current plan is, and gated apps carry no minimum-plan reference, so no upgrade could be offered even in principle. Onboarding installs the same gated apps with no gate at all."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Onboarding.tsx",
+  "line": 133,
+  "text": "We preload the agent pipeline built for your industry — triggers, decisions, and integrations included.",
+  "why": "The industry selection is written to a localStorage string and read back only to name the primary company. No pipeline, trigger, decision or integration is created, and the 5 landing-page pipelines do not map to the 7 industry options."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Onboarding.tsx",
+  "line": 187,
+  "text": "Queued for your first run: \"{intent}\"",
+  "why": "The intent is a query-string parameter that is echoed and then discarded on navigation to /app. No job, queue or record exists."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Register.tsx",
+  "line": 111,
+  "text": "We'll pick up where you left off: \"{intent}\"",
+  "why": "Same value, echoed a second time. It is never stored and is lost on a page refresh."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Register.tsx",
+  "line": 163,
+  "text": "We'll create your organisation now and make you its admin. Skip if you'll set it up later.",
+  "why": "signUp() stores the string on a localStorage user object. No tenant, no primary company, no owner membership and no audit row are created, despite POST /api/v1/tenants doing exactly that transactionally."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Login.tsx",
+  "line": 117,
+  "text": "Protected by enterprise SSO • Audit-logged sessions",
+  "why": "There is no SSO (the buttons sign in as a hardcoded you@google.com address), and no session is recorded or audited — the whole session is a localStorage object with no token."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Login.tsx",
+  "line": 38,
+  "text": "That email and password combination did not work.",
+  "why": "Unreachable. The password is validated only for non-emptiness and is never passed to signIn(), which accepts any address with any password and fabricates a user when it does not recognise the email."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Login.tsx",
+  "line": 99,
+  "text": "Forgot password?",
+  "why": "An <a href=\"/forgot-password\"> with no matching route or page slug — it lands on the 404 page, while a working POST /api/v1/auth/password/forgot sits unused."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/PublicMarketplace.tsx",
+  "line": 121,
+  "text": "Install",
+  "why": "A button that is a <Link to=\"/register\">. Which listing was clicked is discarded, so nothing is installed after signup either."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/components/CopilotDock.tsx",
+  "line": 39,
+  "text": "Anything I change is audit-logged under your name, and consequential actions pause for your approval first.",
+  "why": "The Copilot changes nothing, writes no audit row and raises no approval. It debits 2 credits and returns a fixed paragraph."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/components/CopilotDock.tsx",
+  "line": 40,
+  "text": "Your AI Credits pool is empty for this cycle. Allocate more from Manage plan, or ask an admin to top up.",
+  "why": "'Manage plan' leads to /app/account, which has no allocation or top-up control, and there is no cycle — creditsUsed never resets."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/components/VippyWidget.tsx",
+  "line": 22,
+  "text": "On the live site Vippy answers \"{text}\" from Apragya's own docs. Once you're signed in, the same assistant answers from your tenant's data and can take actions for you.",
+  "why": "No retrieval, no network call, no persistence. The same sentence is returned for every question."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Landing.tsx",
+  "line": 622,
+  "text": "Start with a 14-day free trial, then free forever for up to 3 users.",
+  "why": "No trial record, no free tier, no seat counting and no billing exist. The runtime trial constant is 13 days and never counts down, and the three pricing cards contain no 'free forever' plan — that fourth tier is described only on /free."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Landing.tsx",
+  "line": 705,
+  "text": "14-day trial · no card · cancel anytime",
+  "why": "There is no payment method, no subscription and no cancellation path anywhere in the product."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Landing.tsx",
+  "line": 233,
+  "text": "\"We replaced four tools in the first month. The part that sold our compliance lead was that every agent action is logged with who, what and before-and-after — nothing runs silently.\" — Operations lead, BFSI · 180 employees",
+  "why": "An attributed customer testimonial hardcoded in the JSX. The audit row it describes has no before/after field at all (src/lib/workspace.tsx:161) and its actor is the literal string 'owner'."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/landingData.ts",
+  "line": 165,
+  "text": "99.9% Uptime SLA · SOC 2 Type II controls in place (certification in progress), GDPR-aligned, AES-256 encrypted. Never used to train models.",
+  "why": "Compliance and availability claims with nothing behind them in the repository. Must not be used to infer any implementation."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/landingData.ts",
+  "line": 152,
+  "text": "SSO / SAML / OIDC — Okta, Azure AD, Google Workspace, or any SAML 2.0 / OIDC provider.",
+  "why": "No SSO code exists. The only 'SSO' is two buttons that sign in as you@google.com / you@microsoft.com."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/landingData.ts",
+  "line": 156,
+  "text": "Audit Trail — Every state-changing action logged. SIEM export ready.",
+  "why": "The client audit array is capped, actor-less and IP-less, and there is no export of any kind."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/landingData.ts",
+  "line": 222,
+  "text": "Admins can top up or set per-user allocations, and usage alerts fire before the pool runs dry. Usage is visible in the admin dashboard in near-real-time.",
+  "why": "No top-up, no per-user allocation, no alerting. The pool is one integer that only ever increases."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/landingData.ts",
+  "line": 70,
+  "text": "94% Qualification accuracy · 98% Line-item extraction accuracy · ~40 sec Capture to posting · 100% Decisions audit-logged",
+  "why": "Precise performance figures for pipelines that do not exist in the product."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/pages/info.ts",
+  "line": 153,
+  "text": "How do I invite my team? Admins invite from the workspace settings; five seats are free during trial.",
+  "why": "There is no workspace-settings invite surface, and the dashboard meter says 1 / 1 seats."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/lib/pages/product.ts",
+  "line": 262,
+  "text": "RBAC — Matrix roles down to sub-features. Custom roles per tenant. Admin bypass never leaks paid capabilities.",
+  "why": "A four-role permission map does exist server-side (src/server/tenancy/permissions.ts) but no client surface reads it: the Account page and the sidebar both print the literal string 'Org Admin', and every control is shown to everyone."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/app/Marketplace.tsx",
+  "line": 190,
+  "text": "No apps available yet — Check back later or contact your administrator",
+  "why": "Shown permanently on the 'Agents' tab, whose count is hardcoded to 0, while the public site and this same page's hero advertise 50+ installable agents."
+ },
+ {
+  "domain": "Marketing",
+  "file": "src/screens/Landing.tsx",
+  "line": 601,
+  "text": "Chennai-Based Fronseye Tech Launches Apragya AI — India's First Horizontal AI-Native ERP Platform for Modern Teams … with 50 ready-to-deploy agents",
+  "why": "A dated press release rendered as a real newsroom item; the agent catalog contains 60 entries, none of them deployable."
+ }
+]

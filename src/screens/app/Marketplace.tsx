@@ -6,7 +6,7 @@ import { marketApps, mobileApps, webApps } from '../../lib/appData'
 import type { MarketApp, SmallApp } from '../../lib/appData'
 import { agentGroups, agentsByAppCode, totalEnterpriseAgents } from '../../lib/agentCatalog'
 import { useWorkspace } from '../../lib/workspace'
-import { Dialog } from './travel/shell'
+import { Dialog } from '../../components/EnterpriseUi'
 
 type TabId = 'enterprise' | 'web' | 'mobile' | 'agents' | 'enterpriseAgents'
 type View = 'grid' | 'list'

@@ -1,0 +1,11 @@
+{
+  "checks": [
+    "27-record lead fixture: first page 25, second page 2",
+    "Combined source/score filters and board mode",
+    "Record modal traps Tab focus and closes with Escape",
+    "Unknown route returns 404, renders recovery link and does not redirect",
+    "Nested legal route renders expected page"
+  ],
+  "passed": true,
+  "fixture": "isolated browser localStorage demo data; not backend verification"
+}

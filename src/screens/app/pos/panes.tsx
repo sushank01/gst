@@ -15,7 +15,7 @@ import {
   toleranceActions,
 } from '../../../lib/posData'
 import { useWorkspace } from '../../../lib/workspace'
-import { Dialog, Label, inputClass } from '../travel/shell'
+import { Dialog, Label, inputClass } from '../../../components/EnterpriseUi'
 import { Bar, Empty, PageHead, Select, Stat } from './parts'
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -309,7 +309,7 @@ export function CustomersPane() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
-      String(reader.result)
+      (typeof reader.result === 'string' ? reader.result : '')
         .trim()
         .split(/\r?\n/)
         .slice(1)

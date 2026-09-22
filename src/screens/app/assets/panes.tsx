@@ -12,7 +12,7 @@ import {
   warrantyAlertDays,
 } from '../../../lib/assetData'
 import { useWorkspace } from '../../../lib/workspace'
-import { Dialog, Label, inputClass } from '../travel/shell'
+import { Dialog, Label, inputClass } from '../../../components/EnterpriseUi'
 
 const stageTone: Record<string, string> = {
   'In Stock': 'tone-slate',
@@ -122,6 +122,9 @@ export function AssetDashboard() {
 }
 
 export function AssetRegisterPane() {
+  // One clock read per mount, so a row's age does not change mid-render.
+  // A lazy state initialiser, not useMemo: a memo body still runs during render.
+  const [renderedAt] = useState(() => Date.now())
   const { assets, assetSettings, addAsset, removeAsset, updateAsset } = useWorkspace()
   const types = assetSettings.taxonomies.asset_types ?? []
   const [type, setType] = useState('All types')
@@ -176,7 +179,10 @@ export function AssetRegisterPane() {
     if (!file) return
     const reader = new FileReader()
     reader.onload = () => {
-      const rows = String(reader.result).trim().split(/\r?\n/).slice(1)
+      // `result` is string | ArrayBuffer; treating a buffer as text would
+      // silently import the literal string "[object ArrayBuffer]".
+      const text = typeof reader.result === 'string' ? reader.result : ''
+      const rows = text.trim().split(/\r?\n/).slice(1)
       let added = 0
       rows.forEach((row) => {
         const [name, assetType, assetStage, proj, purchase, warranty] = row.split(',')
@@ -322,7 +328,7 @@ export function AssetRegisterPane() {
                     {asset.warrantyEnd ? `${daysUntil(asset.warrantyEnd)}d` : '—'}
                   </td>
                   <td className="px-5 py-3.5 text-fg-2">
-                    {Math.max(0, Math.floor((Date.now() - new Date(asset.acquiredAt).getTime()) / 86_400_000))}d
+                    {Math.max(0, Math.floor((renderedAt - new Date(asset.acquiredAt).getTime()) / 86_400_000))}d
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <button

@@ -28,24 +28,24 @@ function describe(cadence: Cadence, time: string) {
   return `The 1st of every month at ${time}`
 }
 
-/** The next time this schedule is due, from now, in the viewer's own timezone. */
+/** The next time this schedule is due, from now, in the UTC. */
 function nextRun(cadence: Cadence, time: string) {
   const hour = Number(time.slice(0, 2))
   const next = new Date()
-  next.setSeconds(0, 0)
+  next.setUTCSeconds(0, 0)
 
   if (cadence === 'Hourly') {
-    next.setMinutes(0)
-    next.setHours(next.getHours() + 1)
+    next.setUTCMinutes(0)
+    next.setUTCHours(next.getUTCHours() + 1)
   } else {
-    next.setMinutes(0)
-    next.setHours(hour)
-    if (next.getTime() <= Date.now()) next.setDate(next.getDate() + 1)
-    if (cadence === 'Weekly') while (next.getDay() !== 1) next.setDate(next.getDate() + 1)
-    if (cadence === 'Monthly') while (next.getDate() !== 1) next.setDate(next.getDate() + 1)
+    next.setUTCMinutes(0)
+    next.setUTCHours(hour)
+    if (next.getTime() <= Date.now()) next.setUTCDate(next.getUTCDate() + 1)
+    if (cadence === 'Weekly') while (next.getUTCDay() !== 1) next.setUTCDate(next.getUTCDate() + 1)
+    if (cadence === 'Monthly') while (next.getUTCDate() !== 1) next.setUTCDate(next.getUTCDate() + 1)
   }
 
-  return next.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return next.toLocaleString('en-GB', { timeZone: 'UTC', timeZoneName: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 function NewAutomation({ onClose }: { onClose: () => void }) {

@@ -7,7 +7,7 @@ import { agentsByAppCode } from '../../../lib/agentCatalog'
 import { relativeTime } from '../../../lib/relativeTime'
 import { approvalTypes, approverRoles, assetSettingsNav, taxonomyGroups } from '../../../lib/assetData'
 import { useWorkspace, type ApprovalLevel } from '../../../lib/workspace'
-import { Label, inputClass } from '../travel/shell'
+import { Label, inputClass } from '../../../components/EnterpriseUi'
 
 /** The accent banner both app settings surfaces share. */
 export function CopilotBanner() {

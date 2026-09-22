@@ -9,7 +9,6 @@ import { relativeTime } from '../../lib/relativeTime'
 import { useWorkspace, type PortalPermission, type PortalRole } from '../../lib/workspace'
 
 const tabs = ['Tabs', 'Roles', 'Users', 'Audit'] as const
-type Tab = (typeof tabs)[number]
 
 const allTabIds = portalTabs.map((tab) => tab.id)
 
@@ -304,7 +303,7 @@ function UsersPane() {
       </h2>
       <p className="mt-2 max-w-3xl text-[14px] leading-relaxed text-fg-muted">
         Assign a role per portal user. &quot;-&quot; means the tenant default role applies. Also editable from{' '}
-        <Link to="/app/crm/contacts" className="text-accent hover:underline">
+        <Link to="/app/crm?tab=contacts" className="text-accent hover:underline">
           Organization → Partners
         </Link>
         .
@@ -348,7 +347,7 @@ function AuditPane() {
 
 export default function ClientPortal() {
   const [params, setParams] = useSearchParams()
-  const active = (tabs.find((item) => item.toLowerCase() === params.get('tab')) ?? 'Tabs') as Tab
+  const active = (tabs.find((item) => item.toLowerCase() === params.get('tab')) ?? 'Tabs')
 
   return (
     <div className="mx-auto max-w-4xl pt-2">
