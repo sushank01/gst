@@ -9,28 +9,24 @@ one — the asset metrics rows, for example, are served by
 `/api/v1/reports/apps/{code}`. Closing a line means reading the rows behind
 it and deciding what the operation actually needs, not renaming a path.
 
-At this pass: **725 ledger rows**, 165 documented operations,
-60 SERVED, 28 VERIFIED, 2 BLOCKED,
-635 still DISCOVERED.
+At this pass: **725 ledger rows**, 170 documented operations,
+65 SERVED, 28 VERIFIED, 2 BLOCKED,
+630 still DISCOVERED.
 
-## Sales & POS — 88 endpoint(s)
+## Sales & POS — 84 endpoint(s)
 
 - `get /api/v1/sales/invoices` — 4 operation(s): OP-POS-INVOICE-LIST, OP-POS-INVOICE-SCAN, OP-POS-INVOICE-FILTER-PAYMENT, OP-POS-INVOICE-FILTER-SOURCE
 - `get /api/v1/sales/reports/overview` — 2 operation(s): OP-POS-DASH-READ, OP-POS-DASH-PERIOD
 - `get /api/v1/sales/quotations` — 2 operation(s): OP-POS-QUOTE-LIST, OP-POS-QUOTE-FILTER
-- `post /api/v1/sales/returns` — 2 operation(s): OP-POS-INVOICE-NAV-RETURNS, OP-POS-RETURN-CREATE
 - `put /api/v1/sales/settings/match-policy` — 2 operation(s): OP-POS-MATCH-SAVE, OP-POS-MATCH-REQDOCS
 - `get /api/v1/apps/POS/settings/changes` — 2 operation(s): OP-POS-SET-HISTORY-LIST, OP-POS-SET-HISTORY-SHOWREVERTED
 - `get /api/v1/entitlements` — 1 operation(s): OP-POS-INSTALL-GATE
 - `get /api/v1/sales/reports/monthly` — 1 operation(s): OP-POS-DASH-MONTHLY
 - `get /api/v1/sales/reports/payment-due` — 1 operation(s): OP-POS-DASH-PAYMENTDUE
 - `get /api/v1/sales/reports/payment-status` — 1 operation(s): OP-POS-DASH-PAYSTATUS
-- `get /api/v1/sales/reports/top-debtors` — 1 operation(s): OP-POS-DASH-TOPDEBTORS
 - `get /api/v1/sales/customers/export.csv` — 1 operation(s): OP-POS-CUSTOMER-EXPORT
 - `post /api/v1/sales/customers/import (stage) + POST .../commit` — 1 operation(s): OP-POS-CUSTOMER-IMPORT
 - `post /api/v1/sales/customers/{id}/archive` — 1 operation(s): OP-POS-CUSTOMER-ARCHIVE
-- `get /api/v1/sales/rate-contracts` — 1 operation(s): OP-POS-CONTRACT-LIST
-- `post /api/v1/sales/rate-contracts` — 1 operation(s): OP-POS-CONTRACT-CREATE
 - `post /api/v1/sales/rate-contracts/{id}/archive` — 1 operation(s): OP-POS-CONTRACT-DELETE
 - `post /api/v1/sales/pricing/resolve` — 1 operation(s): OP-POS-CONTRACT-PRICE-RESOLVE
 - `get /api/v1/sales/quotations/metrics` — 1 operation(s): OP-POS-QUOTE-KPI
