@@ -1377,6 +1377,600 @@
         }
       }
     },
+    "/api/v1/assets/facets": {
+      "get": {
+        "operationId": "get_api_v1_assets_facets",
+        "summary": "The counts behind the register's filter chips and dashboard tiles.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/reports/stock": {
+      "get": {
+        "operationId": "get_api_v1_assets_reports_stock",
+        "summary": "Stock by type, location or status.",
+        "description": "Count and value are separate: an asset with no recorded cost is counted but\nadds nothing, so a half-priced register is not mistaken for a half-empty one.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "groupBy",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "type",
+                "location",
+                "status"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/assets/requests/{id}/decision": {
+      "post": {
+        "operationId": "post_api_v1_assets_requests_id_decision",
+        "summary": "Records one decision. Each level is decidable exactly once.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": [
+                      "approved",
+                      "rejected"
+                    ]
+                  },
+                  "version": {
+                    "type": "integer"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": [
+                  "decision",
+                  "version",
+                  "note"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/requests/{id}/issue": {
+      "post": {
+        "operationId": "post_api_v1_assets_requests_id_issue",
+        "summary": "Hands the asset over and closes the request together.",
+        "description": "A request left reading \"approved\" after the asset went out is one somebody\nissues a second time.\n\nA signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "version": {
+                    "type": "integer"
+                  },
+                  "dueBackOn": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "assetId",
+                  "version"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/assets/requests": {
+      "get": {
+        "operationId": "get_api_v1_assets_requests",
+        "summary": "Asset requests, filtered by state, type or who raised them.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          {
+            "name": "requesterUserId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "assetType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ]
+      },
+      "post": {
+        "operationId": "post_api_v1_assets_requests",
+        "summary": "Raises a request. With no approval levels configured it is approved on submission, rather than waiting for an approver who does not exist.",
+        "description": "A signed-in user bound to a workspace they belong to.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "tags": [
+          "assets"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success."
+          },
+          "401": {
+            "description": "No valid session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The session is valid but the role may not do this.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found — also returned for a record in another workspace, so ids cannot be probed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A conflict. Carries `currentVersion` so the client can refetch and merge.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body failed validation. Carries per-field messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assetType": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "assetId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "quantity": {
+                    "type": "integer"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "neededBy": {
+                    "type": "string",
+                    "format": "date"
+                  }
+                },
+                "required": [
+                  "assetType",
+                  "reason"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/assets": {
       "get": {
         "operationId": "get_api_v1_assets",
@@ -11117,9 +11711,9 @@
         ]
       }
     },
-    "/api/v1/support/canned/{id}": {
+    "/api/v1/support/canned-responses/{id}": {
       "post": {
-        "operationId": "post_api_v1_support_canned_id_",
+        "operationId": "post_api_v1_support_canned_responses_id_",
         "summary": "Counts a use, and returns the body to insert. The unused shortcut is the one to retire.",
         "description": "A signed-in user bound to a workspace they belong to.",
         "security": [
@@ -11197,7 +11791,7 @@
         ]
       },
       "delete": {
-        "operationId": "delete_api_v1_support_canned_id_",
+        "operationId": "delete_api_v1_support_canned_responses_id_",
         "summary": "Archives it, freeing the shortcut for reuse.",
         "description": "A signed-in user bound to a workspace they belong to.",
         "security": [
@@ -11275,9 +11869,9 @@
         ]
       }
     },
-    "/api/v1/support/canned": {
+    "/api/v1/support/canned-responses": {
       "get": {
-        "operationId": "get_api_v1_support_canned",
+        "operationId": "get_api_v1_support_canned_responses",
         "summary": "Canned replies available to an agent, optionally narrowed to one team.",
         "description": "A signed-in user bound to a workspace they belong to.",
         "security": [
@@ -11345,7 +11939,7 @@
         }
       },
       "post": {
-        "operationId": "post_api_v1_support_canned",
+        "operationId": "post_api_v1_support_canned_responses",
         "summary": "Creates one. The leading slash is how people type it, not part of the key.",
         "description": "A signed-in user bound to a workspace they belong to.",
         "security": [

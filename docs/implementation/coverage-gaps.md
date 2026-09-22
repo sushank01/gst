@@ -9,24 +9,23 @@ one — the asset metrics rows, for example, are served by
 `/api/v1/reports/apps/{code}`. Closing a line means reading the rows behind
 it and deciding what the operation actually needs, not renaming a path.
 
-At this pass: **725 ledger rows**, 145 documented operations,
-25 SERVED, 28 VERIFIED, 2 BLOCKED,
-670 still DISCOVERED.
+At this pass: **725 ledger rows**, 151 documented operations,
+54 SERVED, 28 VERIFIED, 2 BLOCKED,
+641 still DISCOVERED.
 
-## Sales & POS — 98 endpoint(s)
+## Sales & POS — 88 endpoint(s)
 
+- `get /api/v1/sales/invoices` — 4 operation(s): OP-POS-INVOICE-LIST, OP-POS-INVOICE-SCAN, OP-POS-INVOICE-FILTER-PAYMENT, OP-POS-INVOICE-FILTER-SOURCE
+- `get /api/v1/sales/reports/overview` — 2 operation(s): OP-POS-DASH-READ, OP-POS-DASH-PERIOD
+- `get /api/v1/sales/quotations` — 2 operation(s): OP-POS-QUOTE-LIST, OP-POS-QUOTE-FILTER
 - `post /api/v1/sales/returns` — 2 operation(s): OP-POS-INVOICE-NAV-RETURNS, OP-POS-RETURN-CREATE
 - `put /api/v1/sales/settings/match-policy` — 2 operation(s): OP-POS-MATCH-SAVE, OP-POS-MATCH-REQDOCS
+- `get /api/v1/apps/POS/settings/changes` — 2 operation(s): OP-POS-SET-HISTORY-LIST, OP-POS-SET-HISTORY-SHOWREVERTED
 - `get /api/v1/entitlements` — 1 operation(s): OP-POS-INSTALL-GATE
-- `get /api/v1/sales/reports/overview?period=` — 1 operation(s): OP-POS-DASH-READ
-- `get /api/v1/sales/reports/overview` — 1 operation(s): OP-POS-DASH-PERIOD
-- `get /api/v1/sales/reports/monthly?year=` — 1 operation(s): OP-POS-DASH-MONTHLY
-- `get /api/v1/sales/reports/aging?asOf=` — 1 operation(s): OP-POS-DASH-AGING
+- `get /api/v1/sales/reports/monthly` — 1 operation(s): OP-POS-DASH-MONTHLY
 - `get /api/v1/sales/reports/payment-due` — 1 operation(s): OP-POS-DASH-PAYMENTDUE
 - `get /api/v1/sales/reports/payment-status` — 1 operation(s): OP-POS-DASH-PAYSTATUS
-- `get /api/v1/sales/reports/top-debtors?limit=5` — 1 operation(s): OP-POS-DASH-TOPDEBTORS
-- `get /api/v1/sales/customers?q=` — 1 operation(s): OP-POS-CUSTOMER-SEARCH
-- `get /api/v1/sales/customers?includeArchived=true` — 1 operation(s): OP-POS-CUSTOMER-SHOWINACTIVE
+- `get /api/v1/sales/reports/top-debtors` — 1 operation(s): OP-POS-DASH-TOPDEBTORS
 - `get /api/v1/sales/customers/export.csv` — 1 operation(s): OP-POS-CUSTOMER-EXPORT
 - `post /api/v1/sales/customers/import (stage) + POST .../commit` — 1 operation(s): OP-POS-CUSTOMER-IMPORT
 - `post /api/v1/sales/customers/{id}/archive` — 1 operation(s): OP-POS-CUSTOMER-ARCHIVE
@@ -34,8 +33,6 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `post /api/v1/sales/rate-contracts` — 1 operation(s): OP-POS-CONTRACT-CREATE
 - `post /api/v1/sales/rate-contracts/{id}/archive` — 1 operation(s): OP-POS-CONTRACT-DELETE
 - `post /api/v1/sales/pricing/resolve` — 1 operation(s): OP-POS-CONTRACT-PRICE-RESOLVE
-- `get /api/v1/sales/quotations` — 1 operation(s): OP-POS-QUOTE-LIST
-- `get /api/v1/sales/quotations?status=` — 1 operation(s): OP-POS-QUOTE-FILTER
 - `get /api/v1/sales/quotations/metrics` — 1 operation(s): OP-POS-QUOTE-KPI
 - `post /api/v1/sales/quotations` — 1 operation(s): OP-POS-QUOTE-CREATE
 - `post /api/v1/sales/quotations/{id}/transition` — 1 operation(s): OP-POS-QUOTE-TRANSITION
@@ -47,10 +44,6 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `post /api/v1/sales/delivery-notes` — 1 operation(s): OP-POS-DELIVERY-CREATE
 - `post /api/v1/sales/delivery-notes/{id}/transition` — 1 operation(s): OP-POS-DELIVERY-DISPATCH
 - `post /api/v1/sales/delivery-notes/{id}/reverse` — 1 operation(s): OP-POS-DELIVERY-DELETE
-- `get /api/v1/sales/invoices` — 1 operation(s): OP-POS-INVOICE-LIST
-- `get /api/v1/sales/invoices?reference=` — 1 operation(s): OP-POS-INVOICE-SCAN
-- `get /api/v1/sales/invoices?payment=` — 1 operation(s): OP-POS-INVOICE-FILTER-PAYMENT
-- `get /api/v1/sales/invoices?source=` — 1 operation(s): OP-POS-INVOICE-FILTER-SOURCE
 - `post /api/v1/sales/invoices` — 1 operation(s): OP-POS-INVOICE-CREATE
 - `post /api/v1/sales/invoices/{id}/post` — 1 operation(s): OP-POS-INVOICE-POST
 - `post /api/v1/sales/invoices/{id}/match` — 1 operation(s): OP-POS-INVOICE-MATCH
@@ -59,7 +52,6 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `post /api/v1/pos/sales/{id}/tenders` — 1 operation(s): OP-POS-SALE-TENDER
 - `get /api/v1/pos/shifts/metrics` — 1 operation(s): OP-POS-SHIFT-TAKINGS
 - `get /api/v1/pos/shifts/variance` — 1 operation(s): OP-POS-SHIFT-VARIANCE
-- `get /api/v1/pos/shifts?since=` — 1 operation(s): OP-POS-SHIFT-AUTOREFRESH
 - `post /api/v1/sales/returns/{id}/void` — 1 operation(s): OP-POS-RETURN-DELETE
 - `post /api/v1/sales/credit-notes` — 1 operation(s): OP-POS-CREDIT-CREATE
 - `post /api/v1/sales/credit-notes/{id}/apply` — 1 operation(s): OP-POS-CREDIT-APPLY
@@ -67,10 +59,10 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `post /api/v1/sales/refunds` — 1 operation(s): OP-POS-REFUND-CREATE
 - `post /api/v1/sales/refunds/{id}/execute` — 1 operation(s): OP-POS-REFUND-EXECUTE
 - `post /api/v1/sales/refunds/{id}/cancel` — 1 operation(s): OP-POS-REFUND-DELETE
-- `get /api/v1/sales/ar/aging?asOf=` — 1 operation(s): OP-POS-AGING-READ
+- `get /api/v1/sales/ar/aging` — 1 operation(s): OP-POS-AGING-READ
 - `get /api/v1/sales/ar/aging/by-customer` — 1 operation(s): OP-POS-AGING-BYCUSTOMER
 - `get /api/v1/sales/ar/aging/export.csv` — 1 operation(s): OP-POS-AGING-EXPORT
-- `get /api/v1/sales/reports/{tab}?status=` — 1 operation(s): OP-POS-REPORT-STATUS-FILTER
+- `get /api/v1/sales/reports/{tab}` — 1 operation(s): OP-POS-REPORT-STATUS-FILTER
 - `get /api/v1/sales/reports/tracker` — 1 operation(s): OP-POS-REPORT-TRACKER
 - `get /api/v1/sales/reports/customer-performance` — 1 operation(s): OP-POS-REPORT-CUSTOMER
 - `get /api/v1/sales/reports/cohort` — 1 operation(s): OP-POS-REPORT-COHORT
@@ -107,123 +99,31 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `put /api/v1/apps/POS/agents/auto-pause` — 1 operation(s): OP-POS-SET-AGENT-AUTOPAUSE
 - `delete /api/v1/apps/POS/agents/{agentId}` — 1 operation(s): OP-POS-SET-AGENT-DELETE
 - `get /api/v1/apps/POS/schedules` — 1 operation(s): OP-POS-SET-SCHEDULES
-- `get /api/v1/apps/POS/settings/changes` — 1 operation(s): OP-POS-SET-HISTORY-LIST
-- `get /api/v1/apps/POS/settings/changes?includeReverted=` — 1 operation(s): OP-POS-SET-HISTORY-SHOWREVERTED
 - `post /api/v1/apps/POS/settings/changes/{id}/revert` — 1 operation(s): OP-POS-SET-HISTORY-REVERT
 - `post /api/v1/apps/POS/settings/reset` — 1 operation(s): OP-POS-SET-HISTORY-RESET
 - `get /api/v1/apps/POS/appearance` — 1 operation(s): OP-POS-SET-APPEARANCE
 - `post /api/v1/copilot/ask` — 1 operation(s): OP-POS-SET-COPILOT
 
-## Asset Management — 77 endpoint(s)
+## Support & Ticketing — 62 endpoint(s)
 
-- `get /api/v1/assets/metrics` — 4 operation(s): OP-ITAM-DASH-ACTIVE-COUNT, OP-ITAM-DASH-PENDING-REQUESTS, OP-ITAM-DASH-OUT-OF-WARRANTY, OP-ITAM-DASH-LEAVER-HOLDINGS
-- `get /api/v1/assets/reports/stock-summary?groupBy=` — 2 operation(s): OP-ITAM-RPT-STOCK-SUMMARY, OP-ITAM-RPT-GROUP-BY
-- `patch /api/v1/assets/settings/custom-fields/{id}` — 2 operation(s): OP-ITAM-CF-RENAME, OP-ITAM-CF-SET-TYPE
-- `patch /api/v1/apps/ITAM/agent-controls` — 2 operation(s): OP-ITAM-AGENT-AUTORUN, OP-ITAM-AGENT-AUTOPAUSE
-- `patch /api/v1/assets/taxonomies/asset_types/entries/{id}` — 2 operation(s): OP-ITAM-TAX-EDIT-PREFIX, OP-ITAM-TAX-TOGGLE-CONFIG
-- `get /api/v1/assets/entitlement` — 1 operation(s): OP-ITAM-SHELL-INSTALL-GATE
-- `get /api/v1/billing/subscription` — 1 operation(s): OP-ITAM-SHELL-TRIAL-BADGE
-- `get /api/v1/assets/metrics?window=60` — 1 operation(s): OP-ITAM-DASH-WARRANTY-EXPIRING
-- `get /api/v1/assets?warrantyExpiringWithinDays=60&sort=warrantyEnd` — 1 operation(s): OP-ITAM-DASH-EXPIRING-LIST
-- `get /api/v1/assets?custodianStatus=leaver` — 1 operation(s): OP-ITAM-DASH-LEAVER-LIST
-- `get /api/v1/assets?assetTypeId=` — 1 operation(s): OP-ITAM-ASSET-FILTER-TYPE
-- `get /api/v1/assets?projectId=` — 1 operation(s): OP-ITAM-ASSET-FILTER-PROJECT
-- `get /api/v1/assets?stage=` — 1 operation(s): OP-ITAM-ASSET-FILTER-STAGE
-- `get /api/v1/assets/facets` — 1 operation(s): OP-ITAM-ASSET-STAGE-COUNTS
-- `get /api/v1/assets?q=` — 1 operation(s): OP-ITAM-ASSET-SEARCH
-- `post /api/v1/assets/exports` — 1 operation(s): OP-ITAM-ASSET-EXPORT-CSV
-- `post /api/v1/assets/imports then POST /api/v1/assets/imports/{id}/commit` — 1 operation(s): OP-ITAM-ASSET-IMPORT-CSV
-- `get /api/v1/assets/receivable-lines` — 1 operation(s): OP-ITAM-ASSET-RECEIVE-FROM-PURCHASE
-- `post /api/v1/assets/receive` — 1 operation(s): OP-ITAM-ASSET-RECEIVE-FROM-PURCHASE
-- `get /api/v1/assets/form-schema` — 1 operation(s): OP-ITAM-ASSET-CREATE-OPEN
-- `post /api/v1/assets/{id}/transitions` — 1 operation(s): OP-ITAM-ASSET-STAGE-SET
-- `post /api/v1/assets/{id}/archive` — 1 operation(s): OP-ITAM-ASSET-DELETE
-- `post /api/v1/assets/{id}/assignments` — 1 operation(s): OP-ITAM-ASSET-ASSIGN
-- `post /api/v1/assets/{id}/assignments/{assignmentId}/return` — 1 operation(s): OP-ITAM-ASSET-RETURN
-- `post /api/v1/assets/{id}/transfer` — 1 operation(s): OP-ITAM-ASSET-TRANSFER
-- `post /api/v1/assets/{id}/service-records` — 1 operation(s): OP-ITAM-ASSET-REPAIR-OPEN
-- `post /api/v1/assets/service-records/{id}/close` — 1 operation(s): OP-ITAM-ASSET-REPAIR-CLOSE
-- `post /api/v1/assets/{id}/checks` — 1 operation(s): OP-ITAM-ASSET-CHECK
-- `post /api/v1/assets (customFields payload)` — 1 operation(s): OP-ITAM-ASSET-CUSTOMFIELD-CAPTURE
-- `get /api/v1/assets/my` — 1 operation(s): OP-ITAM-MYASSET-LIST
-- `get /api/v1/assets/my/assignments` — 1 operation(s): OP-ITAM-MYASSET-HISTORY
-- `post /api/v1/assets/my/assignments/{id}/acknowledge` — 1 operation(s): OP-ITAM-MYASSET-ACKNOWLEDGE
-- `get /api/v1/assets/requests` — 1 operation(s): OP-ITAM-REQ-LIST
-- `get /api/v1/assets/requests?scope=mine|awaiting_me` — 1 operation(s): OP-ITAM-REQ-SCOPE
-- `get /api/v1/assets/requests?type=` — 1 operation(s): OP-ITAM-REQ-FILTER-TYPE
-- `get /api/v1/assets/requests?status=` — 1 operation(s): OP-ITAM-REQ-FILTER-STATUS
-- `get /api/v1/assets/requests?q=` — 1 operation(s): OP-ITAM-REQ-SEARCH
-- `post /api/v1/assets/requests` — 1 operation(s): OP-ITAM-REQ-CREATE
-- `post /api/v1/assets/requests/{id}/approve` — 1 operation(s): OP-ITAM-REQ-APPROVE
-- `post /api/v1/assets/requests/{id}/reject` — 1 operation(s): OP-ITAM-REQ-REJECT
-- `post /api/v1/assets/requests/{id}/issue` — 1 operation(s): OP-ITAM-REQ-ISSUE
-- `get /api/v1/assets/requests/{id}` — 1 operation(s): OP-ITAM-REQ-DETAIL
-- `post /api/v1/assets/requests/{id}/withdraw` — 1 operation(s): OP-ITAM-REQ-WITHDRAW
-- `post /api/v1/assets/reports/{key}/exports` — 1 operation(s): OP-ITAM-RPT-EXPORT-CSV
-- `post /api/v1/assets/reports/{key}/exports?format=xlsx` — 1 operation(s): OP-ITAM-RPT-EXPORT-EXCEL
-- `get /api/v1/assets/reports/ledger` — 1 operation(s): OP-ITAM-RPT-ASSET-LEDGER
-- `get /api/v1/assets/reports/department-usage` — 1 operation(s): OP-ITAM-RPT-DEPT-USAGE
-- `get /api/v1/assets/reports/warranty` — 1 operation(s): OP-ITAM-RPT-WARRANTY
-- `get /api/v1/assets/reports/service` — 1 operation(s): OP-ITAM-RPT-SUPPORT-NOTES
-- `get /api/v1/assets/reports/audit` — 1 operation(s): OP-ITAM-RPT-AUDIT-LOG
-- `get /api/v1/assets/settings/approval-levels` — 1 operation(s): OP-ITAM-APPR-LIST
-- `post /api/v1/assets/settings/approval-levels` — 1 operation(s): OP-ITAM-APPR-ADD-LEVEL
-- `delete /api/v1/assets/settings/approval-levels/{id}` — 1 operation(s): OP-ITAM-APPR-REMOVE-LEVEL
-- `patch /api/v1/assets/settings/approval-levels/{id}` — 1 operation(s): OP-ITAM-APPR-SET-TYPE
-- `post /api/v1/assets/settings/approval-levels/{id}/approvers` — 1 operation(s): OP-ITAM-APPR-ADD-APPROVER
-- `delete /api/v1/assets/settings/approval-levels/{id}/approvers/{approverId}` — 1 operation(s): OP-ITAM-APPR-REMOVE-APPROVER
-- `put /api/v1/assets/settings/approval-levels` — 1 operation(s): OP-ITAM-APPR-SAVE
-- `get /api/v1/assets/settings/custom-fields` — 1 operation(s): OP-ITAM-CF-LIST
-- `post /api/v1/assets/settings/custom-fields` — 1 operation(s): OP-ITAM-CF-ADD
-- `post /api/v1/assets/settings/custom-fields/{id}/archive` — 1 operation(s): OP-ITAM-CF-DELETE
-- `get /api/v1/apps/ITAM/agents` — 1 operation(s): OP-ITAM-AGENT-LIST
-- `patch /api/v1/apps/ITAM/agents/{agentKey}` — 1 operation(s): OP-ITAM-AGENT-TOGGLE
-- `patch /api/v1/tenant/agent-controls` — 1 operation(s): OP-ITAM-AGENT-PAUSE-ALL
-- `get /api/v1/billing/credits?period=current_month` — 1 operation(s): OP-ITAM-AGENT-CREDITS-READ
-- `post /api/v1/apps/ITAM/agents/{agentKey}/runs` — 1 operation(s): OP-ITAM-AGENT-RUN
-- `get /api/v1/apps/ITAM/schedules` — 1 operation(s): OP-ITAM-SCHED-LIST
-- `post /api/v1/apps/ITAM/schedules` — 1 operation(s): OP-ITAM-SCHED-CREATE
-- `get /api/v1/assets/change-history` — 1 operation(s): OP-ITAM-HIST-LIST
-- `get /api/v1/assets/change-history?includeReverted=true` — 1 operation(s): OP-ITAM-HIST-SHOW-REVERTED
-- `post /api/v1/assets/settings/reset` — 1 operation(s): OP-ITAM-HIST-RESET
-- `post /api/v1/assets/change-history/{id}/revert` — 1 operation(s): OP-ITAM-HIST-UNDO
-- `get /api/v1/assets/taxonomies/{key}` — 1 operation(s): OP-ITAM-TAX-SELECT
-- `get /api/v1/assets/taxonomies/{key}/entries` — 1 operation(s): OP-ITAM-TAX-LIST
-- `post /api/v1/assets/taxonomies/{key}/entries` — 1 operation(s): OP-ITAM-TAX-ADD-ENTRY
-- `patch /api/v1/assets/taxonomies/{key}/entries/{id}` — 1 operation(s): OP-ITAM-TAX-EDIT-LABEL
-- `delete /api/v1/assets/taxonomies/{key}/entries/{id}` — 1 operation(s): OP-ITAM-TAX-DELETE-ENTRY
-- `put /api/v1/assets/taxonomies/{key}/entries` — 1 operation(s): OP-ITAM-TAX-SAVE
-
-## Support & Ticketing — 77 endpoint(s)
-
+- `get /api/v1/support/exports` — 3 operation(s): OP-SUP-EXPORT-REPORT-SELECT, OP-SUP-EXPORT-FORMAT-SELECT, OP-SUP-EXPORT-RANGE
+- `get /api/v1/support/reports/{key}` — 2 operation(s): OP-SUP-REPORT-TAB, OP-SUP-REPORT-RANGE
+- `get /api/v1/support/csat/review-queue` — 2 operation(s): OP-SUP-CSATREVIEW-LIST, OP-SUP-CSATREVIEW-SHOWREVIEWED
 - `get /api/v1/tenants/{tenantId}/apps/SUP` — 1 operation(s): OP-SUP-APP-INSTALL-GATE
 - `get /api/v1/support/reports/dashboard` — 1 operation(s): OP-SUP-DASH-KPI
-- `get /api/v1/support/reports/breakdown?by=status|priority|category` — 1 operation(s): OP-SUP-DASH-BREAKDOWN
-- `get /api/v1/support/tickets?queue&status&channel&tag&q&cursor&limit&sort` — 1 operation(s): OP-SUP-TICKET-LIST
-- `get /api/v1/support/tickets?queue=all|mine|unassigned` — 1 operation(s): OP-SUP-TICKET-QUEUE-FILTER
-- `get /api/v1/support/tickets?statusId=` — 1 operation(s): OP-SUP-TICKET-STATUS-FILTER
-- `get /api/v1/support/tickets?channelId=` — 1 operation(s): OP-SUP-TICKET-SOURCE-FILTER
-- `get /api/v1/support/tickets?tag=a&tag=b` — 1 operation(s): OP-SUP-TICKET-TAG-FILTER
-- `get /api/v1/support/tickets?q=` — 1 operation(s): OP-SUP-TICKET-SEARCH
+- `get /api/v1/support/reports/breakdown` — 1 operation(s): OP-SUP-DASH-BREAKDOWN
 - `post /api/v1/support/ticket-views` — 1 operation(s): OP-SUP-VIEW-SAVE
 - `post /api/v1/support/tickets/{id}/transition` — 1 operation(s): OP-SUP-TICKET-TRANSITION
 - `post /api/v1/support/tickets/{id}/unassign` — 1 operation(s): OP-SUP-TICKET-UNASSIGN
 - `post /api/v1/support/tickets/{id}/sla-waiver` — 1 operation(s): OP-SUP-TICKET-SLA-FLAG
 - `post /api/v1/support/tickets/{id}/messages (visibility=internal)` — 1 operation(s): OP-SUP-TICKET-NOTE
 - `delete /api/v1/support/tickets/{id}` — 1 operation(s): OP-SUP-TICKET-DELETE
-- `get /api/v1/support/kb/search?q=&locale=` — 1 operation(s): OP-SUP-KB-SEARCH
-- `get /api/v1/support/kb/articles?categoryId=` — 1 operation(s): OP-SUP-KB-CATEGORY-FILTER
-- `get /api/v1/support/kb/articles?state=` — 1 operation(s): OP-SUP-KB-STATE-FILTER
+- `get /api/v1/support/kb/search` — 1 operation(s): OP-SUP-KB-SEARCH
 - `delete /api/v1/support/kb/articles/{id}` — 1 operation(s): OP-SUP-KB-DELETE
 - `post /api/v1/support/kb/articles/import` — 1 operation(s): OP-SUP-KB-IMPORT-CSV
 - `get /api/v1/support/my/tickets` — 1 operation(s): OP-SUP-REQ-LIST
 - `post /api/v1/support/my/tickets` — 1 operation(s): OP-SUP-REQ-CREATE
-- `get /api/v1/support/canned-responses` — 1 operation(s): OP-SUP-CANNED-LIST
-- `post /api/v1/support/canned-responses` — 1 operation(s): OP-SUP-CANNED-CREATE
-- `delete /api/v1/support/canned-responses/{id}` — 1 operation(s): OP-SUP-CANNED-DELETE
 - `patch /api/v1/support/canned-responses/{id}` — 1 operation(s): OP-SUP-CANNED-UPDATE
-- `get /api/v1/support/reports/{key}` — 1 operation(s): OP-SUP-REPORT-TAB
-- `get /api/v1/support/reports/{key}?from=&to=&tz=` — 1 operation(s): OP-SUP-REPORT-RANGE
 - `get /api/v1/support/reports/sla` — 1 operation(s): OP-SUP-REPORT-SLA
 - `get /api/v1/support/reports/response-times` — 1 operation(s): OP-SUP-REPORT-RESPONSE
 - `get /api/v1/support/reports/reopen-rate` — 1 operation(s): OP-SUP-REPORT-REOPEN
@@ -233,10 +133,10 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `get /api/v1/support/reports/volume-heatmap` — 1 operation(s): OP-SUP-REPORT-HEATMAP
 - `get /api/v1/support/sla-policies` — 1 operation(s): OP-SUP-PLANGATE-SLA
 - `get /api/v1/support/routing-rules` — 1 operation(s): OP-SUP-PLANGATE-ROUTING
-- `get /api/v1/support/field-options?kind=` — 1 operation(s): OP-SUP-FIELD-SUBTAB
+- `get /api/v1/support/field-options` — 1 operation(s): OP-SUP-FIELD-SUBTAB
 - `post /api/v1/support/field-options` — 1 operation(s): OP-SUP-FIELD-CREATE
 - `patch /api/v1/support/field-options/{id}` — 1 operation(s): OP-SUP-FIELD-UPDATE
-- `delete /api/v1/support/field-options/{id}?reassignTo=` — 1 operation(s): OP-SUP-FIELD-DELETE
+- `delete /api/v1/support/field-options/{id}` — 1 operation(s): OP-SUP-FIELD-DELETE
 - `post /api/v1/support/field-options/reorder` — 1 operation(s): OP-SUP-FIELD-REORDER
 - `put /api/v1/support/settings/widget` — 1 operation(s): OP-SUP-WIDGET-SAVE
 - `get /api/v1/support/settings/widget/snippet` — 1 operation(s): OP-SUP-WIDGET-COPY-SNIPPET
@@ -261,12 +161,7 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `delete /api/v1/support/auto-responses/{id}` — 1 operation(s): OP-SUP-AUTORESPONSE-DELETE
 - `post /api/v1/support/shift-handoffs` — 1 operation(s): OP-SUP-SHIFTHANDOFF-CREATE
 - `delete /api/v1/support/shift-handoffs/{id}` — 1 operation(s): OP-SUP-SHIFTHANDOFF-DELETE
-- `get /api/v1/support/csat/review-queue?reviewed=` — 1 operation(s): OP-SUP-CSATREVIEW-LIST
-- `get /api/v1/support/csat/review-queue?reviewed=true` — 1 operation(s): OP-SUP-CSATREVIEW-SHOWREVIEWED
 - `post /api/v1/support/csat/{responseId}/review` — 1 operation(s): OP-SUP-CSATREVIEW-RECORD
-- `get /api/v1/support/exports?report=` — 1 operation(s): OP-SUP-EXPORT-REPORT-SELECT
-- `get /api/v1/support/exports?format=csv|xlsx` — 1 operation(s): OP-SUP-EXPORT-FORMAT-SELECT
-- `get /api/v1/support/exports?from=&to=&tz=` — 1 operation(s): OP-SUP-EXPORT-RANGE
 - `post /api/v1/support/exports` — 1 operation(s): OP-SUP-EXPORT-DOWNLOAD
 - `post /api/v1/support/report-schedules` — 1 operation(s): OP-SUP-EXPORT-SCHEDULE-CREATE
 - `delete /api/v1/support/report-schedules/{id}` — 1 operation(s): OP-SUP-EXPORT-SCHEDULE-DELETE
@@ -274,11 +169,77 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `post /api/v1/support/kb/index` — 1 operation(s): OP-SUP-KB-INDEX
 - `get /api/v1/support/agents` — 1 operation(s): OP-SUP-AGENTS-LIST
 
-## Business Suite, Prompt Lab, Agent Studios — 59 endpoint(s)
+## Asset Management — 60 endpoint(s)
+
+- `get /api/v1/assets/metrics` — 5 operation(s): OP-ITAM-DASH-ACTIVE-COUNT, OP-ITAM-DASH-PENDING-REQUESTS, OP-ITAM-DASH-OUT-OF-WARRANTY, OP-ITAM-DASH-WARRANTY-EXPIRING, …
+- `get /api/v1/assets/reports/stock-summary` — 2 operation(s): OP-ITAM-RPT-STOCK-SUMMARY, OP-ITAM-RPT-GROUP-BY
+- `post /api/v1/assets/reports/{key}/exports` — 2 operation(s): OP-ITAM-RPT-EXPORT-CSV, OP-ITAM-RPT-EXPORT-EXCEL
+- `patch /api/v1/assets/settings/custom-fields/{id}` — 2 operation(s): OP-ITAM-CF-RENAME, OP-ITAM-CF-SET-TYPE
+- `patch /api/v1/apps/ITAM/agent-controls` — 2 operation(s): OP-ITAM-AGENT-AUTORUN, OP-ITAM-AGENT-AUTOPAUSE
+- `get /api/v1/assets/change-history` — 2 operation(s): OP-ITAM-HIST-LIST, OP-ITAM-HIST-SHOW-REVERTED
+- `patch /api/v1/assets/taxonomies/asset_types/entries/{id}` — 2 operation(s): OP-ITAM-TAX-EDIT-PREFIX, OP-ITAM-TAX-TOGGLE-CONFIG
+- `get /api/v1/assets/entitlement` — 1 operation(s): OP-ITAM-SHELL-INSTALL-GATE
+- `get /api/v1/billing/subscription` — 1 operation(s): OP-ITAM-SHELL-TRIAL-BADGE
+- `post /api/v1/assets/exports` — 1 operation(s): OP-ITAM-ASSET-EXPORT-CSV
+- `post /api/v1/assets/imports then POST /api/v1/assets/imports/{id}/commit` — 1 operation(s): OP-ITAM-ASSET-IMPORT-CSV
+- `get /api/v1/assets/receivable-lines` — 1 operation(s): OP-ITAM-ASSET-RECEIVE-FROM-PURCHASE
+- `post /api/v1/assets/receive` — 1 operation(s): OP-ITAM-ASSET-RECEIVE-FROM-PURCHASE
+- `get /api/v1/assets/form-schema` — 1 operation(s): OP-ITAM-ASSET-CREATE-OPEN
+- `post /api/v1/assets/{id}/transitions` — 1 operation(s): OP-ITAM-ASSET-STAGE-SET
+- `post /api/v1/assets/{id}/archive` — 1 operation(s): OP-ITAM-ASSET-DELETE
+- `post /api/v1/assets/{id}/assignments` — 1 operation(s): OP-ITAM-ASSET-ASSIGN
+- `post /api/v1/assets/{id}/assignments/{assignmentId}/return` — 1 operation(s): OP-ITAM-ASSET-RETURN
+- `post /api/v1/assets/{id}/transfer` — 1 operation(s): OP-ITAM-ASSET-TRANSFER
+- `post /api/v1/assets/{id}/service-records` — 1 operation(s): OP-ITAM-ASSET-REPAIR-OPEN
+- `post /api/v1/assets/service-records/{id}/close` — 1 operation(s): OP-ITAM-ASSET-REPAIR-CLOSE
+- `post /api/v1/assets/{id}/checks` — 1 operation(s): OP-ITAM-ASSET-CHECK
+- `post /api/v1/assets (customFields payload)` — 1 operation(s): OP-ITAM-ASSET-CUSTOMFIELD-CAPTURE
+- `get /api/v1/assets/my` — 1 operation(s): OP-ITAM-MYASSET-LIST
+- `get /api/v1/assets/my/assignments` — 1 operation(s): OP-ITAM-MYASSET-HISTORY
+- `post /api/v1/assets/my/assignments/{id}/acknowledge` — 1 operation(s): OP-ITAM-MYASSET-ACKNOWLEDGE
+- `post /api/v1/assets/requests/{id}/approve` — 1 operation(s): OP-ITAM-REQ-APPROVE
+- `post /api/v1/assets/requests/{id}/reject` — 1 operation(s): OP-ITAM-REQ-REJECT
+- `get /api/v1/assets/requests/{id}` — 1 operation(s): OP-ITAM-REQ-DETAIL
+- `post /api/v1/assets/requests/{id}/withdraw` — 1 operation(s): OP-ITAM-REQ-WITHDRAW
+- `get /api/v1/assets/reports/ledger` — 1 operation(s): OP-ITAM-RPT-ASSET-LEDGER
+- `get /api/v1/assets/reports/department-usage` — 1 operation(s): OP-ITAM-RPT-DEPT-USAGE
+- `get /api/v1/assets/reports/warranty` — 1 operation(s): OP-ITAM-RPT-WARRANTY
+- `get /api/v1/assets/reports/service` — 1 operation(s): OP-ITAM-RPT-SUPPORT-NOTES
+- `get /api/v1/assets/reports/audit` — 1 operation(s): OP-ITAM-RPT-AUDIT-LOG
+- `get /api/v1/assets/settings/approval-levels` — 1 operation(s): OP-ITAM-APPR-LIST
+- `post /api/v1/assets/settings/approval-levels` — 1 operation(s): OP-ITAM-APPR-ADD-LEVEL
+- `delete /api/v1/assets/settings/approval-levels/{id}` — 1 operation(s): OP-ITAM-APPR-REMOVE-LEVEL
+- `patch /api/v1/assets/settings/approval-levels/{id}` — 1 operation(s): OP-ITAM-APPR-SET-TYPE
+- `post /api/v1/assets/settings/approval-levels/{id}/approvers` — 1 operation(s): OP-ITAM-APPR-ADD-APPROVER
+- `delete /api/v1/assets/settings/approval-levels/{id}/approvers/{approverId}` — 1 operation(s): OP-ITAM-APPR-REMOVE-APPROVER
+- `put /api/v1/assets/settings/approval-levels` — 1 operation(s): OP-ITAM-APPR-SAVE
+- `get /api/v1/assets/settings/custom-fields` — 1 operation(s): OP-ITAM-CF-LIST
+- `post /api/v1/assets/settings/custom-fields` — 1 operation(s): OP-ITAM-CF-ADD
+- `post /api/v1/assets/settings/custom-fields/{id}/archive` — 1 operation(s): OP-ITAM-CF-DELETE
+- `get /api/v1/apps/ITAM/agents` — 1 operation(s): OP-ITAM-AGENT-LIST
+- `patch /api/v1/apps/ITAM/agents/{agentKey}` — 1 operation(s): OP-ITAM-AGENT-TOGGLE
+- `patch /api/v1/tenant/agent-controls` — 1 operation(s): OP-ITAM-AGENT-PAUSE-ALL
+- `get /api/v1/billing/credits` — 1 operation(s): OP-ITAM-AGENT-CREDITS-READ
+- `post /api/v1/apps/ITAM/agents/{agentKey}/runs` — 1 operation(s): OP-ITAM-AGENT-RUN
+- `get /api/v1/apps/ITAM/schedules` — 1 operation(s): OP-ITAM-SCHED-LIST
+- `post /api/v1/apps/ITAM/schedules` — 1 operation(s): OP-ITAM-SCHED-CREATE
+- `post /api/v1/assets/settings/reset` — 1 operation(s): OP-ITAM-HIST-RESET
+- `post /api/v1/assets/change-history/{id}/revert` — 1 operation(s): OP-ITAM-HIST-UNDO
+- `get /api/v1/assets/taxonomies/{key}` — 1 operation(s): OP-ITAM-TAX-SELECT
+- `get /api/v1/assets/taxonomies/{key}/entries` — 1 operation(s): OP-ITAM-TAX-LIST
+- `post /api/v1/assets/taxonomies/{key}/entries` — 1 operation(s): OP-ITAM-TAX-ADD-ENTRY
+- `patch /api/v1/assets/taxonomies/{key}/entries/{id}` — 1 operation(s): OP-ITAM-TAX-EDIT-LABEL
+- `delete /api/v1/assets/taxonomies/{key}/entries/{id}` — 1 operation(s): OP-ITAM-TAX-DELETE-ENTRY
+- `put /api/v1/assets/taxonomies/{key}/entries` — 1 operation(s): OP-ITAM-TAX-SAVE
+
+## Business Suite, Prompt Lab, Agent Studios — 54 endpoint(s)
 
 - `post /api/v1/prompt-lab/runs` — 4 operation(s): OP-LAB-TEMPERATURE-SET, OP-LAB-MAXTOKENS-SET, OP-LAB-RUN, OP-LAB-RUN-DENIED
 - `post /api/v1/suite/chat/sessions/{id}/messages` — 3 operation(s): OP-CHAT-SEND, OP-CHAT-SEND-KEYBOARD, OP-CHAT-SUGGESTION-SEND
 - `get /api/v1/billing/credits` — 3 operation(s): OP-LAB-CREDITS-READ, OP-VIBE-CONTROLS-READ, OP-COPILOT-CREDITS-READ
+- `get /api/v1/runs` — 3 operation(s): OP-STUDIO-OPEN-RUNS, OP-CANVAS-RUNS-NAV, OP-RUN-LIST
+- `get /api/v1/agents` — 3 operation(s): OP-AGENT-CATALOG-LIST, OP-AGENT-CATALOG-SEARCH, OP-AGENT-CATALOG-FILTER
+- `get /api/v1/suite/tools` — 2 operation(s): OP-SUITE-TOOL-LIST, OP-SUITE-FEATURED-LIST
 - `post /api/v1/suite/tools/{slug}/runs` — 2 operation(s): OP-SUITE-TOOL-RUN, OP-SUITE-TOOL-RUN-DENIED
 - `post /api/v1/suite/chat/sessions` — 2 operation(s): OP-CHAT-SESSION-OPEN, OP-CHAT-NEW
 - `patch /api/v1/suite/chat/sessions/{id}` — 2 operation(s): OP-CHAT-MODEL-SELECT, OP-CHAT-SYSTEM-EDIT
@@ -286,11 +247,9 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `get /api/v1/onboarding/checklist` — 2 operation(s): OP-CHECKLIST-COPILOT-FLAG, OP-CHECKLIST-AGENT-FLAG
 - `get /api/v1/suite/categories` — 1 operation(s): OP-SUITE-HOME-READ
 - `get /api/v1/suite/categories/{categoryId}` — 1 operation(s): OP-SUITE-CATEGORY-READ
-- `get /api/v1/suite/tools?categoryId=&q=&page=` — 1 operation(s): OP-SUITE-TOOL-LIST
-- `get /api/v1/suite/tools?featured=true` — 1 operation(s): OP-SUITE-FEATURED-LIST
 - `get /api/v1/suite/tools/{slug}` — 1 operation(s): OP-SUITE-TOOL-RESOLVE
-- `get /api/v1/suite/tools/{slug}/runs?page=` — 1 operation(s): OP-SUITE-TOOL-HISTORY
-- `get /api/v1/ai/models?surface=prompt_lab` — 1 operation(s): OP-LAB-MODEL-SELECT
+- `get /api/v1/suite/tools/{slug}/runs` — 1 operation(s): OP-SUITE-TOOL-HISTORY
+- `get /api/v1/ai/models` — 1 operation(s): OP-LAB-MODEL-SELECT
 - `get /api/v1/prompt-lab/templates` — 1 operation(s): OP-LAB-TEMPLATES-OPEN
 - `get /api/v1/prompt-lab/templates/{id}` — 1 operation(s): OP-LAB-TEMPLATE-APPLY
 - `post /api/v1/prompt-lab/runs (body.variables)` — 1 operation(s): OP-LAB-VARIABLE-BIND
@@ -302,61 +261,51 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `get /api/v1/vibe/builds/{id}` — 1 operation(s): OP-VIBE-BUILD-PROGRESS
 - `post /api/v1/artifacts` — 1 operation(s): OP-VIBE-ARTIFACT-CREATE
 - `post /api/v1/artifacts/{id}/publish` — 1 operation(s): OP-VIBE-ARTIFACT-PUBLISH
-- `get /api/v1/artifacts?page=` — 1 operation(s): OP-VIBE-ARTIFACT-LIST
+- `get /api/v1/artifacts` — 1 operation(s): OP-VIBE-ARTIFACT-LIST
 - `get /api/v1/artifacts/{id}` — 1 operation(s): OP-VIBE-ARTIFACT-OPEN
 - `post /api/v1/artifacts/{id}/rollback` — 1 operation(s): OP-VIBE-ARTIFACT-ROLLBACK
 - `get /api/v1/studio/workspaces/{workspaceId}` — 1 operation(s): OP-STUDIO-WS-OPEN
 - `get /api/v1/studio/workspaces/{id}/{agents|activity|knowledge|tables|files|schedules|logs}` — 1 operation(s): OP-STUDIO-NAV-ITEM-SELECT
-- `get /api/v1/studio/workspaces/{id}/search?q=` — 1 operation(s): OP-STUDIO-SEARCH
+- `get /api/v1/studio/workspaces/{id}/search` — 1 operation(s): OP-STUDIO-SEARCH
 - `post /api/v1/files{presign} then POST /api/v1/studio/builds/{id}/attachments` — 1 operation(s): OP-STUDIO-ATTACH-ADD
 - `delete /api/v1/studio/builds/{id}/attachments/{attachmentId}` — 1 operation(s): OP-STUDIO-ATTACH-REMOVE
 - `post /api/v1/studio/workspaces/{id}/agents` — 1 operation(s): OP-STUDIO-BUILD-SUBMIT
-- `get /api/v1/runs?agentId=` — 1 operation(s): OP-STUDIO-OPEN-RUNS
 - `get /api/v1/studio/template-categories` — 1 operation(s): OP-STUDIO-TEMPLATE-CATEGORY
 - `get /api/v1/studio/templates/{id}` — 1 operation(s): OP-STUDIO-TEMPLATE-APPLY
-- `get /api/v1/studio/workspaces/{id}/health?window=30d` — 1 operation(s): OP-STUDIO-HEALTH-READ
-- `get /api/v1/studio/workspaces/{id}/activity?window=7d` — 1 operation(s): OP-STUDIO-ACTIVITY-CHART
-- `get /api/v1/studio/workspaces/{id}/schedule?month=` — 1 operation(s): OP-STUDIO-CALENDAR-NAV
+- `get /api/v1/studio/workspaces/{id}/health` — 1 operation(s): OP-STUDIO-HEALTH-READ
+- `get /api/v1/studio/workspaces/{id}/activity` — 1 operation(s): OP-STUDIO-ACTIVITY-CHART
+- `get /api/v1/studio/workspaces/{id}/schedule` — 1 operation(s): OP-STUDIO-CALENDAR-NAV
 - `get /api/v1/studio/agents/{id}/graph` — 1 operation(s): OP-CANVAS-OPEN
 - `get /api/v1/studio/agents/{id}/nodes` — 1 operation(s): OP-CANVAS-NODE-SELECT
 - `patch /api/v1/studio/agents/{id}/nodes/{nodeId}` — 1 operation(s): OP-CANVAS-INSPECTOR-READ
 - `post /api/v1/studio/agents/{id}/test-runs` — 1 operation(s): OP-CANVAS-TESTRUN
 - `post /api/v1/studio/agents/{id}/tests{run}` — 1 operation(s): OP-CANVAS-TESTS-LIST
-- `get /api/v1/runs?agentId={id}` — 1 operation(s): OP-CANVAS-RUNS-NAV
 - `post /api/v1/studio/agents/{id}/publish` — 1 operation(s): OP-CANVAS-DEPLOY
-- `get /api/v1/agents?scope=catalog` — 1 operation(s): OP-AGENT-CATALOG-LIST
-- `get /api/v1/agents?q=` — 1 operation(s): OP-AGENT-CATALOG-SEARCH
-- `get /api/v1/agents?kind=business_solution|custom|workflow|automation` — 1 operation(s): OP-AGENT-CATALOG-FILTER
 - `post /api/v1/agents/{agentId}/runs` — 1 operation(s): OP-AGENT-RUN
 - `get /api/v1/agents/{agentId}/runs{count}` — 1 operation(s): OP-AGENT-RUNCOUNT-READ
-- `get /api/v1/runs?agentId=&status=&from=&to=&page=` — 1 operation(s): OP-RUN-LIST
 - `get /api/v1/runs/{id}/steps` — 1 operation(s): OP-RUN-TRACE-READ
 - `post /api/v1/copilot/threads (body.context)` — 1 operation(s): OP-COPILOT-OPEN-EVENT
 - `post /api/v1/copilot/threads/{id}/messages` — 1 operation(s): OP-COPILOT-ASK
 - `get /api/v1/copilot/threads` — 1 operation(s): OP-COPILOT-HISTORY
 - `post /api/v1/public/vippy/messages` — 1 operation(s): OP-VIPPY-SEND
 
-## Pitch Pilot — 58 endpoint(s)
+## Pitch Pilot — 52 endpoint(s)
 
+- `get /api/v1/pitch/rfps` — 6 operation(s): OP-PP-DASH-QUEUE-LIST, OP-PP-DASH-DEADLINE-SUMMARY, OP-PP-INBOX-LIST, OP-PP-INBOX-SEARCH, …
 - `put /api/v1/pitch/brand-kit` — 6 operation(s): OP-PP-BRAND-SAVE, OP-PP-BRAND-FIRMNAME, OP-PP-BRAND-LOGO-URL, OP-PP-BRAND-COLOR-PICKER, …
 - `patch /api/v1/pitch/rfps/{id}` — 3 operation(s): OP-PP-RFP-UPDATE-ESTIMATE, OP-PP-RFP-UPDATE-VERTICAL, OP-PP-RFP-UPDATE-DEADLINE
 - `get /api/v1/pitch/dashboard/summary` — 2 operation(s): OP-PP-DASH-TILES, OP-PP-DASH-PIPELINE-VALUE
 - `post /api/v1/pitch/rfps` — 2 operation(s): OP-PP-RFP-PROSPECT-INPUT, OP-PP-RFP-EXTRACT-SUBMIT
 - `get /api/v1/pitch/schemas` — 2 operation(s): OP-PP-RFP-SCHEMA-SELECT, OP-PP-SCHEMA-LIST
 - `get /api/v1/pitch/extractions/{runId}` — 2 operation(s): OP-PP-RFP-EXTRACTION-RUN, OP-PP-RFP-EXTRACTION-PROGRESS
+- `get /api/v1/pitch/knowledge` — 2 operation(s): OP-PP-KB-LIST, OP-PP-KB-FILTER-CATEGORY
 - `post /api/v1/pitch/knowledge/files/presign` — 2 operation(s): OP-PP-KB-DIALOG-OPEN-EMPTY, OP-PP-KB-FILE-UPLOAD
 - `get /api/v1/pitch/entitlement` — 1 operation(s): OP-PP-APP-ENTITLEMENT-CHECK
 - `get /api/v1/pitch/rfps/counts` — 1 operation(s): OP-PP-NAV-INBOX-BADGE
 - `get /api/v1/pitch/settings` — 1 operation(s): OP-PP-SAMPLE-BANNER-READ
-- `get /api/v1/pitch/rfps?stage=your_turn&owner=me` — 1 operation(s): OP-PP-DASH-QUEUE-LIST
 - `get /api/v1/pitch/analytics/win-rate` — 1 operation(s): OP-PP-DASH-WINRATE
 - `get /api/v1/pitch/analytics/time-saved` — 1 operation(s): OP-PP-DASH-TIME-SAVED
-- `get /api/v1/pitch/usage?period=current_month` — 1 operation(s): OP-PP-DASH-AI-SPEND
-- `get /api/v1/pitch/rfps?deadline_within=7d` — 1 operation(s): OP-PP-DASH-DEADLINE-SUMMARY
-- `get /api/v1/pitch/rfps` — 1 operation(s): OP-PP-INBOX-LIST
-- `get /api/v1/pitch/rfps?q=` — 1 operation(s): OP-PP-INBOX-SEARCH
-- `get /api/v1/pitch/rfps?stage=` — 1 operation(s): OP-PP-INBOX-FILTER-STAGE
-- `get /api/v1/pitch/rfps?vertical=` — 1 operation(s): OP-PP-INBOX-FILTER-VERTICAL
+- `get /api/v1/pitch/usage` — 1 operation(s): OP-PP-DASH-AI-SPEND
 - `post /api/v1/pitch/rfps/export` — 1 operation(s): OP-PP-INBOX-EXPORT-CSV
 - `get /api/v1/pitch/rfps/{id}` — 1 operation(s): OP-PP-INBOX-ROW-OPEN
 - `post /api/v1/pitch/rfps/files/presign then POST /api/v1/pitch/rfps/files/{id}/complete` — 1 operation(s): OP-PP-RFP-FILE-BROWSE
@@ -366,8 +315,6 @@ At this pass: **725 ledger rows**, 145 documented operations,
 - `patch /api/v1/pitch/rfps/{id}/extracted-fields/{fieldId}` — 1 operation(s): OP-PP-RFP-EXTRACTION-REVIEW
 - `post /api/v1/pitch/rfps/{id}/transitions` — 1 operation(s): OP-PP-RFP-STAGE-TRANSITION
 - `delete /api/v1/pitch/rfps/{id}` — 1 operation(s): OP-PP-RFP-DELETE
-- `get /api/v1/pitch/knowledge` — 1 operation(s): OP-PP-KB-LIST
-- `get /api/v1/pitch/knowledge?category=` — 1 operation(s): OP-PP-KB-FILTER-CATEGORY
 - `get /api/v1/pitch/knowledge/counts` — 1 operation(s): OP-PP-KB-CATEGORY-COUNTS
 - `post /api/v1/pitch/knowledge` — 1 operation(s): OP-PP-KB-CREATE
 - `delete /api/v1/pitch/knowledge/{id}` — 1 operation(s): OP-PP-KB-REMOVE

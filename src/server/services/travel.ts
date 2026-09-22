@@ -223,13 +223,20 @@ export async function decideTrip(
     } else {
       const levels = await levelsFor(tx, ctx, decimalText(trip.estimated_cost) ?? '0')
       const remaining = levels.filter((candidate) => candidate > level)
-      await tx.query(
-        remaining.length
-          ? 'update te_travel_requests set current_level = $2, version = version + 1, updated_at = $3 where id = $1'
-          : `update te_travel_requests set status = 'approved', current_level = $2, decided_at = $3,
-                    version = version + 1, updated_at = $3 where id = $1`,
-        remaining.length ? [tripId, remaining[0], ctx.now] : [tripId, level, ctx.now],
-      )
+      // Two statements, not one chosen by a ternary — see the note in assets.ts.
+      if (remaining.length) {
+        await tx.query('update te_travel_requests set current_level = $2, version = version + 1, updated_at = $3 where id = $1', [
+          tripId,
+          remaining[0],
+          ctx.now,
+        ])
+      } else {
+        await tx.query(
+          `update te_travel_requests set status = 'approved', decided_at = $2, version = version + 1, updated_at = $2
+            where id = $1`,
+          [tripId, ctx.now],
+        )
+      }
     }
     await recordAudit(tx, ctx, {
       action: `travel.${input.decision}`,

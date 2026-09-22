@@ -72,8 +72,18 @@ function endpointsOf(cell) {
     .filter((part) => /^(GET|POST|PUT|PATCH|DELETE)\s+\//i.test(part))
     .map((part) => {
       const [method, ...rest] = part.split(/\s+/)
-      // Ledger rows were written with `:id`; the document uses `{id}`.
-      const path = rest.join(' ').replace(/:(\w+)/g, '{$1}').replace(/\/$/, '')
+      /*
+       * Ledger rows were written with `:id` where the document uses `{id}`,
+       * and several carry an example query string. The query is not part of
+       * the path an OpenAPI document keys on, so it is dropped before matching
+       * — otherwise `…/articles?categoryId=` never matches `…/articles`, which
+       * understates the coverage rather than overstating it.
+       */
+      const path = rest
+        .join(' ')
+        .split('?')[0]
+        .replace(/:(\w+)/g, '{$1}')
+        .replace(/\/$/, '')
       return `${method.toLowerCase()} ${path}`
     })
 }

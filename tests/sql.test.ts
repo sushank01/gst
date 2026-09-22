@@ -177,3 +177,25 @@ test('a composed clause only ever receives placeholder fragments', () => {
   }
   assert.deepEqual(bad, [])
 })
+
+test('no query picks its text with a ternary', () => {
+  /*
+   * `db.query(cond ? A : B, cond ? paramsA : paramsB)` is a shape I got wrong
+   * three times: the branches take different parameters, a list padded to fit
+   * both leaves a placeholder unused, and PostgreSQL rejects that only on the
+   * branch that builds it — so the bug hides until exactly that path runs.
+   *
+   * The checks above cannot see inside a ternary, because neither branch is
+   * the literal argument. Rather than teach them to, this refuses the shape:
+   * two `query` calls in an if/else are as short to write and cannot be wrong.
+   */
+  const bad: string[] = []
+  for (const file of walk('src/server')) {
+    const text = readFileSync(file, 'utf8')
+    for (const match of text.matchAll(/query(?:<[^(]*?>)?\(\s*\n?\s*[\w.!?]+\s*(?:\.length\s*)?\?/g)) {
+      bad.push(`${file}:${text.slice(0, match.index).split('\n').length} chooses its SQL with a ternary`)
+    }
+  }
+  assert.deepEqual(bad, [], 'use an if/else with one query call in each branch')
+})
+

@@ -627,3 +627,337 @@ export async function archiveAsset(ctx: TenantContext, assetId: string, version:
     await recordAudit(tx, ctx, { action: 'asset.archived', resource: 'asset', resourceId: assetId })
   })
 }
+
+/* ------------------------------- requests -------------------------------- */
+
+export type AssetRequestRow = {
+  id: string
+  reference: string
+  requesterUserId: string
+  assetType: string | null
+  assetId: string | null
+  quantity: number
+  reason: string | null
+  neededBy: string | null
+  status: string
+  currentLevel: number
+  version: number
+}
+
+const mapRequest = (row: Raw): AssetRequestRow => ({
+  id: row.id as string,
+  reference: row.reference as string,
+  requesterUserId: row.requester_user_id as string,
+  assetType: (row.asset_type as string) ?? null,
+  assetId: (row.asset_id as string) ?? null,
+  quantity: row.quantity as number,
+  reason: (row.reason as string) ?? null,
+  neededBy: date((row.needed_by as Date) ?? null),
+  status: row.status as string,
+  currentLevel: row.current_level as number,
+  version: row.version as number,
+})
+
+/**
+ * The approval levels an asset request must clear, in order.
+ *
+ * A workspace with none configured needs no approval, which is a deliberate
+ * choice rather than an oversight: requiring an approval from a level that
+ * does not exist would leave every request stuck with nobody able to move it.
+ */
+async function approvalLevels(db: Db, ctx: TenantContext): Promise<number[]> {
+  const { rows } = await db.query<{ level: number }>(
+    'select level from asset_approval_levels where tenant_id = $1 order by level',
+    [ctx.tenantId],
+  )
+  return rows.map((row) => row.level)
+}
+
+export async function requestAsset(
+  ctx: TenantContext,
+  input: { assetType?: string | null; assetId?: string | null; quantity?: number; reason?: string | null; neededBy?: string | null },
+): Promise<AssetRequestRow> {
+  ctx.require('record.create')
+  if (!input.assetType?.trim() && !input.assetId) {
+    throw unprocessable('nothing_requested', 'Say what is being asked for.')
+  }
+
+  return ctx.db.transaction(async (tx) => {
+    if (input.assetId) {
+      const { rows } = await tx.query('select 1 from assets where id = $1 and tenant_id = $2 and archived_at is null', [
+        input.assetId,
+        ctx.tenantId,
+      ])
+      if (!rows[0]) throw notFound('That asset')
+    }
+
+    await tx.query('select 1 from tenants where id = $1 for update', [ctx.tenantId])
+    const { rows: counted } = await tx.query<{ n: string }>(
+      'select count(*)::text as n from asset_requests where tenant_id = $1',
+      [ctx.tenantId],
+    )
+    const reference = `AR-${ctx.now.getUTCFullYear()}-${String(Number(counted[0].n) + 1).padStart(4, '0')}`
+
+    const levels = await approvalLevels(tx, ctx)
+    // With no levels configured the request is approved on submission, so it
+    // does not sit waiting for an approver who does not exist.
+    const status = levels.length ? 'submitted' : 'approved'
+
+    const { rows } = await tx.query<Raw>(
+      `insert into asset_requests
+         (tenant_id, company_id, reference, requester_user_id, asset_type, asset_id, quantity, reason, needed_by,
+          status, current_level, decided_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
+      [
+        ctx.tenantId,
+        ctx.companyId,
+        reference,
+        ctx.userId,
+        input.assetType ?? null,
+        input.assetId ?? null,
+        input.quantity ?? 1,
+        input.reason ?? null,
+        input.neededBy ?? null,
+        status,
+        levels[0] ?? 1,
+        status === 'approved' ? ctx.now : null,
+      ],
+    )
+    await recordAudit(tx, ctx, {
+      action: 'asset.requested',
+      resource: 'asset_request',
+      resourceId: rows[0].id as string,
+      detail: { reference, quantity: input.quantity ?? 1 },
+    })
+    return mapRequest(rows[0])
+  })
+}
+
+/**
+ * Records one approval decision.
+ *
+ * `asset_request_approval_key` makes a level decidable exactly once, so a
+ * double-click cannot advance the request two levels at a time. The request
+ * reaches `approved` only when every configured level has approved it.
+ */
+export async function decideAssetRequest(
+  ctx: TenantContext,
+  requestId: string,
+  input: { decision: 'approved' | 'rejected'; version: number; note?: string | null },
+): Promise<AssetRequestRow> {
+  ctx.require('approval.decide')
+
+  return ctx.db.transaction(async (tx) => {
+    const { rows } = await tx.query<Raw>('select * from asset_requests where id = $1 and tenant_id = $2 for update', [
+      requestId,
+      ctx.tenantId,
+    ])
+    const request = rows[0]
+    if (!request) throw notFound('That request')
+    if (request.version !== input.version) throw conflict('Someone else decided this request.', request.version as number)
+    if (request.status !== 'submitted') throw unprocessable('not_submitted', `That request is ${request.status}.`)
+
+    const level = request.current_level as number
+    const { rowCount } = await tx.query(
+      `insert into asset_request_approvals (tenant_id, request_id, level, decided_by, decision, note, decided_at)
+       values ($1,$2,$3,$4,$5,$6,$7)
+       on conflict (request_id, level) do nothing`,
+      [ctx.tenantId, requestId, level, ctx.userId, input.decision, input.note ?? null, ctx.now],
+    )
+    if (!rowCount) throw conflict(`Level ${level} has already been decided.`)
+
+    if (input.decision === 'rejected') {
+      await tx.query(
+        `update asset_requests set status = 'rejected', decided_at = $2, version = version + 1, updated_at = $2 where id = $1`,
+        [requestId, ctx.now],
+      )
+    } else {
+      const levels = await approvalLevels(tx, ctx)
+      const remaining = levels.filter((candidate) => candidate > level)
+      // Two statements rather than one chosen by a ternary: the branches take
+      // different parameters, and a list padded to fit both leaves a
+      // placeholder unused, which PostgreSQL rejects only on that branch.
+      if (remaining.length) {
+        await tx.query('update asset_requests set current_level = $2, version = version + 1, updated_at = $3 where id = $1', [
+          requestId,
+          remaining[0],
+          ctx.now,
+        ])
+      } else {
+        await tx.query(
+          `update asset_requests set status = 'approved', decided_at = $2, version = version + 1, updated_at = $2 where id = $1`,
+          [requestId, ctx.now],
+        )
+      }
+    }
+    await recordAudit(tx, ctx, {
+      action: `asset.request_${input.decision}`,
+      resource: 'asset_request',
+      resourceId: requestId,
+      detail: { level },
+    })
+    const { rows: after } = await tx.query<Raw>('select * from asset_requests where id = $1', [requestId])
+    return mapRequest(after[0])
+  })
+}
+
+/**
+ * Issues the asset a request was approved for, closing the request.
+ *
+ * The issue and the request's transition happen together: an asset handed over
+ * against a request that still reads "approved" is one somebody will issue a
+ * second time.
+ */
+export async function issueAgainstRequest(
+  ctx: TenantContext,
+  requestId: string,
+  input: { assetId: string; version: number; dueBackOn?: string | null },
+): Promise<{ request: AssetRequestRow; asset: AssetRow }> {
+  ctx.require('record.update')
+
+  const request = await ctx.db.transaction(async (tx) => {
+    const { rows } = await tx.query<Raw>('select * from asset_requests where id = $1 and tenant_id = $2 for update', [
+      requestId,
+      ctx.tenantId,
+    ])
+    if (!rows[0]) throw notFound('That request')
+    if (rows[0].version !== input.version) throw conflict('Someone else changed this request.', rows[0].version as number)
+    if (rows[0].status !== 'approved') throw unprocessable('not_approved', `That request is ${rows[0].status}.`)
+
+    await tx.query(
+      `update asset_requests set status = 'issued', asset_id = $2, issued_at = $3, version = version + 1, updated_at = $3
+        where id = $1`,
+      [requestId, input.assetId, ctx.now],
+    )
+    const { rows: after } = await tx.query<Raw>('select * from asset_requests where id = $1', [requestId])
+    return mapRequest(after[0])
+  })
+
+  // Custody is its own transaction with its own guards — the unique index on
+  // open assignments still decides whether this issue is allowed at all.
+  const asset = await assignAsset(ctx, input.assetId, {
+    holderUserId: request.requesterUserId,
+    dueBackOn: input.dueBackOn ?? null,
+  })
+  return { request, asset }
+}
+
+export async function listAssetRequests(
+  ctx: TenantContext,
+  options: { status?: string; requesterUserId?: string; assetType?: string; mine?: boolean; limit?: number; offset?: number } = {},
+): Promise<{ rows: AssetRequestRow[]; total: number }> {
+  ctx.require('record.read')
+  const filters = ['tenant_id = $1']
+  const params: unknown[] = [ctx.tenantId]
+  const add = (clause: string, value: unknown) => {
+    params.push(value)
+    filters.push(clause.replace('$?', `$${params.length}`))
+  }
+  if (options.status) add('status = $?', options.status)
+  if (options.assetType) add('asset_type = $?', options.assetType)
+  if (options.mine) add('requester_user_id = $?', ctx.userId)
+  else if (options.requesterUserId) add('requester_user_id = $?', options.requesterUserId)
+  const where = filters.join(' and ')
+
+  const { rows: counted } = await ctx.db.query<{ n: string }>(
+    `select count(*)::text as n from asset_requests where ${where}`,
+    params as never[],
+  )
+  params.push(Math.min(options.limit ?? 50, 200), Math.max(options.offset ?? 0, 0))
+  const { rows } = await ctx.db.query<Raw>(
+    `select * from asset_requests where ${where} order by created_at desc limit $${params.length - 1} offset $${params.length}`,
+    params as never[],
+  )
+  return { total: Number(counted[0].n), rows: rows.map(mapRequest) }
+}
+
+/* ------------------------------- reporting -------------------------------- */
+
+export type AssetFacets = {
+  byStatus: Record<string, number>
+  byType: Record<string, number>
+  byLocation: Record<string, number>
+  pendingRequests: number
+  outOfWarranty: number
+  warrantyExpiring: number
+}
+
+/**
+ * The counts behind the register's filter chips and dashboard tiles.
+ *
+ * One pass per dimension rather than one query with several `group by`s, so
+ * each count is legible and can be checked against the list it labels.
+ */
+export async function assetFacets(ctx: TenantContext): Promise<AssetFacets> {
+  ctx.require('record.read')
+  const today = ctx.now.toISOString().slice(0, 10)
+  const horizon = new Date(ctx.now.getTime() + 90 * 86_400_000).toISOString().slice(0, 10)
+
+  const [status, type, location, requests, warranty] = await Promise.all([
+    ctx.db.query<{ key: string; n: string }>(
+      'select status as key, count(*)::text as n from assets where tenant_id = $1 and archived_at is null group by status',
+      [ctx.tenantId],
+    ),
+    ctx.db.query<{ key: string; n: string }>(
+      `select coalesce(asset_type, 'unspecified') as key, count(*)::text as n
+         from assets where tenant_id = $1 and archived_at is null group by 1`,
+      [ctx.tenantId],
+    ),
+    ctx.db.query<{ key: string; n: string }>(
+      `select coalesce(location, 'unassigned') as key, count(*)::text as n
+         from assets where tenant_id = $1 and archived_at is null group by 1`,
+      [ctx.tenantId],
+    ),
+    ctx.db.query<{ n: string }>(
+      `select count(*)::text as n from asset_requests where tenant_id = $1 and status = 'submitted'`,
+      [ctx.tenantId],
+    ),
+    ctx.db.query<{ expired: string; expiring: string }>(
+      `select
+         count(*) filter (where warranty_expires_on < $2)::text as expired,
+         count(*) filter (where warranty_expires_on >= $2 and warranty_expires_on < $3)::text as expiring
+       from assets
+      where tenant_id = $1 and archived_at is null and warranty_expires_on is not null`,
+      [ctx.tenantId, today, horizon],
+    ),
+  ])
+
+  const tally = (rows: { key: string; n: string }[]) =>
+    Object.fromEntries(rows.map((row) => [row.key, Number(row.n)])) as Record<string, number>
+
+  return {
+    byStatus: tally(status.rows),
+    byType: tally(type.rows),
+    byLocation: tally(location.rows),
+    pendingRequests: Number(requests.rows[0].n),
+    outOfWarranty: Number(warranty.rows[0].expired),
+    warrantyExpiring: Number(warranty.rows[0].expiring),
+  }
+}
+
+export type StockLine = { key: string; count: number; value: string; currency: string | null }
+
+/**
+ * Stock by type, location or status, with the purchase value held in each.
+ *
+ * Assets with no recorded cost contribute to the count but not the value, and
+ * the two are reported separately so a register that is half-priced is not
+ * mistaken for one that is half-empty.
+ */
+export async function stockSummary(ctx: TenantContext, groupBy: 'type' | 'location' | 'status'): Promise<StockLine[]> {
+  ctx.require('record.read')
+  const query = {
+    type: `select coalesce(asset_type, 'unspecified') as key, count(*)::text as n,
+                  coalesce(sum(purchase_cost), 0)::text as value, min(currency) as currency
+             from assets where tenant_id = $1 and archived_at is null group by 1 order by 1`,
+    location: `select coalesce(location, 'unassigned') as key, count(*)::text as n,
+                      coalesce(sum(purchase_cost), 0)::text as value, min(currency) as currency
+                 from assets where tenant_id = $1 and archived_at is null group by 1 order by 1`,
+    status: `select status as key, count(*)::text as n,
+                    coalesce(sum(purchase_cost), 0)::text as value, min(currency) as currency
+               from assets where tenant_id = $1 and archived_at is null group by 1 order by 1`,
+  }[groupBy]
+
+  const { rows } = await ctx.db.query<{ key: string; n: string; value: string; currency: string | null }>(query, [ctx.tenantId])
+  return rows.map((row) => ({ key: row.key, count: Number(row.n), value: row.value, currency: row.currency }))
+}

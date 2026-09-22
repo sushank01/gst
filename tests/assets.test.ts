@@ -304,3 +304,182 @@ test('depreciation is computed only from inputs that were actually supplied', as
   assert.equal(settled?.netBookValue, '50000.0000')
   await db.close()
 })
+
+/* ------------------------------ requests --------------------------------- */
+
+const {
+  requestAsset, decideAssetRequest, issueAgainstRequest, listAssetRequests, assetFacets, stockSummary,
+} = await import('../src/server/services/assets.ts')
+
+/** A workspace with `levels` approval levels configured. */
+async function withApprovals(levels: number) {
+  const context = await workspace()
+  for (let level = 1; level <= levels; level += 1) {
+    await context.db.query(
+      `insert into asset_approval_levels (tenant_id, level, approver_kind, approver_role) values ($1,$2,'role','admin')`,
+      [context.ctx.tenantId, level],
+    )
+  }
+  return context
+}
+
+test('with no approval levels configured a request is approved on submission', async () => {
+  const { db, ctx } = await workspace()
+  const request = await requestAsset(ctx, { assetType: 'laptop', reason: 'new joiner' })
+  assert.match(request.reference, /^AR-\d{4}-0001$/)
+  assert.equal(
+    request.status,
+    'approved',
+    'requiring an approval from a level that does not exist leaves every request stuck',
+  )
+  await db.close()
+})
+
+test('a request clears each configured level in order', async () => {
+  const { db, ctx } = await withApprovals(2)
+  const request = await requestAsset(ctx, { assetType: 'laptop', quantity: 2 })
+  assert.equal(request.status, 'submitted')
+  assert.equal(request.currentLevel, 1)
+
+  const afterOne = await decideAssetRequest(ctx, request.id, { decision: 'approved', version: request.version })
+  assert.equal(afterOne.status, 'submitted')
+  assert.equal(afterOne.currentLevel, 2)
+
+  const afterTwo = await decideAssetRequest(ctx, request.id, { decision: 'approved', version: afterOne.version })
+  assert.equal(afterTwo.status, 'approved')
+  await db.close()
+})
+
+test('a level cannot be decided twice, so a double-click cannot skip one', async () => {
+  const { db, ctx } = await withApprovals(2)
+  const request = await requestAsset(ctx, { assetType: 'laptop' })
+
+  const results = await Promise.allSettled([
+    decideAssetRequest(ctx, request.id, { decision: 'approved', version: request.version }),
+    decideAssetRequest(ctx, request.id, { decision: 'approved', version: request.version }),
+  ])
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1)
+
+  const { rows } = await db.query<{ n: string }>(
+    'select count(*)::text as n from asset_request_approvals where request_id = $1',
+    [request.id],
+  )
+  assert.equal(rows[0].n, '1')
+  await db.close()
+})
+
+test('a rejection stops the request', async () => {
+  const { db, ctx } = await withApprovals(2)
+  const request = await requestAsset(ctx, { assetType: 'laptop' })
+  const rejected = await decideAssetRequest(ctx, request.id, { decision: 'rejected', version: request.version, note: 'no budget' })
+  assert.equal(rejected.status, 'rejected')
+  await assert.rejects(
+    () => decideAssetRequest(ctx, request.id, { decision: 'approved', version: rejected.version }),
+    /is rejected/i,
+  )
+  await db.close()
+})
+
+test('issuing against a request hands the asset over and closes the request together', async () => {
+  const { db, ctx } = await withApprovals(1)
+  const asset = await createAsset(ctx, LAPTOP)
+  const request = await requestAsset(ctx, { assetType: 'laptop' })
+  const approved = await decideAssetRequest(ctx, request.id, { decision: 'approved', version: request.version })
+
+  const issued = await issueAgainstRequest(ctx, request.id, { assetId: asset.id, version: approved.version })
+  assert.equal(issued.request.status, 'issued')
+  assert.equal(issued.asset.status, 'assigned')
+  assert.equal(issued.asset.holder?.userId, ctx.userId)
+
+  // A request that still read "approved" is one somebody issues a second time.
+  await assert.rejects(
+    () => issueAgainstRequest(ctx, request.id, { assetId: asset.id, version: issued.request.version }),
+    /is issued/i,
+  )
+  await db.close()
+})
+
+test('an unapproved request cannot be issued against', async () => {
+  const { db, ctx } = await withApprovals(1)
+  const asset = await createAsset(ctx, LAPTOP)
+  const request = await requestAsset(ctx, { assetType: 'laptop' })
+  await assert.rejects(
+    () => issueAgainstRequest(ctx, request.id, { assetId: asset.id, version: request.version }),
+    /is submitted/i,
+  )
+  await db.close()
+})
+
+test('a request must say what it is asking for', async () => {
+  const { db, ctx } = await workspace()
+  await assert.rejects(() => requestAsset(ctx, { reason: 'because' }), /what is being asked for/i)
+  await db.close()
+})
+
+test('requests list by status and by who raised them', async () => {
+  const { db, ctx } = await withApprovals(1)
+  await requestAsset(ctx, { assetType: 'laptop' })
+  const second = await requestAsset(ctx, { assetType: 'monitor' })
+  await decideAssetRequest(ctx, second.id, { decision: 'rejected', version: second.version })
+
+  assert.equal((await listAssetRequests(ctx, {})).total, 2)
+  assert.equal((await listAssetRequests(ctx, { status: 'submitted' })).total, 1)
+  assert.equal((await listAssetRequests(ctx, { mine: true })).total, 2)
+  assert.equal((await listAssetRequests(ctx, { assetType: 'monitor' })).total, 1)
+  await db.close()
+})
+
+test('facets count what the filter chips claim, and warranty is split by whether it has passed', async () => {
+  const { db, ctx, owner } = await workspace()
+  const past = new Date(ctx.now.getTime() - 40 * 86_400_000).toISOString().slice(0, 10)
+  const soon = new Date(ctx.now.getTime() + 40 * 86_400_000).toISOString().slice(0, 10)
+  const later = new Date(ctx.now.getTime() + 400 * 86_400_000).toISOString().slice(0, 10)
+
+  const issued = await createAsset(ctx, { name: 'A', assetType: 'laptop', location: 'Pune', warrantyExpiresOn: past })
+  await createAsset(ctx, { name: 'B', assetType: 'laptop', location: 'Pune', warrantyExpiresOn: soon })
+  await createAsset(ctx, { name: 'C', assetType: 'monitor', warrantyExpiresOn: later })
+  await assignAsset(ctx, issued.id, { holderUserId: owner })
+  await requestAsset(ctx, { assetType: 'laptop' })
+
+  const facets = await assetFacets(ctx)
+  assert.equal(facets.byStatus.assigned, 1)
+  assert.equal(facets.byStatus.in_stock, 2)
+  assert.equal(facets.byType.laptop, 2)
+  assert.equal(facets.byLocation.Pune, 2)
+  assert.equal(facets.byLocation.unassigned, 1, 'an asset with no location is counted, not dropped')
+  assert.equal(facets.outOfWarranty, 1)
+  assert.equal(facets.warrantyExpiring, 1, 'expiring within 90 days; the one 400 days out is neither')
+  assert.equal(facets.pendingRequests, 0, 'no approval levels, so nothing is pending')
+  await db.close()
+})
+
+test('stock summary reports count and value separately', async () => {
+  const { db, ctx } = await workspace()
+  await createAsset(ctx, { name: 'A', assetType: 'laptop', purchaseCost: '120000.0000', currency: 'INR' })
+  await createAsset(ctx, { name: 'B', assetType: 'laptop' }) // no recorded cost
+  await createAsset(ctx, { name: 'C', assetType: 'monitor', purchaseCost: '30000.0000', currency: 'INR' })
+
+  const byType = await stockSummary(ctx, 'type')
+  const laptops = byType.find((line) => line.key === 'laptop')!
+  assert.equal(laptops.count, 2)
+  assert.equal(laptops.value, '120000.0000', 'the uncosted asset counts but adds no value')
+  assert.equal(byType.find((line) => line.key === 'monitor')!.value, '30000.0000')
+
+  const byStatus = await stockSummary(ctx, 'status')
+  assert.equal(byStatus.find((line) => line.key === 'in_stock')!.count, 3)
+  await db.close()
+})
+
+test('ISOLATION: requests and facets never cross workspaces', async () => {
+  const { db, ctx, rivalCtx } = await withApprovals(1)
+  const request = await requestAsset(ctx, { assetType: 'laptop' })
+  await createAsset(ctx, LAPTOP)
+
+  await assert.rejects(
+    () => decideAssetRequest(rivalCtx, request.id, { decision: 'approved', version: request.version }),
+    /That request/,
+  )
+  assert.equal((await listAssetRequests(rivalCtx, {})).total, 0)
+  assert.deepEqual((await assetFacets(rivalCtx)).byStatus, {})
+  await db.close()
+})
