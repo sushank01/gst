@@ -1,11 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Link, useNavigate } from '../../lib/router'
 import { useAuth } from '../../lib/auth'
 import { useWorkspace } from '../../lib/workspace'
 import { marketApps } from '../../lib/appData'
 import { useApps } from '../../lib/useWorkspaceSummary'
+import { api } from '../../lib/api'
+import { useResource } from '../../lib/useResource'
 import { WorkspaceSummary } from './WorkspaceSummary'
 import { AppMetricsPanel, OverviewPanel, RunsRangeFilter } from './dashboardPanels'
 import type { RunsRange } from './dashboardPanels'
@@ -17,46 +19,41 @@ function greeting() {
   return 'Good evening'
 }
 
+/**
+ * The second-factor prompt.
+ *
+ * "Turn on now" used to set a workspace flag to 'on' and dismiss the banner.
+ * No enrolment happened: no secret was generated, no device was registered,
+ * no challenge was ever required at sign-in. Somebody could click it, see the
+ * warning disappear, and reasonably believe their account was protected —
+ * which is the single most dangerous thing a security control can do.
+ *
+ * Enrolment needs a second factor to enrol WITH, which is decision D3. Until
+ * then the banner says what is true and offers nothing to click.
+ */
 function TwoFactorBanner() {
-  const { twoFactor, setTwoFactor } = useWorkspace()
-  if (twoFactor !== 'pending') return null
-
   return (
-    <section className="flex flex-wrap items-start gap-4 rounded-2xl border border-warn/30 bg-warn-muted/40 p-5">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-warn/15 text-warn">🛡</span>
+    <section className="flex flex-wrap items-start gap-4 rounded-2xl border border-line bg-surface p-5">
+      <span aria-hidden className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-fg-muted">
+        🛡
+      </span>
       <div className="min-w-[16rem] flex-1">
-        <h2 className="text-[15px] font-semibold text-warn">Add a second factor to your account</h2>
+        <h2 className="text-[15px] font-semibold">Two-factor authentication is not available yet</h2>
         <p className="mt-1 max-w-3xl text-[13px] leading-relaxed text-fg-2">
-          Admin accounts are the biggest target for takeover attempts. Enabling two-factor auth takes about 60 seconds
-          and blocks every stolen-password attack we see.
+          Your account is protected by its password alone. Enrolling a second factor needs a delivery channel or an
+          authenticator this deployment can verify against, and none is configured — so there is nothing here to
+          turn on, and nothing that would pretend to.
         </p>
-      </div>
-      <div className="flex gap-2">
-        <button
-          onClick={() => setTwoFactor('on')}
-          className="rounded-xl bg-warn px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90"
-        >
-          Turn on now
-        </button>
-        <button
-          onClick={() => setTwoFactor('snoozed')}
-          className="rounded-xl border border-line bg-surface px-4 py-2 text-[13px] font-medium text-fg-2 transition hover:bg-surface-2"
-        >
-          ✕ Remind me later
-        </button>
+        <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-fg-muted">
+          What does protect the account today: passwords are stored with scrypt, sign-in locks out after eight
+          failures, sessions are opaque values checked against the database on every request, and entering a
+          workspace issues a fresh token.
+        </p>
       </div>
     </section>
   )
 }
 
-/**
- * The plan card.
- *
- * Every number comes from the server: the countdown from the subscription's
- * stored end date, the credit figures from the ledger, the app count from the
- * installations. The prototype rendered "13 days left" as a constant and a
- * credit total that no spend ever moved, so both were wrong from day two.
- */
 function TrialCard() {
   const { data, loading, error } = useApps()
 
@@ -119,12 +116,55 @@ function TrialCard() {
   )
 }
 
+/**
+ * Getting started.
+ *
+ * The old list had five items and three of them could never be ticked:
+ * "Create your first agent", "Allocate credits to yourself" and "Try the AI
+ * Copilot" all needed a model nobody has connected. A checklist that sticks at
+ * forty per cent for ever is not encouragement, it is a standing reproach for
+ * something the reader cannot do.
+ *
+ * What remains is what the server can confirm: apps installed, and somebody
+ * else in the workspace. Both are checked against real rows rather than a
+ * flag the browser sets when you click.
+ */
 function Checklist() {
   const navigate = useNavigate()
-  const { checklist, checklistDone, dismissedChecklist, setFlag } = useWorkspace()
-  if (dismissedChecklist) return null
+  const { dismissedChecklist, setFlag } = useWorkspace()
+  const apps = useApps()
+  const members = useResource<{ members: { userId: string }[] }>(
+    'members:checklist',
+    useCallback((signal) => api.get<{ members: { userId: string }[] }>('/members', undefined, signal), []),
+  )
 
-  const pct = Math.round((checklistDone / checklist.length) * 100)
+  if (dismissedChecklist) return null
+  // Nothing is claimed complete or incomplete until both answers are in.
+  if (apps.loading || members.loading || apps.error || members.error) return null
+
+  const installed = (apps.data?.apps ?? []).filter((app) => app.status && app.status !== 'uninstalled').length
+  const teammates = (members.data?.members ?? []).length
+
+  const tasks = [
+    {
+      id: 'app',
+      icon: '🗂',
+      name: 'Install an application',
+      blurb: 'CRM, HR, Support, Sales — the ones that are built.',
+      done: installed > 0,
+      to: '/app/marketplace',
+    },
+    {
+      id: 'invite',
+      icon: '👤',
+      name: 'Invite a teammate',
+      blurb: 'They join your workspace with a role you choose.',
+      done: teammates > 1,
+      to: '/app/account',
+    },
+  ]
+  const complete = tasks.filter((task) => task.done).length
+  if (complete === tasks.length) return null
 
   return (
     <section className="relative rounded-2xl border border-line bg-gradient-to-br from-accent/5 via-surface to-fuchsia-500/5 p-6">
@@ -137,45 +177,31 @@ function Checklist() {
       </button>
 
       <div className="flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 text-accent">✦</span>
-        <h2 className="text-[15px] font-semibold">Get the most out of Apragya</h2>
+        <span aria-hidden className="grid h-9 w-9 place-items-center rounded-xl bg-accent/15 text-accent">
+          ✦
+        </span>
+        <h2 className="text-[15px] font-semibold">Get your workspace going</h2>
       </div>
       <p className="mt-2 text-[13px] text-fg-muted">
-        A few quick wins to get your team running. Tasks tick off automatically as you go.
+        {complete} of {tasks.length} done. Each one ticks off from your records, not from clicking here.
       </p>
 
-      <div className="mt-5 flex items-center justify-between text-[12px] text-fg-muted">
-        <span>
-          {checklistDone} of {checklist.length} complete
-        </span>
-        <span>{pct}%</span>
-      </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full bg-gradient-to-r from-accent to-fuchsia-500" style={{ width: `${pct}%` }} />
-      </div>
-
       <ul className="mt-5 space-y-2.5">
-        {checklist.map((task) => (
+        {tasks.map((task) => (
           <li key={task.id}>
             <button
-              onClick={() => {
-                if (task.action === 'allocate') setFlag('creditsAllocated')
-                else if (task.action === 'invite') setFlag('invitedTeammate')
-                else if (task.to) navigate(task.to)
-              }}
+              onClick={() => navigate(task.to)}
               className={`flex w-full items-center gap-4 rounded-xl border px-4 py-3.5 text-left transition ${
-                task.done
-                  ? 'border-ok/30 bg-ok-muted/40'
-                  : 'border-line bg-surface hover:border-accent/50'
+                task.done ? 'border-ok/30 bg-ok-muted/40' : 'border-line bg-surface hover:border-accent/50'
               }`}
             >
               <span
                 aria-hidden
                 className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[12px] ${
-                  task.done ? 'bg-ok text-white' : 'border-2 border-bad/40 text-bad'
+                  task.done ? 'bg-ok text-white' : 'border-2 border-line text-fg-muted'
                 }`}
               >
-                {task.done ? '✓' : '◉'}
+                {task.done ? '✓' : '○'}
               </span>
               <span aria-hidden className="text-sm">
                 {task.icon}
