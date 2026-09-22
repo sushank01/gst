@@ -9,28 +9,24 @@ one — the asset metrics rows, for example, are served by
 `/api/v1/reports/apps/{code}`. Closing a line means reading the rows behind
 it and deciding what the operation actually needs, not renaming a path.
 
-At this pass: **725 ledger rows**, 118 documented operations,
-12 SERVED, 28 VERIFIED, 2 BLOCKED,
-683 still DISCOVERED.
+At this pass: **725 ledger rows**, 132 documented operations,
+21 SERVED, 28 VERIFIED, 2 BLOCKED,
+674 still DISCOVERED.
 
-## Sales & POS — 106 endpoint(s)
+## Sales & POS — 98 endpoint(s)
 
-- `patch /api/v1/sales/customers/{id}` — 2 operation(s): OP-POS-CUSTOMER-UPDATE, OP-POS-CUSTOMER-GROUP-ASSIGN
 - `post /api/v1/sales/returns` — 2 operation(s): OP-POS-INVOICE-NAV-RETURNS, OP-POS-RETURN-CREATE
 - `put /api/v1/sales/settings/match-policy` — 2 operation(s): OP-POS-MATCH-SAVE, OP-POS-MATCH-REQDOCS
 - `get /api/v1/entitlements` — 1 operation(s): OP-POS-INSTALL-GATE
 - `get /api/v1/sales/reports/overview?period=` — 1 operation(s): OP-POS-DASH-READ
 - `get /api/v1/sales/reports/overview` — 1 operation(s): OP-POS-DASH-PERIOD
-- `get /api/v1/sales/reports/order-to-cash` — 1 operation(s): OP-POS-DASH-OTC
 - `get /api/v1/sales/reports/monthly?year=` — 1 operation(s): OP-POS-DASH-MONTHLY
 - `get /api/v1/sales/reports/aging?asOf=` — 1 operation(s): OP-POS-DASH-AGING
 - `get /api/v1/sales/reports/payment-due` — 1 operation(s): OP-POS-DASH-PAYMENTDUE
 - `get /api/v1/sales/reports/payment-status` — 1 operation(s): OP-POS-DASH-PAYSTATUS
 - `get /api/v1/sales/reports/top-debtors?limit=5` — 1 operation(s): OP-POS-DASH-TOPDEBTORS
-- `get /api/v1/sales/customers` — 1 operation(s): OP-POS-CUSTOMER-LIST
 - `get /api/v1/sales/customers?q=` — 1 operation(s): OP-POS-CUSTOMER-SEARCH
 - `get /api/v1/sales/customers?includeArchived=true` — 1 operation(s): OP-POS-CUSTOMER-SHOWINACTIVE
-- `post /api/v1/sales/customers` — 1 operation(s): OP-POS-CUSTOMER-CREATE
 - `get /api/v1/sales/customers/export.csv` — 1 operation(s): OP-POS-CUSTOMER-EXPORT
 - `post /api/v1/sales/customers/import (stage) + POST .../commit` — 1 operation(s): OP-POS-CUSTOMER-IMPORT
 - `post /api/v1/sales/customers/{id}/archive` — 1 operation(s): OP-POS-CUSTOMER-ARCHIVE
@@ -59,12 +55,8 @@ At this pass: **725 ledger rows**, 118 documented operations,
 - `post /api/v1/sales/invoices/{id}/post` — 1 operation(s): OP-POS-INVOICE-POST
 - `post /api/v1/sales/invoices/{id}/match` — 1 operation(s): OP-POS-INVOICE-MATCH
 - `post /api/v1/sales/invoices/{id}/void` — 1 operation(s): OP-POS-INVOICE-DELETE
-- `post /api/v1/pos/shifts` — 1 operation(s): OP-POS-SHIFT-OPEN
-- `post /api/v1/pos/shifts/{id}/close` — 1 operation(s): OP-POS-SHIFT-CLOSE
 - `get /api/v1/inventory/warehouses` — 1 operation(s): OP-POS-SHIFT-WAREHOUSE
-- `post /api/v1/pos/sales` — 1 operation(s): OP-POS-SALE-CREATE
 - `post /api/v1/pos/sales/{id}/tenders` — 1 operation(s): OP-POS-SALE-TENDER
-- `get /api/v1/pos/shifts` — 1 operation(s): OP-POS-SHIFT-LIST
 - `get /api/v1/pos/shifts/metrics` — 1 operation(s): OP-POS-SHIFT-TAKINGS
 - `get /api/v1/pos/shifts/variance` — 1 operation(s): OP-POS-SHIFT-VARIANCE
 - `get /api/v1/pos/shifts?since=` — 1 operation(s): OP-POS-SHIFT-AUTOREFRESH
