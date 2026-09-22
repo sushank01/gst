@@ -4,6 +4,7 @@ import { createTenantWithOwner, listTenantsForUser } from '../../../../server/se
 import { rotateSessionTenant } from '../../../../server/auth/session.ts'
 import { sessionCookie } from '../../../../server/http/cookies.ts'
 
+/** The workspaces this account belongs to. */
 export const GET = authRoute(async ({ ctx }) => ({ body: { tenants: await listTenantsForUser(ctx.db, ctx.userId) } }))
 
 const Body = z

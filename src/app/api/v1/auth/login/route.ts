@@ -7,6 +7,7 @@ import { sessionCookie } from '../../../../../server/http/cookies.ts'
 
 const Body = z.object({ email: emailField, password: z.string().min(1, 'Enter your password.') }).strict()
 
+/** Signs in and sets the session cookie. A wrong password and an unknown account fail identically. */
 export const POST = publicRoute(async ({ request, db, now }) => {
   const input = parseOrThrow(Body, await jsonBody(request))
   const signedIn = await signIn(

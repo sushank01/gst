@@ -12,6 +12,7 @@ const Body = z
   })
   .strict()
 
+/** Records one approval decision. Each level is decidable once per round. */
 export const POST = tenantRoute(async ({ request, ctx }) => ({
   body: { report: await decideReport(ctx, pathSegment(request, 1), parseOrThrow(Body, await jsonBody(request))) },
 }))

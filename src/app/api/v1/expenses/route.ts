@@ -13,6 +13,7 @@ const Query = z
   })
   .strict()
 
+/** Expenses, filtered by person, claim or date. `unfiled=true` returns what is not yet on a report. */
 export const GET = tenantRoute(async ({ request, ctx }) => ({
   body: { expenses: await listExpenses(ctx, parseOrThrow(Query, searchParams(request))) },
 }))
@@ -37,6 +38,7 @@ const Body = z
   })
   .strict()
 
+/** Records one expense. A cross-currency amount must state the rate used; none is ever invented. */
 export const POST = tenantRoute(async ({ request, ctx }) => ({
   status: 201,
   body: { expense: await recordExpense(ctx, parseOrThrow(Body, await jsonBody(request))) },

@@ -143,10 +143,17 @@ export async function createTicket(ctx: TenantContext, input: CreateTicketInput)
     const reference = await nextReference(tx, ctx)
     const priority = input.priority ?? 'medium'
     const { rows } = await tx.query(
+      /*
+       * `created_at` is set explicitly from the request clock rather than left
+       * to the column default. Otherwise the row is stamped by the DATABASE
+       * clock while `first_response_at` comes from the APPLICATION clock, and
+       * every first-response duration carries the skew between them — which
+       * can make a response look like it arrived before the ticket did.
+       */
       `insert into tickets
          (tenant_id, company_id, reference, subject, requester_party_id, requester_email, requester_name,
-          status, priority, category, channel, team_id, tags, last_activity_at, created_by)
-       values ($1,$2,$3,$4,$5,$6,$7,'new',$8,$9,$10,$11,$12,$13,$14)
+          status, priority, category, channel, team_id, tags, last_activity_at, created_by, created_at, updated_at)
+       values ($1,$2,$3,$4,$5,$6,$7,'new',$8,$9,$10,$11,$12,$13,$14,$13,$13)
        returning *`,
       [
         ctx.tenantId,

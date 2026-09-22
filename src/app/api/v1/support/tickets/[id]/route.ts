@@ -3,6 +3,7 @@ import { parseOrThrow, z, trimmed, optionalTrimmed } from '../../../../../../ser
 import { listTickets, slaStatus, transitionTicket } from '../../../../../../server/services/support.ts'
 import { notFound } from '../../../../../../server/http/errors.ts'
 
+/** One ticket with its SLA clocks. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const id = pathSegment(request)
   // Reuses the list query so the detail view and the list can never disagree
@@ -16,6 +17,7 @@ const Patch = z
   .object({ status: trimmed(60), version: z.coerce.number().int().min(0), note: optionalTrimmed(2000) })
   .strict()
 
+/** Moves a ticket to another state, pausing or resuming its clocks as the state requires. */
 export const PATCH = tenantRoute(async ({ request, ctx }) => {
   const input = parseOrThrow(Patch, await jsonBody(request))
   const ticket = await transitionTicket(ctx, pathSegment(request), input)

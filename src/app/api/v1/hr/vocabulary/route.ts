@@ -4,6 +4,7 @@ import { createVocabulary, listVocabulary } from '../../../../../server/services
 
 const Kind = z.enum(['department', 'designation', 'location'])
 
+/** Departments, designations or locations. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const query = parseOrThrow(
     z.object({ kind: Kind, includeArchived: z.coerce.boolean().optional() }).strict(),
@@ -23,6 +24,7 @@ const Body = z
   })
   .strict()
 
+/** Adds a department, designation or location. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const { kind, ...input } = parseOrThrow(Body, await jsonBody(request))
   return { status: 201, body: { entry: await createVocabulary(ctx, kind, input) } }

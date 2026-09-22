@@ -2,6 +2,7 @@ import { tenantRoute, jsonBody, pathSegment, searchParams } from '../../../../..
 import { parseOrThrow, z, currency, isoDate, money, optionalTrimmed, uuid } from '../../../../../server/http/validate.ts'
 import { archiveAsset, depreciationOf, readAsset, updateAsset } from '../../../../../server/services/assets.ts'
 
+/** One asset, its current holder, and its depreciation when the inputs for one exist. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const asset = await readAsset(ctx, pathSegment(request))
   // Null when the inputs for it were never supplied — the client shows
@@ -32,6 +33,7 @@ const Patch = z
   })
   .strict()
 
+/** Edits an asset. Takes the version last read. */
 export const PATCH = tenantRoute(async ({ request, ctx }) => {
   const asset = await updateAsset(ctx, pathSegment(request), parseOrThrow(Patch, await jsonBody(request)))
   return { body: { asset } }

@@ -2,6 +2,7 @@ import { tenantRoute, jsonBody } from '../../../../../server/http/handler.ts'
 import { parseOrThrow, z, currency, isoDate, money, optionalTrimmed, trimmed, uuid } from '../../../../../server/http/validate.ts'
 import { importCardTransactions, unmatchedTransactions } from '../../../../../server/services/expenses.ts'
 
+/** Card transactions that are not yet matched to an expense. */
 export const GET = tenantRoute(async ({ ctx }) => ({ body: { transactions: await unmatchedTransactions(ctx) } }))
 
 const Line = z
@@ -18,6 +19,7 @@ const Line = z
   })
   .strict()
 
+/** Imports a statement. Re-importing adds nothing: the provider reference is the key. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const { lines } = parseOrThrow(z.object({ lines: z.array(Line).min(1).max(2000) }).strict(), await jsonBody(request))
   return { body: await importCardTransactions(ctx, lines) }

@@ -14,6 +14,7 @@ const Query = z
   })
   .strict()
 
+/** Tickets, filtered and paged. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const query = parseOrThrow(Query, searchParams(request))
   const { rows, total } = await listTickets(ctx, query)
@@ -36,6 +37,7 @@ const Body = z
   })
   .strict()
 
+/** Opens a ticket with its first message and SLA clocks. A seen inbound message threads instead. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const input = parseOrThrow(Body, await jsonBody(request))
   const ticket = await createTicket(ctx, { ...input, requesterEmail: input.requesterEmail || null })

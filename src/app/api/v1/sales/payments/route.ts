@@ -19,6 +19,7 @@ const Body = z
   })
   .strict()
 
+/** Records a payment and allocates it. An idempotency key makes a retry safe. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const result = await recordPayment(ctx, parseOrThrow(Body, await jsonBody(request)))
   return { status: result.duplicate ? 200 : 201, body: result }

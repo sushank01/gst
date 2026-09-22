@@ -13,7 +13,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "db:migrate": "node --experimental-strip-types scripts/migrate.ts",
-    "verify": "npm run lint && npm run typecheck && npm test && npm run build"
+    "verify": "npm run lint && npm run typecheck && npm test && npm run build",
+    "openapi": "node scripts/openapi.mjs"
   },
   "dependencies": {
     "next": "^16.3.5",

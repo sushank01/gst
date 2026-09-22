@@ -6,6 +6,7 @@ const Body = z
   .object({ decision: z.enum(['approved', 'rejected']), version: z.coerce.number().int().min(0), note: optionalTrimmed(2000) })
   .strict()
 
+/** Records one approval decision on a trip. */
 export const POST = tenantRoute(async ({ request, ctx }) => ({
   body: { request: await decideTrip(ctx, pathSegment(request, 1), parseOrThrow(Body, await jsonBody(request))) },
 }))

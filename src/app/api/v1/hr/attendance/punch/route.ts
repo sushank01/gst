@@ -16,7 +16,7 @@ const Body = z
   .strict()
 
 /**
- * Clocks in or out.
+ * Clocks in or out — the caller's own record, or somebody else's as a correction.
  *
  * Without `employeeId` this acts on the caller's own record, which is the
  * self-service path. With one it is an administrative correction and requires

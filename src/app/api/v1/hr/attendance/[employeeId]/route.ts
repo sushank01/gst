@@ -5,6 +5,7 @@ import { loadDefaultCalendar } from '../../../../../../server/services/calendarS
 
 const Query = z.object({ from: isoDate, to: isoDate }).strict()
 
+/** Settled attendance days over a date range. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const query = parseOrThrow(Query, searchParams(request))
   const days = await attendanceBetween(ctx, pathSegment(request), query.from, query.to)

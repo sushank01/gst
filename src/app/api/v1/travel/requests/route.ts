@@ -13,6 +13,7 @@ const Query = z
   })
   .strict()
 
+/** Travel requests, filtered by person, state or dates. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { rows, total } = await listTrips(ctx, parseOrThrow(Query, searchParams(request)))
   return { body: { requests: rows, total } }
@@ -35,6 +36,7 @@ const Body = z
   })
   .strict()
 
+/** Raises a travel request. Overlapping trips for one person are refused. */
 export const POST = tenantRoute(async ({ request, ctx }) => ({
   status: 201,
   body: { request: await createTrip(ctx, parseOrThrow(Body, await jsonBody(request))) },

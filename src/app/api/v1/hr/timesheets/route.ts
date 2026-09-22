@@ -10,6 +10,7 @@ const Query = z
   })
   .strict()
 
+/** Timesheets, filtered by person and state. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   ctx.require('record.read')
   const query = parseOrThrow(Query, searchParams(request))

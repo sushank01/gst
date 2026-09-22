@@ -15,6 +15,7 @@ const Query = z
   })
   .strict()
 
+/** People, filtered and paged. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { rows, total } = await listEmployees(ctx, parseOrThrow(Query, searchParams(request)))
   return { body: { employees: rows, total } }
@@ -41,6 +42,7 @@ const Body = z
   })
   .strict()
 
+/** Hires somebody: the record and its first position, in one transaction. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const input = parseOrThrow(Body, await jsonBody(request))
   const employee = await hireEmployee(ctx, {

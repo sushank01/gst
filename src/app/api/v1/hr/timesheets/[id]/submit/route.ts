@@ -4,6 +4,7 @@ import { submitTimesheet } from '../../../../../../../server/services/timesheets
 
 const Body = z.object({ version: z.coerce.number().int().min(0) }).strict()
 
+/** Submits a timesheet for approval. An empty one is refused. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const { version } = parseOrThrow(Body, await jsonBody(request))
   return { body: { timesheet: await submitTimesheet(ctx, pathSegment(request, 1), version) } }

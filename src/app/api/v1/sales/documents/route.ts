@@ -13,6 +13,7 @@ const Query = z
   })
   .strict()
 
+/** Order-to-cash documents, filtered by kind, state or customer. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { rows, total } = await listDocuments(ctx, parseOrThrow(Query, searchParams(request)))
   return { body: { documents: rows, total } }
@@ -49,6 +50,7 @@ const Body = z
   })
   .strict()
 
+/** Creates a document. Every total is computed on the server from the lines. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const document = await createDocument(ctx, parseOrThrow(Body, await jsonBody(request)))
   return { status: 201, body: { document } }

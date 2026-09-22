@@ -17,6 +17,7 @@ const Body = z
   .object({ body: trimmed(20_000), visibility: z.enum(['public', 'internal']), externalMessageId: optionalTrimmed(200) })
   .strict()
 
+/** Adds a reply or an internal note. Only a public reply satisfies the first-response clock. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const input = parseOrThrow(Body, await jsonBody(request))
   const result = await replyToTicket(ctx, pathSegment(request, 1), input)

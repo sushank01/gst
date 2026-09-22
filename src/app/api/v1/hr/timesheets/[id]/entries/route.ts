@@ -2,6 +2,7 @@ import { tenantRoute, jsonBody, pathSegment, searchParams } from '../../../../..
 import { parseOrThrow, z, isoDate, optionalTrimmed, uuid } from '../../../../../../../server/http/validate.ts'
 import { addEntry, listEntries, removeEntry } from '../../../../../../../server/services/timesheets.ts'
 
+/** The lines on a timesheet. */
 export const GET = tenantRoute(async ({ request, ctx }) => ({
   body: { entries: await listEntries(ctx, pathSegment(request, 1)) },
 }))
@@ -22,6 +23,7 @@ export const POST = tenantRoute(async ({ request, ctx }) => ({
   body: { timesheet: await addEntry(ctx, pathSegment(request, 1), parseOrThrow(Body, await jsonBody(request))) },
 }))
 
+/** Removes a line while the sheet is still a draft. */
 export const DELETE = tenantRoute(async ({ request, ctx }) => {
   const { entryId } = parseOrThrow(z.object({ entryId: uuid }).strict(), searchParams(request))
   return { body: { timesheet: await removeEntry(ctx, pathSegment(request, 1), entryId) } }

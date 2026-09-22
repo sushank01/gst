@@ -16,6 +16,7 @@ const Query = z
   })
   .strict()
 
+/** Leave requests, filtered by person, state or overlapping dates. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { rows, total } = await listLeaveRequests(ctx, parseOrThrow(Query, searchParams(request)))
   return { body: { requests: rows, total } }

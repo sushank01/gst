@@ -6,6 +6,7 @@ const Query = z
   .object({ section: z.string().trim().max(60).optional(), limit: z.coerce.number().int().min(1).max(200).optional() })
   .strict()
 
+/** Who changed a settings section, when, and what they said about it. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const query = parseOrThrow(Query, searchParams(request))
   const changes = await listSettingsChanges(ctx, pathSegment(request, 1), query.section, query.limit)

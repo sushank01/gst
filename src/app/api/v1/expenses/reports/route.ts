@@ -11,6 +11,7 @@ const Query = z
   })
   .strict()
 
+/** Expense claims, filtered by person and state. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { rows, total } = await listReports(ctx, parseOrThrow(Query, searchParams(request)))
   return { body: { reports: rows, total } }
@@ -18,6 +19,7 @@ export const GET = tenantRoute(async ({ request, ctx }) => {
 
 const Body = z.object({ employeeId: uuid, title: trimmed(200), currency, travelRequestId: uuid.optional() }).strict()
 
+/** Opens an empty claim for somebody, in one currency. */
 export const POST = tenantRoute(async ({ request, ctx }) => ({
   status: 201,
   body: { report: await openReport(ctx, parseOrThrow(Body, await jsonBody(request))) },

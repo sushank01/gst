@@ -15,6 +15,7 @@ const Query = z
   })
   .strict()
 
+/** The asset register, filtered and paged. Archived assets are hidden unless asked for. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { rows, total } = await listAssets(ctx, parseOrThrow(Query, searchParams(request)))
   return { body: { assets: rows, total } }
@@ -45,6 +46,7 @@ const Body = z
   })
   .strict()
 
+/** Registers an asset, allocating the next tag from a locked sequence. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const asset = await createAsset(ctx, parseOrThrow(Body, await jsonBody(request)))
   return { status: 201, body: { asset } }

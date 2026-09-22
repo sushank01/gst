@@ -14,6 +14,7 @@ const Body = z
   })
   .strict()
 
+/** Records service. An open record takes the asset out of circulation; a completed one returns it. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const asset = await recordService(ctx, pathSegment(request, 1), parseOrThrow(Body, await jsonBody(request)))
   return { body: { asset } }

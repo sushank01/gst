@@ -2,6 +2,7 @@ import { tenantRoute, jsonBody, pathSegment } from '../../../../../../server/htt
 import { parseOrThrow, z } from '../../../../../../server/http/validate.ts'
 import { cancelTrip, readTrip } from '../../../../../../server/services/travel.ts'
 
+/** One trip with its bookings. */
 export const GET = tenantRoute(async ({ request, ctx }) => ({ body: { request: await readTrip(ctx, pathSegment(request)) } }))
 
 /** Calls the trip off. Bookings stay on record — they may already have cost money. */

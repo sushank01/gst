@@ -20,6 +20,7 @@ const Body = z
   })
   .strict()
 
+/** Moves somebody. Closes the open position and opens the next, so the history is kept. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const employee = await transferEmployee(ctx, pathSegment(request, 1), parseOrThrow(Body, await jsonBody(request)))
   return { body: { employee } }

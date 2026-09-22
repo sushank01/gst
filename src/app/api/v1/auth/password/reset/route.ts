@@ -6,6 +6,7 @@ import { clearedSessionCookie } from '../../../../../../server/http/cookies.ts'
 
 const Body = z.object({ token: z.string().min(1), password: passwordField }).strict()
 
+/** Sets a new password from a reset token, and revokes every existing session. */
 export const POST = publicRoute(async ({ request, db, now }) => {
   const input = parseOrThrow(Body, await jsonBody(request))
   const userId = await resetPassword(db, input.token, input.password, now)

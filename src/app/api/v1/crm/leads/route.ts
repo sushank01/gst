@@ -13,6 +13,7 @@ const Query = z
   })
   .strict()
 
+/** Leads, filtered and paged. The count and the rows always agree. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const query = parseOrThrow(Query, searchParams(request))
   const { rows, total } = await listLeads(ctx, {
@@ -39,6 +40,7 @@ const Body = z
   })
   .strict()
 
+/** Creates a lead, with its person and organisation as linked records rather than name strings. */
 export const POST = tenantRoute(async ({ request, ctx }) => {
   const input = parseOrThrow(Body, await jsonBody(request))
   const lead = await createLead(ctx, { ...input, email: input.email || null })

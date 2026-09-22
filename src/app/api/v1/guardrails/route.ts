@@ -4,6 +4,7 @@ import { createPolicy, listPolicies } from '../../../../server/services/guardrai
 
 const Checkpoint = z.enum(['input', 'output', 'tool_call', 'tool_result'])
 
+/** The guardrail policies, optionally for one checkpoint. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { checkpoint } = parseOrThrow(z.object({ checkpoint: Checkpoint.optional() }).strict(), searchParams(request))
   return { body: { policies: await listPolicies(ctx, checkpoint) } }
@@ -25,6 +26,7 @@ const Body = z
   })
   .strict()
 
+/** Creates a policy. One whose configuration could never match is refused. */
 export const POST = tenantRoute(async ({ request, ctx }) => ({
   status: 201,
   body: { policy: await createPolicy(ctx, parseOrThrow(Body, await jsonBody(request))) },

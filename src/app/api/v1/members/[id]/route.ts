@@ -11,12 +11,14 @@ function membershipId(request: Request): string {
   return segments[segments.length - 1] ?? ''
 }
 
+/** Changes a role. A workspace may not lose its last owner. */
 export const PATCH = tenantRoute(async ({ request, ctx }) => {
   const { role } = parseOrThrow(Body, await jsonBody(request))
   await changeMemberRole(ctx, membershipId(request), role)
   return { status: 204 }
 })
 
+/** Removes somebody from the workspace and revokes their sessions for it immediately. */
 export const DELETE = tenantRoute(async ({ request, ctx }) => {
   await removeMember(ctx, membershipId(request))
   return { status: 204 }

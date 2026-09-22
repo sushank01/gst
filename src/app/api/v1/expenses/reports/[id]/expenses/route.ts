@@ -10,6 +10,7 @@ export const POST = tenantRoute(async ({ request, ctx }) => {
   return { body: { report: await attachExpense(ctx, pathSegment(request, 1), expenseId) } }
 })
 
+/** Takes an expense off the claim, freeing it to be filed elsewhere. */
 export const DELETE = tenantRoute(async ({ request, ctx }) => {
   const { expenseId } = parseOrThrow(Body, searchParams(request))
   return { body: { report: await detachExpense(ctx, pathSegment(request, 1), expenseId) } }

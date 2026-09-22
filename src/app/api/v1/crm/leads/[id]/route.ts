@@ -22,6 +22,7 @@ const Patch = z
   })
   .strict()
 
+/** Edits a lead, or restores an archived one. */
 export const PATCH = tenantRoute(async ({ request, ctx }) => {
   const input = parseOrThrow(Patch, await jsonBody(request))
   if (input.restore) {

@@ -5,6 +5,7 @@ import { badRequest } from '../../../../../server/http/errors.ts'
 
 const Body = z.object({ token: z.string().min(1) }).strict()
 
+/** Confirms an email address with the token from the verification message. */
 export const POST = publicRoute(async ({ request, db, now }) => {
   const { token } = parseOrThrow(Body, await jsonBody(request))
   const userId = await verifyEmail(db, token, now)

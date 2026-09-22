@@ -4,6 +4,7 @@ import { readSettings, writeSettings } from '../../../../../server/services/sett
 
 const Section = z.object({ section: z.string().trim().min(1).max(60) }).strict()
 
+/** One settings section, merged over its defaults so a new setting appears with its default. */
 export const GET = tenantRoute(async ({ request, ctx }) => {
   const { section } = parseOrThrow(Section, searchParams(request))
   // The caller's defaults are not accepted from the request: a settings

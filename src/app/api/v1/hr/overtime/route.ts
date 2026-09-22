@@ -11,6 +11,7 @@ const Body = z
   })
   .strict()
 
+/** Claims overtime for a day. One live claim per person per day. */
 export const POST = tenantRoute(async ({ request, ctx }) => ({
   status: 201,
   body: { overtime: await requestOvertime(ctx, parseOrThrow(Body, await jsonBody(request))) },
