@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useWorkspace } from '../../lib/workspace'
+import { NoModelConnected } from '../../components/NotBuilt'
 
 const models = ['Claude Sonnet 4', 'Claude Opus 4', 'GPT-4o', 'Gemini Pro']
 
@@ -24,10 +24,8 @@ const templates = [
   },
 ]
 
-type Result = { model: string; text: string; ms: number; tokens: number; credits: number }
 
 export default function PromptLab() {
-  const { spend, creditsLeft } = useWorkspace()
 
   const [model, setModel] = useState(models[0])
   const [temperature, setTemperature] = useState(2)
@@ -35,8 +33,6 @@ export default function PromptLab() {
   const [system, setSystem] = useState('')
   const [user, setUser] = useState('')
   const [templatesOpen, setTemplatesOpen] = useState(false)
-  const [running, setRunning] = useState(false)
-  const [result, setResult] = useState<Result | null>(null)
 
   const templatesRef = useRef<HTMLDivElement>(null)
 
@@ -51,26 +47,7 @@ export default function PromptLab() {
 
   const variables = [...new Set([...system, ...user].join('').match(/\{\{\s*[\w.]+\s*\}\}/g) ?? [])]
 
-  async function run() {
-    if (!user.trim() || running) return
-    setRunning(true)
-    setResult(null)
 
-    await new Promise((resolve) => setTimeout(resolve, 900))
-    const credits = 3
-    const funded = spend(credits)
-
-    setResult({
-      model,
-      ms: 1200 + Math.round(Math.random() * 900),
-      tokens: Math.round(user.length / 3) + 180,
-      credits: funded ? credits : 0,
-      text: funded
-        ? `On the live platform this runs against ${model} at temperature ${temperature}, capped at ${maxTokens} tokens, and returns the completion here.\n\nEverything you try in the Lab costs the same AI Credits per call as any other model use — the discipline of iterating here is what keeps production spend down. When a prompt works, save it to the library and Vibe Studio and Agent Studio builds can reach for it.`
-        : 'Your AI Credits pool is empty for this cycle. An admin can top up or raise your per-user allocation.',
-    })
-    setRunning(false)
-  }
 
   return (
     <div className="-mx-6 -mt-2 flex min-h-[calc(100dvh-5rem)] flex-col xl:flex-row">
@@ -142,15 +119,11 @@ export default function PromptLab() {
           </div>
 
           <button
-            onClick={run}
-            disabled={!user.trim() || running}
-            className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-[14px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+            disabled
+            title="No model is connected on this deployment"
+            className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-[14px] font-semibold text-white transition disabled:opacity-40"
           >
-            {running ? (
-              <span aria-hidden className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-            ) : (
-              <span aria-hidden>▷</span>
-            )}
+            <span aria-hidden>▷</span>
             Run
           </button>
         </div>
@@ -205,39 +178,20 @@ export default function PromptLab() {
       <section className="flex w-full min-w-0 flex-col border-t border-line xl:w-[42%] xl:border-t-0">
         <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-3.5">
           <h2 className="text-[15px] font-semibold">Response</h2>
-          {result && (
-            <span className="text-[12px] text-fg-muted">
-              {result.model} · {(result.ms / 1000).toFixed(1)}s · {result.tokens} tokens · {result.credits} credits
-            </span>
-          )}
+          {/*
+            * The meta line here read "<model> · 1.8s · 412 tokens · 3 credits".
+            * The latency was `1200 + Math.random() * 900`, the token count was
+            * `input.length / 3 + 180`, and the credits were genuinely spent.
+            * Two invented measurements beside one real charge.
+            */}
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-          {running ? (
-            <p className="py-20 text-center text-[14px] text-fg-muted">Running against {model}…</p>
-          ) : result ? (
-            <>
-              <p className="text-[14px] leading-relaxed whitespace-pre-wrap text-fg-2">{result.text}</p>
-              <p className="mt-6 text-[12px] text-fg-muted">
-                {creditsLeft.toLocaleString()} credits left this cycle.
-              </p>
-            </>
-          ) : (
-            <div className="grid h-full place-items-center text-center">
-              <div>
-                <span
-                  aria-hidden
-                  className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-surface-2 text-xl text-fg-muted"
-                >
-                  ✦
-                </span>
-                <p className="mt-5 text-lg font-medium text-fg-2">Enter a prompt and click Run</p>
-                <p className="mx-auto mt-2 max-w-sm text-[14px] leading-relaxed text-fg-muted">
-                  Test prompts against multiple models, compare responses, and save templates for reuse.
-                </p>
-              </div>
-            </div>
-          )}
+          <NoModelConnected what="The Prompt Lab" />
+          <p className="mt-5 text-[13px] leading-relaxed text-fg-muted">
+            The prompt, the system message and the model settings you choose here are all kept. When a provider is
+            connected they are what will be sent — so a prompt written now is not wasted work.
+          </p>
         </div>
       </section>
     </div>

@@ -96,26 +96,30 @@ function Dashboard() {
 
   return (
     <>
-      <h2 className="mt-6 text-[15px] font-semibold">Privacy posture</h2>
+      {/*
+        * Only what this workspace has actually recorded. The tiles that stood
+        * here for DSAR turnaround, active DPA templates and completed transfer
+        * impact assessments were all `value={0}` literals over features that do
+        * not exist — a zero in a compliance dashboard reads as "we checked and
+        * there are none", which is a different claim from "we cannot check".
+        */}
+      <h2 className="mt-6 text-[15px] font-semibold">What you have recorded</h2>
       <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon="clock" label="DSAR overdue" value={0} sub="0 open / 0 total" />
         <Metric icon="file-text" label="DPIA needs review" value={needsReview} sub={`${highRisk} high-risk`} />
         <Metric icon="user-check" label="Profiling w/o human review" value={unreviewed} />
         <Metric icon="shield-alert" label="Sensitive data fields" value={sensitive} sub={`${dataInventory.length} catalogued`} />
-      </div>
-
-      <h2 className="mt-8 text-[15px] font-semibold">Processors &amp; transfers</h2>
-      <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric icon="briefcase" label="Active DPA templates" value={0} sub="0 with SCC" tone="bad" />
-        <Metric icon="scale" label="TIA high-risk" value={0} sub="0 completed" />
-        <Metric icon="link" label="Cross-border flows" value={crossBorder} />
         <Metric icon="network" label="Data flows mapped" value={dataFlows.length} sub={`${crossBorder} cross-border`} />
       </div>
 
       <p className="mt-6 flex items-start gap-3 rounded-2xl bg-surface-2/70 px-5 py-4 text-[13px] leading-relaxed text-fg-2">
         <Icon name="alert-triangle" size={16} className="mt-0.5 text-warn" />
-        No active DPA template is published. Add and activate one under the Processors area so enterprise buyers can be
-        sent a signed Data Processing Agreement.
+        <span>
+          <strong className="font-semibold text-fg">Recording is not enforcing.</strong> These registers are your
+          own record of what you process and why. Nothing on this deployment reads them: writing a retention period
+          here does not delete anything, and recording a lawful basis does not restrict what the application stores.
+          They were also shipped pre-filled with a platform-wide inventory and transfer map, which named tables this
+          database does not have and asserted data-processing agreements that do not exist. That is gone.
+        </span>
       </p>
     </>
   )
@@ -352,7 +356,6 @@ function InventoryPane() {
   const { dataInventory, addInventoryField, removeInventoryField, updateInventoryField } = useWorkspace()
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
-  const [discovered, setDiscovered] = useState<string | null>(null)
   const [draft, setDraft] = useState({
     entity: '',
     field: '',
@@ -384,26 +387,20 @@ function InventoryPane() {
     <>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-[14px] text-fg-2">
-          Catalogue of where personal data lives (GDPR Art. 30 support). Platform-wide entries apply to every tenant.
+          Your own catalogue of where personal data lives. Entries are the ones you add — nothing is pre-filled, and
+          no entry here changes what the application stores.
         </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={() =>
-              setDiscovered(
-                `Scan complete — no personal-data fields found beyond the ${dataInventory.length} already catalogued.`,
-              )
-            }
-            className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[13px] font-medium text-fg-2 transition hover:bg-surface-2"
-          >
-            <Icon name="search" size={15} /> Discover PII
-          </button>
-          <Button variant="accent" onClick={() => openFor(null)}>
-            + Add field
-          </Button>
-        </div>
+        {/*
+          * "Discover PII" has gone. It ran no scan: it set a sentence reading
+          * "Scan complete — no personal-data fields found beyond the N already
+          * catalogued", which is an assertion about a database nobody looked
+          * at. A button that reports a clean result without checking is worse
+          * than no button, because somebody will rely on it.
+          */}
+        <Button variant="accent" onClick={() => openFor(null)}>
+          + Add field
+        </Button>
       </div>
-
-      {discovered && <p className="mt-3 text-[13px] text-fg-muted">{discovered}</p>}
 
       <div className="mt-4 overflow-x-auto rounded-2xl border border-line bg-surface">
         <table className="w-full min-w-[56rem] border-collapse text-[13px]">
@@ -758,7 +755,7 @@ function RetentionPane() {
             <table className="w-full min-w-[40rem] border-collapse text-[13px]">
               <thead className="border-b border-line bg-surface-2/50 text-[12px] text-fg-muted">
                 <tr>
-                  {['Connector', 'Keep for', 'Enabled', 'Last run'].map((column) => (
+                  {['Connector', 'Keep for', 'Status', 'Purge'].map((column) => (
                     <th key={column} scope="col" className="px-5 py-3.5 text-left font-medium">
                       {column}
                     </th>
@@ -779,10 +776,12 @@ function RetentionPane() {
                           policy.enabled ? 'bg-ok-muted text-ok' : 'bg-surface-2 text-fg-muted'
                         }`}
                       >
-                        {policy.enabled ? 'Enabled' : 'Off'}
+                        {policy.enabled ? 'Recorded' : 'Off'}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-fg-muted">{policy.lastRun || 'Never'}</td>
+                    {/* "Never" read as "the purge has not run yet". No purge
+                        job exists at all, which is a different statement. */}
+                    <td className="px-5 py-3.5 text-fg-muted">Not enforced</td>
                     <td className="px-5 py-3.5 text-right">
                       <button
                         onClick={() => removeRetentionPolicy(policy.id)}
@@ -800,7 +799,7 @@ function RetentionPane() {
         </>
       ) : (
         <EmptyTable
-          columns={['Connector', 'Keep for', 'Enabled', 'Last run']}
+          columns={['Connector', 'Keep for', 'Status', 'Purge']}
           message="No connector retention policies set"
         />
       )}

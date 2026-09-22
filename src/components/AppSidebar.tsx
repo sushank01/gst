@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { NavLink, useLocation, useSearchParams } from '../lib/router'
 import { useAuth } from '../lib/auth'
-import { useWorkspace } from '../lib/workspace'
+import { useInstallations } from '../lib/useInstallations'
 import { administerGroup, allNavLeaves, analyzeGroup, buildGroup, runGroup, toolsGroup, workspaceGroup } from '../lib/appNav'
 import type { NavGroup, NavLeaf } from '../lib/appNav'
 import { marketApps } from '../lib/appData'
@@ -164,7 +164,15 @@ export function AppSidebar({
   onToggleCollapsed: () => void
 }) {
   const { session } = useAuth()
-  const { installed, trialDaysLeft } = useWorkspace()
+  /*
+   * Both come from the server: which apps this workspace actually has, and a
+   * trial countdown computed from the subscription's stored end date. The
+   * prototype read a browser array and a constant that said "13 days left"
+   * for every workspace, for ever.
+   */
+  const { apps, entitlement } = useInstallations()
+  const installed = apps.filter((app) => app.status && app.status !== 'uninstalled').map((app) => app.code)
+  const trialDaysLeft = entitlement?.trialDaysLeft ?? null
 
   const installedApps = marketApps
     .filter((app) => installed.includes(app.code))
@@ -193,10 +201,14 @@ export function AppSidebar({
           <>
             <p className="mt-2 text-[13.5px] font-semibold">Apragya AI</p>
             <p className="mt-0.5 text-[10px] leading-snug text-fg-muted">AI Operating System for Business</p>
-            <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-fg-2">
-              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-warn" />
-              Trial · {trialDaysLeft}d
-            </span>
+            {/* No trial, or not loaded yet, shows nothing — a "Trial · 0d" badge
+                on a workspace that was never trialling is a fabrication. */}
+            {trialDaysLeft !== null && (
+              <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2 py-0.5 text-[10px] text-fg-2">
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-warn" />
+                {trialDaysLeft === 0 ? 'Trial ended' : `Trial · ${trialDaysLeft}d`}
+              </span>
+            )}
           </>
         )}
       </div>

@@ -5,30 +5,19 @@ import { useSearchParams } from '../../lib/router'
 import { Button } from '../../components/ui'
 import {
   capabilities,
-  vibeControls,
   vibeModel,
   vibeModels,
   vibePromptPlaceholder,
   vibeTopNav,
 } from '../../lib/vibeData'
 import type { Capability } from '../../lib/vibeData'
-import { useWorkspace } from '../../lib/workspace'
+import { NoModelConnected } from '../../components/NotBuilt'
 
-const buildSteps = ['Reading the prompt', 'Proposing the shape', 'Wiring tools + guardrails', 'Snapshotting version 1']
 
-/** Artifact names come from free text, so trim on a word boundary rather than mid-word. */
-function toArtifactName(prompt: string, max = 48) {
-  const clean = prompt.trim().replace(/\s+/g, ' ')
-  if (clean.length <= max) return clean
-  const cut = clean.slice(0, max)
-  const lastSpace = cut.lastIndexOf(' ')
-  return `${(lastSpace > 20 ? cut.slice(0, lastSpace) : cut).replace(/[.,;:]$/, '')}…`
-}
 
 function TopBar() {
   const [active, setActive] = useState(vibeTopNav[0].id)
   const [model, setModel] = useState(vibeModel)
-  const { creditsUsed } = useWorkspace()
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-4">
@@ -51,16 +40,12 @@ function TopBar() {
       </nav>
 
       <div className="flex flex-wrap items-center gap-2">
-        {/* Readouts, not actions: the spend and the key in force for this studio. */}
-        {vibeControls.map((control) => (
-          <span
-            key={control.id}
-            className="flex items-center gap-2 rounded-xl border border-line bg-surface px-3 py-1.5 text-[13px] text-fg-2"
-          >
-            <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${control.tone}`} />
-            {control.id === 'aiu' ? `${creditsUsed} AIU` : control.label}
-          </span>
-        ))}
+        {/*
+          * The chips that sat here read "Claude · SaaS Key" and an AIU spend
+          * figure — both asserting a provider key in force for this studio.
+          * There is no key. The model picker stays: choosing one in advance is
+          * a real preference, and it is labelled as such.
+          */}
         <select
           aria-label="Model"
           value={model}
@@ -98,36 +83,36 @@ function CapabilityCard({ capability, onPick }: { capability: Capability; onPick
 
 export default function VibeStudio() {
   const [params, setParams] = useSearchParams()
-  const { addArtifact, publishArtifact, artifacts, spend } = useWorkspace()
 
   const [prompt, setPrompt] = useState(params.get('prompt') ?? '')
   const [capability, setCapability] = useState<Capability>(capabilities[0])
-  const [phase, setPhase] = useState<'idle' | 'building' | 'done'>('idle')
-  const [step, setStep] = useState(0)
-  const [builtId, setBuiltId] = useState<string | null>(null)
+  const [phase, setPhase] = useState<'idle' | 'kept'>('idle')
 
   // The prompt arrives from Home or the landing hero; consume it once.
   useEffect(() => {
     if (params.get('prompt')) setParams({}, { replace: true })
   }, [params, setParams])
 
-  async function build(from: Capability = capability) {
+  /**
+   * There is no build.
+   *
+   * This used to walk four labels — "Reading the prompt", "Proposing the
+   * shape", "Wiring tools + guardrails", "Snapshotting version 1" — on a 450ms
+   * timer, spend fifteen credits, and add an artifact row. No prompt was read,
+   * nothing was wired, and the "snapshot" was an object in one browser's
+   * localStorage that the next panel described as "versioned inside your
+   * tenant" and "an immutable snapshot".
+   *
+   * Generating an application needs a model (D3) and somewhere to run what it
+   * generates (D1). Until both exist, the prompt is kept and nothing is
+   * claimed.
+   */
+  function keep(from: Capability = capability) {
     if (!prompt.trim()) return
     setCapability(from)
-    setPhase('building')
-
-    for (let index = 0; index < buildSteps.length; index += 1) {
-      setStep(index)
-      await new Promise((resolve) => setTimeout(resolve, 450))
-    }
-
-    spend(15)
-    const artifact = addArtifact({ name: toArtifactName(prompt), skill: from.name, kind: from.name })
-    setBuiltId(artifact.id)
-    setPhase('done')
+    setPhase('kept')
   }
 
-  const built = artifacts.find((artifact) => artifact.id === builtId)
 
   return (
     <div className="-mx-6 -mt-2 min-h-full bg-[color-mix(in_oklab,var(--color-accent)_4%,var(--color-bg))] px-6 pt-2 pb-10">
@@ -149,7 +134,7 @@ export default function VibeStudio() {
           onSubmit={(event) => {
             event.preventDefault()
             // Fire-and-forget by design; `build` reports its own failures in state.
-            void build()
+            keep()
           }}
           className="mt-8 rounded-2xl border border-line bg-surface p-5 text-left shadow-sm focus-within:border-accent"
         >
@@ -179,41 +164,13 @@ export default function VibeStudio() {
         </form>
       </section>
 
-      {phase === 'building' && (
-        <ol className="mx-auto mt-6 max-w-xl space-y-2 rounded-2xl border border-line bg-surface p-5">
-          {buildSteps.map((label, index) => (
-            <li
-              key={label}
-              className={`flex items-center gap-2.5 text-[13px] ${index <= step ? 'text-fg' : 'text-fg-muted'}`}
-            >
-              <span className={index < step ? 'text-ok' : ''}>{index < step ? '✓' : index === step ? '◐' : '○'}</span>
-              {label}
-            </li>
-          ))}
-        </ol>
+      {phase === 'kept' && (
+        <div className="mx-auto mt-6 max-w-xl">
+          <NoModelConnected what="Generating an application" />
+        </div>
       )}
 
-      {phase === 'done' && built && (
-        <section className="mx-auto mt-6 max-w-xl rounded-2xl border border-ok/40 bg-ok-muted/40 p-5">
-          <p className="text-[11px] font-semibold tracking-[0.14em] text-ok uppercase">Build complete</p>
-          <h2 className="mt-2 text-lg font-semibold">{built.name}</h2>
-          <p className="mt-1 text-[13px] text-fg-muted">
-            {built.kind} · v{built.version} · {built.status}
-          </p>
-          <p className="mt-3 text-[13px] leading-relaxed text-fg-2">
-            Versioned inside your tenant. Refine it in conversation, edit the graph by hand, or publish — publishing
-            needs the app-publish permission and creates an immutable snapshot.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button onClick={() => publishArtifact(built.id)} disabled={built.status === 'published'}>
-              {built.status === 'published' ? `Published · v${built.version}` : 'Publish to tenant'}
-            </Button>
-            <Button variant="secondary" onClick={() => setPhase('idle')}>
-              Build another
-            </Button>
-          </div>
-        </section>
-      )}
+      {/* The "Build complete" panel is gone with the build that never happened. */}
 
       <section className="mx-auto mt-16 max-w-5xl">
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
@@ -225,35 +182,14 @@ export default function VibeStudio() {
 
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {capabilities.map((item) => (
-            <CapabilityCard key={item.id} capability={item} onPick={() => build(item)} />
+            <CapabilityCard key={item.id} capability={item} onPick={() => keep(item)} />
           ))}
         </ul>
       </section>
 
-      {artifacts.length > 0 && (
-        <section className="mx-auto mt-12 max-w-5xl">
-          <h2 className="mb-3 text-sm font-semibold">Your artifacts</h2>
-          <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
-            {artifacts.map((artifact) => (
-              <li key={artifact.id} className="flex items-center justify-between gap-4 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-[13px] font-medium">{artifact.name}</p>
-                  <p className="text-xs text-fg-muted">
-                    {artifact.skill} · v{artifact.version}
-                  </p>
-                </div>
-                <span
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-medium ${
-                    artifact.status === 'published' ? 'bg-ok-muted text-ok' : 'bg-surface-2 text-fg-muted'
-                  }`}
-                >
-                  {artifact.status}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* The artifact list is gone with the builds that produced it: every entry
+          was an object in this browser's localStorage, described on screen as
+          "versioned inside your tenant". */}
     </div>
   )
 }

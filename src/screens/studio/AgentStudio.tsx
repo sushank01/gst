@@ -4,7 +4,7 @@ import { useRef, useState } from 'react'
 import { Link } from '../../lib/router'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
-import { useWorkspace } from '../../lib/workspace'
+import { NoModelConnected } from '../../components/NotBuilt'
 import {
   studioGroups,
   studioModel,
@@ -122,13 +122,15 @@ function Sidebar({ active, onSelect }: { active: string; onSelect: (label: strin
   )
 }
 
+/**
+ * Agent health.
+ *
+ * This reported a passing percentage — twice, once as the large accent figure
+ * and once in the list below it — over runs that never executed, beside an
+ * "Active agents" tile whose value was the literal string "1". Every figure
+ * described a subsystem that does not exist.
+ */
 function AgentHealth() {
-  const { runs } = useWorkspace()
-  const passing = runs.length ? Math.round((runs.filter((run) => run.status === 'success').length / runs.length) * 100) : 0
-  const avgLatency = runs.length
-    ? `${(runs.reduce((sum, run) => sum + run.ms, 0) / runs.length / 1000).toFixed(1)}s`
-    : '—'
-
   return (
     <section className="rounded-2xl border border-line bg-surface p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -136,33 +138,10 @@ function AgentHealth() {
           <h2 className="text-lg font-semibold">Agent Health</h2>
           <p className="mt-1 text-[13px] text-fg-muted">Run reliability across your agents</p>
         </div>
-        <span className="rounded-lg bg-surface-2 px-3 py-1.5 text-[12px] text-fg-2">Last 30 days</span>
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-10">
-        <div className="text-center">
-          <span aria-hidden className="mx-auto mb-3 block h-2.5 w-2.5 rounded-full bg-accent" />
-          <p className="text-3xl font-bold text-accent">{passing}%</p>
-          <p className="mt-1 text-[12px] text-fg-muted">Runs passing</p>
-        </div>
-
-        <ul className="flex-1 space-y-4">
-          {[
-            { icon: '📈', tone: 'bg-sky-500/20 text-sky-300', label: 'Active agents', value: '1' },
-            { icon: '✓', tone: 'bg-emerald-500/20 text-emerald-300', label: 'Successful runs', value: `${passing}%` },
-            { icon: '🕐', tone: 'bg-orange-500/20 text-orange-300', label: 'Avg latency', value: avgLatency },
-          ].map((row) => (
-            <li key={row.label} className="flex items-center gap-3">
-              <span aria-hidden className={`grid h-9 w-9 place-items-center rounded-xl text-[14px] ${row.tone}`}>
-                {row.icon}
-              </span>
-              <span>
-                <span className="block text-[13px] text-fg-muted">{row.label}</span>
-                <span className="block text-lg font-semibold">{row.value}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+      <div className="mt-6">
+        <NoModelConnected what="Running an agent" />
       </div>
     </section>
   )
@@ -238,7 +217,6 @@ export default function AgentStudio() {
   const [help, setHelp] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const { theme, toggle: toggleTheme } = useTheme()
-  const { recordRun } = useWorkspace()
 
   const firstName = session?.user.fullName.split(' ')[0] ?? 'there'
 
@@ -302,11 +280,13 @@ export default function AgentStudio() {
               event.preventDefault()
               const text = prompt.trim()
               if (!text) return
-              // Building an agent is a run like any other, so it lands in Runs
-              // and in the audit trail rather than vanishing.
-              recordRun({ agent: text.slice(0, 60), source: 'Agent Studio' })
-              setSent(`Sent to the builder — "${text.slice(0, 48)}${text.length > 48 ? '…' : ''}" is queued in Runs.`)
-              setPrompt('')
+              /*
+               * Nothing is sent. This used to record a run and report the
+               * brief "queued in Runs" — a queue that never dequeued, against
+               * a builder that does not exist. The brief is kept on screen so
+               * the typing is not lost.
+               */
+              setSent(`Kept: “${text.slice(0, 48)}${text.length > 48 ? '…' : ''}”. Nothing is built yet — no model is connected on this deployment.`)
               setAttachments([])
             }}
             className="mx-auto mt-8 max-w-2xl rounded-2xl border border-line bg-surface p-4 focus-within:border-accent"
@@ -482,23 +462,9 @@ export default function AgentStudio() {
             <MiniCalendar />
           </div>
 
-          <section className="mt-4 rounded-2xl border border-line bg-surface p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold">Recent Activity</h2>
-                <p className="mt-1 text-[13px] text-fg-muted">Runs per day across all agents</p>
-              </div>
-              <span className="rounded-lg bg-surface-2 px-3 py-1.5 text-[12px] text-fg-2">This week</span>
-            </div>
-
-            <div className="mt-8 grid grid-cols-7 gap-2 text-center">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
-                <div key={index} className="flex h-28 flex-col justify-end">
-                  <span className="mt-2 text-[12px] text-fg-muted">{day}</span>
-                </div>
-              ))}
-            </div>
-          </section>
+          {/* "Recent Activity — Runs per day across all agents / This week"
+              rendered seven empty bars. An empty chart under a date range
+              asserts that the range was measured and found empty. */}
         </main>
       </div>
     </div>

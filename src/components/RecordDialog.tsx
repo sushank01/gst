@@ -5,7 +5,6 @@ import { useMemo, useState } from 'react'
 // The field vocabulary was first written for HR's page specs; every generic
 // create dialog in the app now shares it.
 import type { HrField, HrModal } from '../lib/hrData'
-import { useWorkspace } from '../lib/workspace'
 
 const inputClass =
   'mt-2 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-[14px] text-fg placeholder:text-fg-muted focus:border-accent focus:outline-none'
@@ -140,23 +139,33 @@ function Field({
 }
 
 /**
- * One dialog for every HR page that has one. The fields come from the page's
- * spec; submitting writes a record under that page's key, which is what the
- * page then lists.
+ * One dialog for every page that has a "+ Add" button.
+ *
+ * It collects the fields a page declares and hands them BACK to the caller.
+ * It used to write them into a browser-local record store itself, which meant
+ * every screen using it produced data that looked saved and was not. The
+ * caller now owns the write, so the dialog cannot invent persistence: a screen
+ * with no server endpoint behind it has to say so rather than quietly
+ * succeeding.
+ *
+ * `onSubmit` may reject. The dialog stays open and shows the message, because
+ * closing on a failed save is how somebody loses what they typed.
  */
 export function RecordDialog({
   modal,
-  recordKey,
   onClose,
+  onSubmit,
 }: {
   modal: HrModal
-  recordKey: string
   onClose: () => void
+  /** Receives the filled fields and a suggested title. Throw to keep the dialog open. */
+  onSubmit: (input: { title: string; fields: Record<string, string> }) => Promise<void> | void
 }) {
-  const { addAppRecord } = useWorkspace()
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(modal.fields.map((field, index) => [`${field.label}-${index}`, initialValue(field)])),
   )
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const missing = useMemo(
     () =>
@@ -167,19 +176,32 @@ export function RecordDialog({
     [modal.fields, values],
   )
 
-  const submit = () => {
+  const submit = async () => {
+    // A guard, not just a disabled button: a double click fires both handlers
+    // before React re-renders.
+    if (saving) return
+    setSaving(true)
+    setError(null)
+
     const fields: Record<string, string> = {}
     modal.fields.forEach((field, index) => {
       const value = values[`${field.label}-${index}`]
       if (field.kind !== 'entries' && value?.trim()) fields[field.label] = value.trim()
     })
-    // The first filled text field is what the list shows as the record's name.
+    // The first filled text field is what a list shows as the record's name.
     const title =
       modal.fields
         .map((field, index) => (field.kind === 'text' ? values[`${field.label}-${index}`]?.trim() : ''))
         .find(Boolean) ?? modal.title
-    addAppRecord(recordKey, title, fields)
-    onClose()
+
+    try {
+      await onSubmit({ title, fields })
+      onClose()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'That could not be saved.')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -195,17 +217,23 @@ export function RecordDialog({
           ))}
         </div>
 
+        {error && (
+          <p className="border-t border-line px-6 pt-4 text-[13px] text-bad" role="alert">
+            {error}
+          </p>
+        )}
+
         <footer className="flex justify-end gap-3 border-t border-line px-6 py-4">
           <button onClick={onClose} className="rounded-xl px-4 py-2 text-[14px] font-medium text-fg-2 hover:bg-surface-2">
             Cancel
           </button>
           <button
-            onClick={submit}
-            disabled={missing}
+            onClick={() => void submit()}
+            disabled={missing || saving}
             title={missing ? 'Fill in the required fields' : undefined}
             className="rounded-xl bg-accent px-5 py-2 text-[14px] font-semibold text-white transition enabled:hover:opacity-90 disabled:opacity-40"
           >
-            {modal.submit}
+            {saving ? 'Saving…' : modal.submit}
           </button>
         </footer>
     </Dialog>

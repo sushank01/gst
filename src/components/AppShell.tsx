@@ -7,10 +7,16 @@ import { Dialog } from './Dialog'
 import { AppSidebar } from './AppSidebar'
 import { CopilotDock } from './CopilotDock'
 import { ThemeSwitch } from './ThemeSwitch'
-import { useWorkspace } from '../lib/workspace'
+import { useNotifications } from '../lib/useNotifications'
 
 function TopBar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
-  const { unreadCount } = useWorkspace()
+  /*
+   * `undefined` until the server answers, which is not the same as zero. A
+   * badge rendered as 0 while the request is in flight asserts there is
+   * nothing waiting, which it does not yet know.
+   */
+  const { unread } = useNotifications()
+  const label = unread === undefined ? 'Inbox' : `Inbox — ${unread} unread notification${unread === 1 ? '' : 's'}`
 
   return (
     <div className="pointer-events-none sticky top-0 z-20 flex justify-between px-6 py-4 lg:justify-end">
@@ -19,13 +25,13 @@ function TopBar({ onOpenNavigation }: { onOpenNavigation: () => void }) {
         <ThemeSwitch compact />
         <NavLink
           to="/app/inbox"
-          aria-label={`Inbox — ${unreadCount} unread notifications`}
+          aria-label={label}
           className="relative grid h-8 w-8 place-items-center rounded-full text-fg-2 transition hover:bg-surface-2"
         >
           🔔
-          {unreadCount > 0 && (
+          {unread !== undefined && unread > 0 && (
             <span className="absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-bad px-1 text-[9px] font-bold text-white">
-              {unreadCount}
+              {unread}
             </span>
           )}
         </NavLink>

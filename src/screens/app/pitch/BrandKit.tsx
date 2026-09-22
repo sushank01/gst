@@ -13,7 +13,7 @@ const swatches = [
 ]
 
 export default function BrandKitPane() {
-  const { brandKit, updateBrandKit, pitchSampleLoaded, clearPitchSample, loadPitchSample } = useWorkspace()
+  const { brandKit, updateBrandKit } = useWorkspace()
   const [draft, setDraft] = useState(brandKit)
   const dirty = JSON.stringify(draft) !== JSON.stringify(brandKit)
 
@@ -33,9 +33,14 @@ export default function BrandKitPane() {
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold tracking-tight">Brand Kit</h1>
+          {/*
+            * "All saved" used to appear in the ok colour whenever the draft
+            * matched local state — which is true on mount, before anything has
+            * been saved anywhere. Nothing here reaches a server.
+            */}
           <p className="mt-2 text-[14px] text-fg-muted">
-            Every generated deck reads from here — firm name, palette, contact strip.{' '}
-            {!dirty && <span className="font-medium text-ok">All saved</span>}
+            Firm name, palette and contact strip. Kept in this browser only: no deck rendering exists yet, so
+            nothing reads these values.
           </p>
         </div>
         <Button variant="accent" disabled={!dirty} onClick={() => updateBrandKit(draft)}>
@@ -96,8 +101,11 @@ export default function BrandKitPane() {
                   aria-label="Logo URL"
                   className={`${field} font-mono text-[13px]`}
                 />
+                {/* The 4 MB limit was advertised and never enforced: the file
+                    was read into a data URL and written to localStorage, where
+                    a large one can exceed the quota and lose the whole store. */}
                 <p className="mt-2 text-[12px] text-fg-muted">
-                  PNG, JPEG, GIF, or WebP up to 4 MB. Embedded on the cover and CTA slides of every deck.
+                  PNG, JPEG, GIF or WebP. Kept in this browser, so keep it small — nothing renders a deck yet.
                 </p>
               </div>
             </div>
@@ -199,26 +207,11 @@ export default function BrandKitPane() {
         </section>
       </div>
 
-      <p className="mt-4 rounded-xl bg-accent-muted px-5 py-3.5 text-[13px] leading-relaxed text-fg-2">
-        💡 <strong className="font-semibold text-fg">Tip:</strong> After saving, regenerate any RFP&apos;s deck (RFQ
-        Editor → Generate PPT Deck) — the new firm name + palette show up immediately.
-      </p>
-
-      <section className="mt-4 rounded-2xl border border-line bg-surface p-6">
-        <h2 className="text-[16px] font-semibold">Sample data</h2>
-        <p className="mt-1.5 text-[13px] text-fg-muted">
-          {pitchSampleLoaded
-            ? 'Sample RFPs are loaded in this tenant. Clearing removes them along with any sample KB documents and templates.'
-            : 'This tenant has no sample data. Load a few example RFPs to try the full flow before your own arrive.'}
-        </p>
-        <Button
-          variant="secondary"
-          className="mt-4"
-          onClick={() => (pitchSampleLoaded ? clearPitchSample() : loadPitchSample())}
-        >
-          {pitchSampleLoaded ? 'Clear sample data' : 'Load sample data'}
-        </Button>
-      </section>
+      {/*
+        * The sample-data section is gone with `loadPitchSample`. It wrote four
+        * invented RFPs — named prospects with dollar values — into the
+        * workspace, and the banner above then called them yours.
+        */}
     </div>
   )
 }

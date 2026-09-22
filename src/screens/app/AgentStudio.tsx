@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { useNavigate } from '../../lib/router'
 import { Button } from '../../components/ui'
 import { PageHeader } from '../../components/PageHeader'
-import { marketApps } from '../../lib/appData'
-import { useWorkspace } from '../../lib/workspace'
 
 const canvasNodes = [
   { id: 'trigger', label: 'Trigger', kind: 'Record created', tone: 'bg-fg text-bg' },
@@ -20,23 +18,8 @@ const tabs = ['Canvas', 'Tests', 'Runs'] as const
 
 export default function AgentStudio() {
   const navigate = useNavigate()
-  const { installed, recordRun } = useWorkspace()
   const [tab, setTab] = useState<(typeof tabs)[number]>('Canvas')
   const [selected, setSelected] = useState(canvasNodes[2].id)
-  const [running, setRunning] = useState(false)
-
-  const agents = marketApps
-    .filter((app) => installed.includes(app.code))
-    .flatMap((app) => app.agents.map((agent) => ({ agent, app: app.name })))
-  const primary = agents[0]
-
-  async function testRun() {
-    setRunning(true)
-    await new Promise((resolve) => setTimeout(resolve, 900))
-    recordRun({ agent: primary?.agent ?? 'Untitled agent', source: 'Agent Studio test' })
-    setRunning(false)
-    navigate('/app/runs')
-  }
 
   const node = canvasNodes.find((item) => item.id === selected)!
 
@@ -47,7 +30,7 @@ export default function AgentStudio() {
         title="Hand-tune every step. See it run."
         blurb="The visual canvas for authoring, testing, and shipping agents. Every node, tool call, and guardrail is inspectable."
         action={
-          <Button onClick={testRun} loading={running}>
+          <Button disabled title="No model is connected on this deployment">
             Run test
           </Button>
         }
@@ -99,24 +82,16 @@ export default function AgentStudio() {
             <h2 className="mt-2 text-sm font-semibold">{node.label}</h2>
             <p className="mt-1 text-xs text-fg-muted">{node.kind}</p>
 
-            <dl className="mt-4 space-y-3 text-[13px]">
-              <div>
-                <dt className="text-xs text-fg-muted">Model</dt>
-                <dd>Auto-routed · best for task</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-fg-muted">Guardrails</dt>
-                <dd>Content filter · approval cap</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-fg-muted">On failure</dt>
-                <dd>Pause for human review</dd>
-              </div>
-            </dl>
-
-            <p className="mt-5 text-[11px] leading-relaxed text-fg-muted">
-              Deploy publishes an immutable snapshot. In-flight runs finish on the previous version; new runs pick up
-              the new one.
+            {/*
+              * This read "Model: Auto-routed · best for task", "Guardrails:
+              * Content filter · approval cap" and "On failure: Pause for human
+              * review" — three settings nobody had set, on a node that is part
+              * of a fixed six-node illustration. An inspector that reports
+              * configuration nobody chose is worse than an empty one.
+              */}
+            <p className="mt-4 text-[13px] leading-relaxed text-fg-muted">
+              Nothing is configured on this node. The canvas above is an illustration of the shape an agent takes,
+              not a graph this workspace holds.
             </p>
           </aside>
         </div>
@@ -125,34 +100,26 @@ export default function AgentStudio() {
       {tab === 'Tests' && (
         <div className="rounded-2xl border border-line bg-surface p-5">
           <h2 className="text-sm font-semibold">Golden tests</h2>
-          <p className="mt-1 text-[13px] text-fg-muted">
-            Catch regressions before they ship. Tests run as part of the build gate.
+          {/*
+            * Four tests used to be listed here with results — three green, one
+            * red — none of which had ever been run against anything. A red
+            * result is as much a fabrication as a green one, and arguably a
+            * more convincing one, because it looks like evidence of rigour.
+            */}
+          <p className="mt-3 text-[13px] leading-relaxed text-fg-muted">
+            No test has been run. Golden tests would need an agent that executes, which needs a model and somewhere
+            to run it — decisions D3 and D1.
           </p>
-          <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
-            {[
-              { name: 'Scores a high-fit inbound lead above 0.8', status: 'pass' },
-              { name: 'Routes enterprise leads to the named rep', status: 'pass' },
-              { name: 'Pauses when the deal value exceeds the cap', status: 'pass' },
-              { name: 'Rejects a lead with no contactable email', status: 'fail' },
-            ].map((test) => (
-              <li key={test.name} className="flex items-center justify-between px-4 py-3 text-[13px]">
-                <span>{test.name}</span>
-                <span className={test.status === 'pass' ? 'text-accent' : 'text-red-600'}>
-                  {test.status === 'pass' ? '✓ pass' : '✕ fail'}
-                </span>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
 
       {tab === 'Runs' && (
-        <div className="rounded-2xl border border-line bg-surface p-5 text-[13px] text-fg-muted">
-          Run history lives in the{' '}
-          <button onClick={() => navigate('/app/runs')} className="font-semibold text-accent hover:underline">
-            Runs
-          </button>{' '}
-          surface, where every execution can be replayed step by step.
+        <div className="rounded-2xl border border-line bg-surface p-5 text-[13px] leading-relaxed text-fg-muted">
+          There is no run history: no agent has executed on this deployment. Scheduled work that does run is under{' '}
+          <button onClick={() => navigate('/app/scheduled-jobs')} className="font-semibold text-accent hover:underline">
+            Scheduled Jobs
+          </button>
+          .
         </div>
       )}
     </div>

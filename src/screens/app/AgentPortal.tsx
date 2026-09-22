@@ -6,15 +6,18 @@ import { agentGroups, groupTones, totalEnterpriseAgents } from '../../lib/agentC
 import type { CatalogAgent } from '../../lib/agentCatalog'
 import { marketApps } from '../../lib/appData'
 import { useWorkspace } from '../../lib/workspace'
+import { NoModelConnected } from '../../components/NotBuilt'
 
+/*
+ * Four of the seven filters that stood here — Business Solution Agents,
+ * Agents, Workflows, Automations — always rendered the same empty panel:
+ * nothing could ever match them. A tab that can never have content is a
+ * promise the product does not keep. "Recent Runs" went with them, because
+ * every run it listed carried the same six-step sample trace.
+ */
 const filters = [
   { id: 'all', icon: '', label: 'All' },
-  { id: 'business', icon: '🧩', label: 'Business Solution Agents' },
-  { id: 'agents', icon: '', label: 'Agents' },
   { id: 'enterprise', icon: '', label: 'Enterprise Agents' },
-  { id: 'workflows', icon: '', label: 'Workflows' },
-  { id: 'automations', icon: '', label: 'Automations' },
-  { id: 'runs', icon: '⏱', label: 'Recent Runs' },
 ] as const
 
 type FilterId = (typeof filters)[number]['id']
@@ -23,14 +26,10 @@ function AgentCard({
   agent,
   appName,
   installed,
-  runCount,
-  onRun,
 }: {
   agent: CatalogAgent
   appName: string
   installed: boolean
-  runCount: number
-  onRun: () => void
 }) {
   return (
     <li className="flex flex-col rounded-2xl border border-line bg-surface p-5">
@@ -60,11 +59,12 @@ function AgentCard({
           <div className="flex items-center justify-between gap-3">
             <span className="flex items-center gap-1.5 text-[12px] text-fg-muted">
               <span aria-hidden>◷</span>
-              {runCount ? `${runCount} run${runCount === 1 ? '' : 's'}` : 'No runs yet'}
+              Not runnable yet
             </span>
             <button
-              onClick={onRun}
-              className="rounded-lg border border-line px-2.5 py-1 text-[12px] font-medium text-fg-2 transition hover:bg-surface-2"
+              disabled
+              title="No model is connected on this deployment"
+              className="rounded-lg border border-line px-2.5 py-1 text-[12px] font-medium text-fg-muted opacity-50"
             >
               Run
             </button>
@@ -74,56 +74,6 @@ function AgentCard({
         )}
       </div>
     </li>
-  )
-}
-
-/** The Recent Runs filter reads real run history rather than a fixed empty state. */
-function RecentRuns() {
-  const { runs } = useWorkspace()
-
-  if (!runs.length) {
-    return (
-      <div className="rounded-2xl border border-dashed border-line bg-surface px-6 py-20 text-center">
-        <span aria-hidden className="text-2xl text-fg-muted">
-          ◷
-        </span>
-        <p className="mt-4 text-lg font-semibold">No recent runs yet</p>
-        <p className="mx-auto mt-2 max-w-sm text-[14px] text-fg-muted">
-          Run an agent from a card above and its trace lands here.
-        </p>
-      </div>
-    )
-  }
-
-  return (
-    <>
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-[11px] font-semibold tracking-[0.1em] text-fg-muted uppercase">
-          Recent runs ({runs.length})
-        </p>
-        <Link to="/app/runs" className="text-[13px] font-medium text-accent hover:underline">
-          Full traces →
-        </Link>
-      </div>
-
-      <ul className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
-        {runs.map((run) => (
-          <li key={run.id} className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-            <div className="min-w-[14rem] flex-1">
-              <p className="text-[14px] font-medium">{run.agent}</p>
-              <p className="mt-0.5 text-[12px] text-fg-muted">
-                {run.source} · {new Date(run.startedAt).toLocaleTimeString()} · {run.id}
-              </p>
-            </div>
-            <div className="flex items-center gap-3 text-[12px]">
-              <span className="rounded-lg bg-ok-muted px-2 py-0.5 font-medium text-ok">{run.status}</span>
-              <span className="text-fg-muted">{run.credits} credits</span>
-              <span className="text-fg-muted">{(run.ms / 1000).toFixed(1)}s</span>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </>
   )
 }
 
@@ -145,17 +95,11 @@ function EmptyFilter({ label }: { label: string }) {
 }
 
 export default function AgentPortal() {
-  const { installed, runs, recordRun } = useWorkspace()
+  const { installed } = useWorkspace()
   const [filter, setFilter] = useState<FilterId>('all')
   const [query, setQuery] = useState('')
 
   const appByCode = new Map(marketApps.map((app) => [app.code, app]))
-  const runsByAgent = useMemo(() => {
-    const counts = new Map<string, number>()
-    runs.forEach((run) => counts.set(run.agent, (counts.get(run.agent) ?? 0) + 1))
-    return counts
-  }, [runs])
-
   const needle = query.trim().toLowerCase()
   const groups = useMemo(
     () =>
@@ -187,10 +131,17 @@ export default function AgentPortal() {
           </p>
         </div>
 
-        <span className="rounded-full bg-warn-muted px-3.5 py-1.5 text-[13px] font-medium text-warn">
-          {totalEnterpriseAgents} Enterprise agents
+        {/* A catalogue count, labelled as one. It used to read "N Enterprise
+            agents" as though the workspace had them; these are designs, and
+            none of them can run on this deployment. */}
+        <span className="rounded-full bg-surface-2 px-3.5 py-1.5 text-[13px] font-medium text-fg-2">
+          {totalEnterpriseAgents} in the catalogue
         </span>
       </header>
+
+      <div className="mt-6">
+        <NoModelConnected what="Running an agent" />
+      </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <div className="relative min-w-[18rem] flex-1">
@@ -264,8 +215,6 @@ export default function AgentPortal() {
                             agent={agent}
                             appName={group.name}
                             installed={isInstalled}
-                            runCount={runsByAgent.get(agent.name) ?? 0}
-                            onRun={() => recordRun({ agent: agent.name, source: group.name })}
                           />
                         ))}
                       </ul>
@@ -277,8 +226,6 @@ export default function AgentPortal() {
           ) : (
             <p className="py-20 text-center text-[14px] text-fg-muted">Nothing matches “{query}”.</p>
           )
-        ) : filter === 'runs' ? (
-          <RecentRuns />
         ) : (
           <EmptyFilter label={filters.find((item) => item.id === filter)?.label ?? 'items'} />
         )}

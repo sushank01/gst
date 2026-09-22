@@ -5,6 +5,7 @@ import { Icon } from '../../../components/Icon'
 import { marketApps } from '../../../lib/appData'
 import { pitchNav } from '../../../lib/pitchData'
 import { useWorkspace } from '../../../lib/workspace'
+import { AwaitingDecision, ElsewhereLink } from '../../../components/NotBuilt'
 import {
   Analytics,
   ExtractionSchema,
@@ -32,21 +33,27 @@ const panes: Record<string, () => React.ReactElement> = {
 }
 
 export default function PitchPilot() {
-  const { installed, rfps, pitchSampleLoaded } = useWorkspace()
+  const { installed, rfps } = useWorkspace()
   const { pathname } = useLocation()
   const section = pathname.startsWith(`${base}/`) ? pathname.slice(base.length + 1).split('/')[0] : ''
   const Pane = panes[section] ?? PitchDashboard
 
   if (!app || !installed.includes('PP')) {
     return (
-      <div className="mx-auto max-w-2xl pt-2">
-        <h1 className="text-[22px] font-bold tracking-tight">Pitch Pilot is not installed</h1>
-        <p className="mt-2 text-[14px] text-fg-muted">
-          Install it from the marketplace and your RFP inbox, knowledge base and brand kit appear here.
-        </p>
-        <Link to="/app/marketplace" className="mt-5 inline-block text-[13px] font-medium text-accent hover:underline">
-          Browse marketplace →
-        </Link>
+      <div className="mx-auto max-w-3xl pt-2">
+        <AwaitingDecision
+          title="Pitch Pilot is not available on this deployment"
+          decision="D2"
+          because={
+            <>
+              It is in the catalogue, but nothing is built behind it: no RFP extraction, no knowledge index and no
+              deck rendering. Installing it would give you an empty shell, so the marketplace refuses rather than
+              letting you try.
+            </>
+          }
+        >
+          <ElsewhereLink to="/app/marketplace">See what can be installed</ElsewhereLink>
+        </AwaitingDecision>
       </div>
     )
   }
@@ -54,18 +61,6 @@ export default function PitchPilot() {
   return (
     // Pitch Pilot carries its own indigo palette and its own left rail.
     <div className="pitch-pilot -mx-6 -mt-2">
-      {pitchSampleLoaded && (
-        <p className="border-b border-line bg-accent-muted/60 px-6 py-2.5 text-[13px] text-fg-2">
-          <span aria-hidden className="mr-2 text-accent">
-            ●
-          </span>
-          <strong className="font-semibold">Sample data loaded</strong>{' '}
-          <span className="text-fg-muted">
-            — try the full flow, then clear it from Settings → Brand Kit when you&apos;re ready to start fresh.
-          </span>
-        </p>
-      )}
-
       <div className="flex min-h-[calc(100dvh-8rem)]">
         <aside className="hidden w-[16rem] shrink-0 border-r border-line lg:block">
           <div className="px-5 py-4">

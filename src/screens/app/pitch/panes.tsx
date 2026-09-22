@@ -7,7 +7,6 @@ import { Icon } from '../../../components/Icon'
 import {
   inFlightStages,
   kbCategories,
-  monthlyAiBudget,
   rfpStages,
   stockSchemas,
   verticals,
@@ -27,7 +26,7 @@ function Crumb() {
 }
 
 export function PitchDashboard() {
-  const { rfps, creditsUsed } = useWorkspace()
+  const { rfps } = useWorkspace()
 
   const inFlight = rfps.filter((item) => inFlightStages.includes(item.stage as RfpStage))
   const yourTurn = rfps.filter((item) => item.stage === 'Your turn')
@@ -49,11 +48,12 @@ export function PitchDashboard() {
     <div>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight">
-            Good afternoon — here&apos;s where your pitches stand 👋
-          </h1>
+          {/* "Good afternoon" was hard-coded and greeted everybody at every
+              hour; "No deadlines this week" was printed whatever the deadlines
+              said, because no RFP carries one. */}
+          <h1 className="text-[28px] font-bold tracking-tight">Where your pitches stand</h1>
           <p className="mt-2 text-[14px] text-fg-muted">
-            {today} · {rfps.length} active RFPs · No deadlines this week
+            {today} · {rfps.length} active {rfps.length === 1 ? 'RFP' : 'RFPs'}
           </p>
         </div>
         <Link to="/app/pitch-pilot/new">
@@ -123,26 +123,14 @@ export function PitchDashboard() {
             </p>
           </section>
 
-          <section className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-600 p-5 text-white">
-            <p className="flex items-center gap-2 text-[11px] font-semibold tracking-[0.06em] uppercase opacity-90">
-              <Icon name="zap" size={14} /> Time saved this month
-            </p>
-            <p className="mt-3 text-[28px] leading-none font-bold">0 hrs</p>
-            <p className="mt-3 text-[12px] opacity-90">Telemetry starts after your first sent deck</p>
-          </section>
-
-          <section className="rounded-2xl border border-line bg-surface p-5">
-            <p className="text-[11px] font-semibold tracking-[0.06em] text-fg-muted uppercase">AI spend this month</p>
-            <div className="mt-3 flex items-end justify-between gap-3">
-              <p className="text-[26px] leading-none font-bold">$ {creditsUsed}</p>
-              <p className="text-[12px] text-fg-muted">of $ {monthlyAiBudget} budget</p>
-            </div>
-            <div className="mt-4 border-t border-line pt-3">
-              <Link to="/app/account" className="text-[13px] font-medium text-accent hover:underline">
-                See in Cost Center →
-              </Link>
-            </div>
-          </section>
+          {/*
+            * Two cards have gone. "Time saved this month — 0 hrs" sat on a
+            * gradient under "Telemetry starts after your first sent deck":
+            * there is no telemetry, no deck can be sent, and nothing would
+            * have measured it if one could. "AI spend this month" printed a
+            * credit count with a dollar sign — credits are not dollars — and
+            * compared it to a constant budget of 1000 that nobody set.
+            */}
         </div>
       </div>
     </div>
@@ -261,7 +249,6 @@ export function NewRfp() {
   const [file, setFile] = useState<File | null>(null)
   const [prospect, setProspect] = useState('')
   const [schema, setSchema] = useState('auto')
-  const [busy, setBusy] = useState(false)
 
   const schemas = [
     { id: 'auto', name: 'Auto-detect', hint: 'Recommended' },
@@ -269,21 +256,26 @@ export function NewRfp() {
     ...customSchemas.map((item) => ({ id: item.id, name: item.name, hint: 'Custom' })),
   ]
 
-  async function extract() {
+  /**
+   * Records the RFP. It does not extract anything.
+   *
+   * This used to wait 900ms and write a summary reading "Extracted from
+   * <file>" with an estimate of 0, under copy promising the requirements would
+   * be pulled out of the document. The PDF was never opened. Extraction needs
+   * a model (D3); recording that an RFP arrived does not, so that part stays.
+   */
+  function record() {
     if (!file) return
-    setBusy(true)
-    await new Promise((resolve) => setTimeout(resolve, 900))
     addRfp({
       // Falls back to the file name when the prospect is left blank, as the hint promises.
       prospect: prospect.trim() || file.name.replace(/\.pdf$/i, ''),
-      summary: `Extracted from ${file.name}`,
+      summary: `Not yet read: ${file.name}`,
       stage: 'Your turn',
       vertical: verticals[0],
       estimate: 0,
       schema: schemas.find((item) => item.id === schema)?.name ?? 'Auto-detect',
       deadline: '',
     })
-    setBusy(false)
     setFile(null)
     setProspect('')
   }
@@ -361,8 +353,8 @@ export function NewRfp() {
           <Button variant="secondary" onClick={() => setFile(null)}>
             Cancel
           </Button>
-          <Button variant="accent" disabled={!file} loading={busy} onClick={extract}>
-            <Icon name="sparkles" size={15} /> Extract &amp; Open ▶
+          <Button variant="accent" disabled={!file} onClick={record}>
+            Record this RFP
           </Button>
         </div>
       </section>
@@ -386,7 +378,7 @@ export function KnowledgeBase() {
         <div className="max-w-3xl">
           <h1 className="text-[28px] font-bold tracking-tight">Knowledge Base</h1>
           <p className="mt-2 text-[14px] leading-relaxed text-fg-muted">
-            Case studies, team bios, methodology docs. The AI RAGs against this when drafting RFQ answers — better KB →
+            Case studies, team bios, methodology docs. Titles only for now: no file is stored and nothing indexes them —
             better on-brief responses.
           </p>
         </div>
@@ -514,7 +506,7 @@ export function Templates() {
         <div className="max-w-3xl">
           <h1 className="text-[28px] font-bold tracking-tight">Templates</h1>
           <p className="mt-2 text-[14px] leading-relaxed text-fg-muted">
-            Upload your firm&apos;s branded .pptx template. Every generated deck inherits its masters, fonts, and
+            Name your firm&apos;s branded .pptx template. Only the file name is kept — the file itself is discarded, and
             dimensions — Brand Kit colors paint on top.
           </p>
         </div>
@@ -604,7 +596,7 @@ export function ExtractionSchema() {
           🚀
         </span>
         <span>
-          <strong className="font-semibold text-fg">4 schemas ship out of the box</strong> — Design &amp; Development,
+          <strong className="font-semibold text-fg">Four schemas ship as examples</strong> — Design &amp; Development,
           Software Development, Services &amp; Consulting, Government / Municipal. Each tunes which fields the AI
           extracts. Add a custom schema any time.
         </span>

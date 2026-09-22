@@ -3,53 +3,43 @@
 import { useRef, useState } from 'react'
 import { Button } from '../../../components/ui'
 import { chatModels, chatSuggestions } from '../../../lib/businessData'
-import { useWorkspace } from '../../../lib/workspace'
+import { NoModelConnected } from '../../../components/NotBuilt'
 import { Icon } from '../../../components/Icon'
 import { BackLink } from './shared'
 
 type Message = { id: string; role: 'user' | 'assistant'; text: string }
 
 /** One chat turn costs the same as the AI Chat Assistant tool it wraps. */
-const costPerTurn = 1
 
 export default function BusinessChat() {
-  const { spend } = useWorkspace()
   const [messages, setMessages] = useState<Message[]>([])
   const [draft, setDraft] = useState('')
   const [model, setModel] = useState(chatModels[0])
   const [systemOpen, setSystemOpen] = useState(false)
   const [system, setSystem] = useState('')
-  const [thinking, setThinking] = useState(false)
   const composer = useRef<HTMLTextAreaElement>(null)
 
-  async function send(text: string) {
+  /**
+   * Keeps what was typed and says nothing came back.
+   *
+   * The previous version spent a credit, waited 650ms and appended a reply
+   * that echoed the question back — "<model> answered '<prompt>'. This rebuild
+   * simulates the reply" — beneath a footer reading "AI can make mistakes.
+   * Please verify important information." A simulated answer under a caution
+   * about answers being wrong is the worst possible arrangement: it borrows
+   * the credibility of the warning.
+   */
+  function send(text: string) {
     const prompt = text.trim()
-    if (!prompt || thinking) return
-
+    if (!prompt) return
     setDraft('')
     setMessages((prev) => [...prev, { id: `u-${Date.now()}`, role: 'user', text: prompt }])
-    setThinking(true)
-
-    const funded = spend(costPerTurn)
-    await new Promise((resolve) => setTimeout(resolve, 650))
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `a-${Date.now()}`,
-        role: 'assistant',
-        text: funded
-          ? `${model} answered “${prompt}”${system.trim() ? ', following your system prompt' : ''}. This rebuild simulates the reply — the turn cost ${costPerTurn} AI Credit from the tenant pool and is logged against your account.`
-          : 'Not enough AI Credits left in this cycle. An admin can top up the pool or raise your per-user allocation.',
-      },
-    ])
-    setThinking(false)
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()
-      void send(draft)
+      send(draft)
     }
   }
 
@@ -140,13 +130,7 @@ export default function BusinessChat() {
                 </p>
               </li>
             ))}
-            {thinking && (
-              <li className="flex justify-start">
-                <p className="rounded-2xl border border-line bg-surface px-4 py-3 text-[14px] text-fg-muted">
-                  Thinking…
-                </p>
-              </li>
-            )}
+            {/* No "Thinking…" bubble: nothing is thinking. */}
           </ul>
         ) : (
           <div className="text-center">
@@ -162,7 +146,7 @@ export default function BusinessChat() {
               {chatSuggestions.map((suggestion) => (
                 <li key={suggestion}>
                   <button
-                    onClick={() => void send(suggestion)}
+                    onClick={() => send(suggestion)}
                     className="h-full w-full rounded-2xl border border-line bg-surface px-5 py-4 text-left text-[14px] leading-relaxed text-fg-2 transition hover:border-accent hover:bg-surface-2"
                   >
                     {suggestion}
@@ -187,17 +171,17 @@ export default function BusinessChat() {
             className="w-full resize-none rounded-2xl border border-line bg-surface py-3.5 pr-14 pl-5 text-[14px] placeholder:text-fg-muted focus:border-accent focus:outline-none"
           />
           <button
-            onClick={() => void send(draft)}
-            disabled={!draft.trim() || thinking}
+            onClick={() => send(draft)}
+            disabled={!draft.trim()}
             aria-label="Send message"
             className="absolute top-1/2 right-3 -translate-y-1/2 rounded-xl px-2.5 py-1.5 text-[16px] text-accent transition disabled:text-fg-muted"
           >
             ➤
           </button>
         </div>
-        <p className="mt-2 text-center text-[12px] text-fg-muted">
-          AI can make mistakes. Please verify important information.
-        </p>
+        <div className="mx-auto mt-3 max-w-2xl">
+          <NoModelConnected what="Chat" />
+        </div>
       </div>
     </div>
   )

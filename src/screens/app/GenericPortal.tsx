@@ -5,7 +5,7 @@ import { marketApps } from '../../lib/appData'
 import { agentsByAppCode } from '../../lib/agentCatalog'
 import { useWorkspace } from '../../lib/workspace'
 import { EmptyPanel, PanelHeader } from './PortalPanel'
-import { CountUp } from '../../components/CountUp'
+import { NotBuilt } from '../../components/NotBuilt'
 
 /**
  * Landing surface for an installed app that has no bespoke portal yet.
@@ -51,20 +51,24 @@ export default function GenericPortal() {
 
       <p className="max-w-2xl text-[14px] leading-relaxed text-fg-2">{app.blurb}</p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-4">
-        {[
-          { label: 'Records', value: '0' },
-          { label: 'Bound agents', value: String(agents.length) },
-          { label: 'Runs this month', value: '0' },
-          { label: 'Pending reviews', value: '0' },
-        ].map((stat) => (
-          <div key={stat.label} className="rounded-2xl border border-line bg-surface p-5">
-            <p className="text-2xl font-bold">
-              <CountUp value={stat.value} />
-            </p>
-            <p className="mt-1 text-xs text-fg-muted">{stat.label}</p>
-          </div>
-        ))}
+      {/*
+        * The four tiles that stood here read Records 0, Runs this month 0 and
+        * Pending reviews 0 — literals, animated by CountUp so an absent
+        * measurement arrived looking like a measured one. This application has
+        * no implementation behind it, so there is nothing to count, and saying
+        * that is more useful than counting to zero.
+        */}
+      <div className="mt-6">
+        <NotBuilt
+          title={`${app.name} is in the catalogue, not on this deployment`}
+          because={
+            <>
+              Nothing is stored for this application yet, so there are no records to show and no figures to report.
+              It appears here because the marketplace lists it.
+            </>
+          }
+          needs={<>Which applications are released is decision D2.</>}
+        />
       </div>
 
       {agents.length > 0 && (

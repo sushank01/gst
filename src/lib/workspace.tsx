@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from 'react'
 import { marketApps, sampleTrace } from './appData'
 import type { CheckPoint, GuardrailAction, GuardrailType } from './guardrailData'
-import { dataFlows, dataInventory, type DataFlow, type InventoryField } from './complianceData'
+import type { DataFlow, InventoryField } from './complianceData'
 import {
   defaultCategories,
   defaultChannels,
@@ -697,7 +697,6 @@ type WorkspaceValue = Persisted & {
   updateBrandKit: (patch: Partial<BrandKit>) => void
   addCustomSchema: (schema: Omit<CustomSchema, 'id'>) => void
   updateCustomSchema: (id: string, patch: Partial<CustomSchema>) => void
-  loadPitchSample: () => void
   clearPitchSample: () => void
   addPosCustomer: (customer: Omit<PosCustomer, 'id' | 'createdAt'>) => void
   addPosDoc: (doc: Omit<PosDoc, 'id' | 'reference' | 'createdAt'>) => void
@@ -751,8 +750,11 @@ const empty: Persisted = {
   customConnectors: [],
   portalTabs: null,
   portalRoles: [],
-  dataInventory,
-  dataFlows,
+  // Both start empty. They used to be seeded with a platform-wide register
+  // that named tables this database does not have and claimed data-processing
+  // agreements nobody had signed — see the note in `complianceData.ts`.
+  dataInventory: [],
+  dataFlows: [],
   dpias: [],
   automatedDecisions: [],
   retentionPolicies: [],
@@ -1903,61 +1905,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     [update],
   )
 
-  const loadPitchSample = useCallback(
-    () =>
-      update((prev) => ({
-        ...prev,
-        pitchSampleLoaded: true,
-        rfps: [
-          {
-            id: crypto.randomUUID(),
-            prospect: 'City of Hidden Hills',
-            summary: 'Municipal website redesign and accessibility audit',
-            stage: 'Your turn',
-            vertical: 'Government / Municipal',
-            estimate: 180000,
-            schema: 'Government / Municipal',
-            deadline: '',
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: crypto.randomUUID(),
-            prospect: 'Meridian Health',
-            summary: 'Patient portal rebuild with HL7 integration',
-            stage: 'Drafting',
-            vertical: 'Healthcare',
-            estimate: 320000,
-            schema: 'Software Development',
-            deadline: '',
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: crypto.randomUUID(),
-            prospect: 'Northwind Retail',
-            summary: 'Brand refresh across 40 stores',
-            stage: 'Out for client',
-            vertical: 'Retail',
-            estimate: 95000,
-            schema: 'Design & Development',
-            deadline: '',
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: crypto.randomUUID(),
-            prospect: 'Adler Foundation',
-            summary: 'Grants management consulting engagement',
-            stage: 'Extracting',
-            vertical: 'Non-profit',
-            estimate: 60000,
-            schema: 'Services & Consulting',
-            deadline: '',
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      })),
-    [update],
-  )
-
+  /*
+   * `loadPitchSample` is gone. It wrote four invented RFPs into the workspace
+   * — named prospects with dollar values (City of Hidden Hills, $180,000;
+   * Meridian Health, $320,000) — and a banner then described them as your
+   * data, offering to "clear it when you're ready to start fresh". Sample data
+   * that is indistinguishable from real data is how a demo becomes a forecast.
+   */
   const clearPitchSample = useCallback(
     () => update((prev) => ({ ...prev, pitchSampleLoaded: false, rfps: [], kbDocs: [], pitchTemplates: [] })),
     [update],
@@ -2297,7 +2251,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       updateBrandKit,
       addCustomSchema,
       updateCustomSchema,
-      loadPitchSample,
       clearPitchSample,
       addPosCustomer,
       addPosDoc,
@@ -2389,7 +2342,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       updateBrandKit,
       addCustomSchema,
       updateCustomSchema,
-      loadPitchSample,
       clearPitchSample,
       addPosCustomer,
       addPosDoc,

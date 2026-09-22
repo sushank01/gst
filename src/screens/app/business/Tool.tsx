@@ -4,39 +4,27 @@ import { useState } from 'react'
 import { Navigate, useParams } from '../../../lib/router'
 import { Button } from '../../../components/ui'
 import { toolBySlug } from '../../../lib/businessData'
-import { useWorkspace } from '../../../lib/workspace'
+import { NoModelConnected } from '../../../components/NotBuilt'
 import { BackLink, CreditChip } from './shared'
 
 /**
- * `/app/business/tool/:slug`. The live product opens each tool into its own form;
- * this rebuild gives every tool the same prompt-and-run shell, since the per-tool
- * forms have not been transcribed.
+ * `/app/business/tool/:slug`.
+ *
+ * Every tool shares one prompt-and-run shell. The Run button used to spend the
+ * tool's credits, wait 700ms, and emit the same sentence for all of them —
+ * "<tool> produced a result for …, and is tagged to your active company" —
+ * under a caption asserting the output was tagged to the active company.
+ * Nothing was produced and nothing was tagged, and the credits were gone.
+ *
+ * The editor stays, because writing the brief is a real thing to do. Running
+ * it is what needs a provider (D3).
  */
 export default function BusinessTool() {
   const { slug = '' } = useParams()
   const tool = toolBySlug[slug]
-  const { spend } = useWorkspace()
   const [input, setInput] = useState('')
-  const [output, setOutput] = useState<string | null>(null)
-  const [running, setRunning] = useState(false)
 
   if (!tool) return <Navigate to="/app/business" replace />
-
-  async function run() {
-    if (!tool || !input.trim()) return
-    setRunning(true)
-    setOutput(null)
-
-    const funded = spend(tool.cost)
-    await new Promise((resolve) => setTimeout(resolve, 700))
-
-    setOutput(
-      funded
-        ? `${tool.name} produced a result for “${input.trim()}”. It cost ${tool.cost} AI Credits from the tenant pool and is tagged to your active company.`
-        : 'Not enough AI Credits left in this cycle. An admin can top up the pool or raise your per-user allocation.',
-    )
-    setRunning(false)
-  }
 
   return (
     <div className="mx-auto max-w-3xl pt-2">
@@ -64,15 +52,14 @@ export default function BusinessTool() {
           className="mt-2 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] focus:border-accent focus:outline-none"
         />
         <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button variant="accent" onClick={run} loading={running} disabled={!input.trim()}>
+          <Button variant="accent" disabled title="No model is connected on this deployment">
             Run · {tool.cost} credits
           </Button>
-          <span className="text-[12px] text-fg-muted">Output is soft-tagged to your active company.</span>
         </div>
 
-        {output && (
-          <p className="mt-5 rounded-xl bg-bg px-4 py-3.5 text-[13px] leading-relaxed text-fg-2">{output}</p>
-        )}
+        <div className="mt-5">
+          <NoModelConnected what={tool.name} />
+        </div>
       </section>
     </div>
   )

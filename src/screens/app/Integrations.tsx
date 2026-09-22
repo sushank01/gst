@@ -30,10 +30,7 @@ function ConnectionDialog({ preset, onClose }: { preset?: string; onClose: () =>
   const [connectorId, setConnectorId] = useState(preset ?? connectors[0].id)
   const [name, setName] = useState('')
   const [account, setAccount] = useState('')
-  const [secret, setSecret] = useState('')
   const connector = connectorById[connectorId]
-
-  const needsSecret = connector.auth === 'api_key' || connector.auth === 'basic'
 
   return (
     <Dialog size="xl" title="Add connection" onClose={onClose}>
@@ -73,29 +70,20 @@ function ConnectionDialog({ preset, onClose }: { preset?: string; onClose: () =>
           />
         </label>
 
-        {connector.auth === 'oauth2' ? (
-          <p className="rounded-xl border border-line bg-bg px-4 py-3 text-[13px] leading-relaxed text-fg-muted">
-            {connector.name.split(' (')[0]} authorises in its own consent screen. This rebuild has no OAuth client
-            registered, so the connection is saved unauthorised — a real tenant would finish the handshake here.
-          </p>
-        ) : needsSecret ? (
-          <label className="text-[13px] font-medium">
-            API key / password
-            <input
-              type="password"
-              value={secret}
-              onChange={(event) => setSecret(event.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-line bg-bg px-3.5 py-2.5 text-[14px] font-normal focus:border-accent focus:outline-none"
-            />
-            <span className="mt-1.5 block text-[12px] font-normal text-fg-muted">
-              Never persisted. Only the last four characters are kept, so the row stays recognisable.
-            </span>
-          </label>
-        ) : (
-          <p className="rounded-xl border border-line bg-bg px-4 py-3 text-[13px] text-fg-muted">
-            This connector needs no credentials.
-          </p>
-        )}
+        {/*
+          * No credential field, whatever the connector's auth kind. The
+          * previous version took an API key and kept its last four characters
+          * under a label reading "Never persisted. Only the last four
+          * characters are kept" — two sentences that contradict each other,
+          * over a connection that can never connect. Nothing dials out on this
+          * deployment, so a secret taken here would be one held for no reason.
+          */}
+        <p className="rounded-xl border border-line bg-bg px-4 py-3 text-[13px] leading-relaxed text-fg-muted">
+          {connector.auth === 'oauth2'
+            ? `${connector.name.split(' (')[0]} authorises in its own consent screen, and no OAuth client is registered on this deployment.`
+            : 'Credentials are not accepted here yet: no connector adapter runs on this deployment, so there is nothing for a key to authenticate against.'}{' '}
+          What you save below is a note of the connection you intend to make.
+        </p>
       </div>
 
       <div className="mt-6 flex justify-end gap-3">
@@ -106,16 +94,12 @@ function ConnectionDialog({ preset, onClose }: { preset?: string; onClose: () =>
           variant="accent"
           disabled={!name.trim()}
           onClick={() => {
-            addConnection({
-              connectorId,
-              name: name.trim(),
-              account: account.trim(),
-              secretHint: secret ? `••••${secret.slice(-4)}` : '',
-            })
+            // Recorded as an intention, not a connection: nothing dials out.
+            addConnection({ connectorId, name: name.trim(), account: account.trim(), secretHint: '' })
             onClose()
           }}
         >
-          Save connection
+          Record this connection
         </Button>
       </div>
     </Dialog>
@@ -360,7 +344,8 @@ export default function Integrations() {
       <section className="mt-6 rounded-2xl border border-line bg-surface p-6">
         <h2 className="text-[15px] font-semibold">Available connectors</h2>
         <p className="mt-1 text-[13px] text-fg-muted">
-          Connectors registered on this platform. Install one to create a connection.
+          The connector catalogue. None is registered on this deployment yet, so a connection recorded here is a
+          note of intent rather than a live link.
         </p>
 
         <ul className="mt-5 grid gap-4 lg:grid-cols-2">
