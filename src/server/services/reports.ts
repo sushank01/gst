@@ -272,3 +272,63 @@ export async function search(ctx: TenantContext, term: string, perKind = 5): Pro
     })),
   ]
 }
+
+export type AppMetric = { label: string; value: string; hint?: string }
+
+/**
+ * The figures behind one application's dashboard tab.
+ *
+ * Only what can actually be computed. The prototype rendered "Win rate 0.0%"
+ * and "Attrition 0.0%" under a "last updated" timestamp, which reads as a
+ * measured zero rather than an absent measurement — and neither could be
+ * derived from anything the product stored. A metric that needs data nobody
+ * has entered is omitted, not printed as a zero.
+ */
+export async function appMetrics(ctx: TenantContext, appCode: string): Promise<AppMetric[]> {
+  ctx.require('record.read')
+
+  if (appCode === 'HR') {
+    const report = await overview(ctx)
+    return [
+      { label: 'Active headcount', value: String(report.people.headcount) },
+      { label: 'On probation', value: String(report.people.onProbation) },
+      { label: 'Joiners this month', value: String(report.people.joinersThisMonth) },
+      { label: 'Leavers this month', value: String(report.people.leaversThisMonth) },
+      { label: 'On leave today', value: String(report.people.onLeaveToday) },
+    ]
+  }
+
+  if (appCode === 'CRM') {
+    const { rows } = await ctx.db.query<{ status: string; n: string }>(
+      `select status, count(*)::text as n from leads
+        where tenant_id = $1 and archived_at is null group by status`,
+      [ctx.tenantId],
+    )
+    const byStatus = new Map(rows.map((row) => [row.status.toLowerCase(), Number(row.n)]))
+    const total = [...byStatus.values()].reduce((sum, count) => sum + count, 0)
+    const won = byStatus.get('converted') ?? byStatus.get('won') ?? 0
+
+    const { rows: deals } = await ctx.db.query<{ open: string; value: string; currency: string | null }>(
+      `select count(*)::text as open,
+              coalesce(sum(d.amount), 0)::text as value,
+              min(d.currency) as currency
+         from deals d
+         join pipeline_stages s on s.id = d.stage_id
+        where d.tenant_id = $1 and s.outcome = 'open'`,
+      [ctx.tenantId],
+    )
+
+    const metrics: AppMetric[] = [
+      { label: 'Leads', value: String(total) },
+      { label: 'Converted', value: String(won) },
+      { label: 'Open pipeline', value: `${deals[0].currency ?? ''} ${deals[0].value}`.trim(), hint: `${deals[0].open} open deal(s)` },
+    ]
+    // A conversion rate with no leads is 0/0, which is not zero per cent.
+    if (total > 0) {
+      metrics.push({ label: 'Converted share', value: `${((won / total) * 100).toFixed(1)}%`, hint: `${won} of ${total}` })
+    }
+    return metrics
+  }
+
+  return []
+}

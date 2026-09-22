@@ -3,8 +3,12 @@
 import { StatCard } from '../../components/StatCard'
 
 import { Link } from '../../lib/router'
-import { builderTiles, jumpCards, marketApps, pendingApprovals, quickTools } from '../../lib/appData'
+import { builderTiles, jumpCards, quickTools } from '../../lib/appData'
 import { useWorkspace } from '../../lib/workspace'
+import { useInstallations } from '../../lib/useInstallations'
+import { useOverview } from '../../lib/useWorkspaceSummary'
+import { api } from '../../lib/api'
+import { useResource } from '../../lib/useResource'
 import { CountUp } from '../../components/CountUp'
 
 /** Cards below the context tabs on the Overview dashboard. */
@@ -13,52 +17,9 @@ function Stat(props: Omit<React.ComponentProps<typeof StatCard>, 'variant'>) {
   return <StatCard {...props} variant="dashboard" />
 }
 
-function MeterCard({
-  title,
-  blurb,
-  icon,
-  value,
-  unit,
-  pct,
-  linkLabel,
-  to,
-}: {
-  title: string
-  blurb: string
-  icon: string
-  value: string
-  unit: string
-  pct: number
-  linkLabel: string
-  to: string
-}) {
-  return (
-    <div className="rounded-2xl border border-line bg-surface p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[15px] font-semibold">{title}</h3>
-          <p className="mt-0.5 text-[12px] text-fg-muted">{blurb}</p>
-        </div>
-        <span aria-hidden className="text-accent">
-          {icon}
-        </span>
-      </div>
-
-      <p className="mt-5 text-3xl font-bold">
-        {value} <span className="text-[13px] font-normal text-fg-muted">{unit}</span>
-      </p>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-
-      <Link to={to} className="mt-4 inline-block text-[13px] font-medium text-accent hover:underline">
-        {linkLabel} →
-      </Link>
-    </div>
-  )
-}
-
 const ranges = ['This month', '30 days', 'Today', 'All time'] as const
+export type AppMetric = { label: string; value: string; hint?: string }
+
 export type RunsRange = (typeof ranges)[number]
 
 export function RunsRangeFilter({ value, onChange }: { value: RunsRange; onChange: (next: RunsRange) => void }) {
@@ -91,10 +52,13 @@ export function RunsRangeFilter({ value, onChange }: { value: RunsRange; onChang
 }
 
 export function OverviewPanel({ range }: { range: RunsRange }) {
-  const { installed, appQuota, creditsUsed, creditsTotal, runs, artifacts, approvals } = useWorkspace()
-
-  // Only undecided reviews are still "pending" — Approvals is the source of truth.
-  const pendingReviews = pendingApprovals.filter((item) => !approvals[item.id]).length
+  const { runs, artifacts } = useWorkspace()
+  /*
+   * Installed apps and credits come from the server, so this row cannot
+   * disagree with the plan card above it or with the marketplace.
+   */
+  const { entitlement } = useInstallations()
+  const { data: report } = useOverview()
 
   const since = (() => {
     const now = new Date()
@@ -105,8 +69,22 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
   })()
 
   const runsInRange = runs.filter((run) => new Date(run.startedAt) >= since)
-  const agents = marketApps.filter((app) => installed.includes(app.code)).flatMap((app) => app.agents)
-  const creditPct = Math.round((creditsUsed / creditsTotal) * 100)
+
+  const installedCount = entitlement ? entitlement.used : 0
+  const quotaHint =
+    entitlement?.appQuota === null || entitlement === undefined
+      ? 'no limit recorded'
+      : `${entitlement.remaining ?? 0} slot(s) remaining`
+
+  const credits = report?.credits
+  const creditsAvailable = credits ? credits.available.toLocaleString() : '—'
+  const creditsHint = credits ? `${credits.used.toLocaleString()} of ${credits.granted.toLocaleString()} used` : 'loading'
+  /*
+   * A percentage of nothing is not zero per cent. With no credits granted the
+   * bar is empty and says so, rather than showing "100% remaining" of a pool
+   * that does not exist.
+   */
+  const creditPct = credits && credits.granted > 0 ? Math.round((credits.used / credits.granted) * 100) : null
 
   const outcomes = [
     { label: 'Succeeded', value: runsInRange.filter((run) => run.status === 'success').length, tone: 'text-ok' },
@@ -118,54 +96,17 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-        <Stat label="Apps installed" value={String(installed.length)} sub={`${appQuota - installed.length} slots remaining`} />
-        <Stat label="Total agents" value={String(agents.length)} sub={`${agents.length} active`} />
-        <Stat
-          label="Runs"
-          value={String(runsInRange.length)}
-          sub={`${range.toLowerCase()} · 0 active now`}
-        />
-        <Stat label="Pending reviews" value={String(pendingReviews)} sub="HITL approvals needed" />
-        <Stat label="Queue" value="0" sub="0 queued · 0 processing" />
-        <Stat
-          label="AI Credits usage"
-          value={`${creditPct}%`}
-          sub={`${creditsUsed.toLocaleString()} / ${creditsTotal.toLocaleString()}`}
-        />
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-3">
-        <MeterCard
-          title="Plan & Billing"
-          blurb="Upgrade for more capacity"
-          icon="💳"
-          value={String(installed.length)}
-          unit={`/ ${appQuota} app slots`}
-          pct={(installed.length / appQuota) * 100}
-          linkLabel="View plan details"
-          to="/app/account"
-        />
-        <MeterCard
-          title="Members"
-          blurb="Active users in your org"
-          icon="👥"
-          value="1"
-          unit="/ 1 seats"
-          pct={100}
-          linkLabel="Invite members"
-          to="/app/account"
-        />
-        <MeterCard
-          title="Org AI Credits Pool"
-          blurb="AI Credits for chat, agent runs, codegen"
-          icon="⚡"
-          value={creditsTotal.toLocaleString()}
-          unit="AI Credits"
-          pct={creditPct}
-          linkLabel="Allocate Credits"
-          to="/app/account"
-        />
+      {/*
+        * Agent execution does not exist yet — there is no provider connected
+        * (decision D3) — so the counts that used to sit here ("Total agents",
+        * "Pending reviews", "Queue") described a subsystem that runs nothing.
+        * They are gone rather than showing numbers derived from a catalogue.
+        * The real workspace figures are in <WorkspaceSummary> above.
+        */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Stat label="Apps installed" value={String(installedCount)} sub={quotaHint} />
+        <Stat label="Runs" value={String(runsInRange.length)} sub={`${range.toLowerCase()}`} />
+        <Stat label="AI credits available" value={creditsAvailable} sub={creditsHint} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
@@ -287,13 +228,17 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
           </div>
 
           <p className="mt-6 text-3xl font-bold">
-            {creditsUsed.toLocaleString()}{' '}
-            <span className="text-[13px] font-normal text-fg-muted">/ {creditsTotal.toLocaleString()}</span>
+            {credits ? credits.used.toLocaleString() : '—'}{' '}
+            <span className="text-[13px] font-normal text-fg-muted">
+              / {credits ? credits.granted.toLocaleString() : '—'}
+            </span>
           </p>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
-            <div className="h-full rounded-full bg-accent" style={{ width: `${creditPct}%` }} />
+            <div className="h-full rounded-full bg-accent" style={{ width: `${creditPct ?? 0}%` }} />
           </div>
-          <p className="mt-3 text-[12px] text-fg-muted">{100 - creditPct}% remaining.</p>
+          <p className="mt-3 text-[12px] text-fg-muted">
+            {creditPct === null ? 'No credits have been granted to this workspace yet.' : `${100 - creditPct}% remaining.`}
+          </p>
         </section>
       </div>
 
@@ -366,35 +311,50 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
   )
 }
 
-/** Per-app dashboards behind the CRM and HR tabs. */
+/**
+ * Per-app dashboards behind the CRM and HR tabs.
+ *
+ * Every figure comes from the server. The prototype printed a fixed set of
+ * zeroes — "Win rate 0.0%", "Attrition 0.0%" — under a "last updated" line
+ * showing the current time, which reads as a measured result. Neither could be
+ * derived from anything the product stored. The server now returns only the
+ * metrics it can actually compute, and this renders what it returns.
+ */
 export function AppMetricsPanel({ app }: { app: 'CRM' | 'HR' }) {
-  const metrics =
-    app === 'CRM'
-      ? [
-          { label: 'Deals won', value: 'US$0' },
-          { label: 'New leads', value: '0' },
-          { label: 'Open pipeline', value: 'US$0' },
-          { label: 'Win rate', value: '0.0%' },
-        ]
-      : [
-          { label: 'Active headcount', value: '0' },
-          { label: 'Joiners', value: '0' },
-          { label: 'Leavers', value: '0' },
-          { label: 'Attrition', value: '0.0%' },
-        ]
+  const { data, loading, error, canRetry, refetch } = useResource<{ metrics: AppMetric[] }>(
+    `app-metrics:${app}`,
+    (signal) => api.get<{ metrics: AppMetric[] }>(`/reports/apps/${app}`, undefined, signal),
+  )
+
+  if (loading) return <p className="text-[13px] text-fg-muted">Loading {app} figures…</p>
+
+  if (error || !data) {
+    return (
+      <div className="rounded-2xl border border-bad/30 bg-bad-muted/30 p-5">
+        <p className="text-[13px] text-fg-2">{error?.message ?? 'These figures could not be loaded.'}</p>
+        {canRetry && (
+          <button onClick={refetch} className="mt-3 text-[13px] font-medium text-accent hover:underline">
+            Try again
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (!data.metrics.length) {
+    return <p className="text-[13px] text-fg-muted">There are no figures for {app} yet.</p>
+  }
 
   return (
     <div>
-      <p className="mb-5 text-[13px] text-fg-muted">
-        Amounts in USD. Last updated {new Date().toLocaleString('en-GB')}.
-      </p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {metrics.map((metric) => (
+        {data.metrics.map((metric) => (
           <div key={metric.label} className="rounded-2xl border border-line bg-surface p-5">
             <p className="text-[11px] font-semibold tracking-[0.08em] text-fg-muted uppercase">{metric.label}</p>
             <p className="mt-2.5 text-3xl font-bold">
               <CountUp value={metric.value} />
             </p>
+            {metric.hint && <p className="mt-1.5 text-[12px] text-fg-muted">{metric.hint}</p>}
           </div>
         ))}
       </div>

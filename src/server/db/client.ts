@@ -202,7 +202,27 @@ export async function openPostgres(url: string): Promise<Db> {
 export async function getDb(): Promise<Db> {
   if (shared) return shared
   const url = process.env.DATABASE_URL?.trim()
-  shared = url ? await openPostgres(url) : await openPglite(process.env.PGLITE_DIR || '.data/pg')
+  if (url) {
+    /*
+     * A real server. Migrations are NOT applied here: schema changes on a
+     * shared database are a deliberate deploy step (`npm run db:migrate`), not
+     * something that happens because a request arrived. Several instances
+     * starting at once would otherwise race to migrate.
+     */
+    shared = await openPostgres(url)
+    return shared
+  }
+
+  /*
+   * Local PGlite. Here migrations ARE applied on open, so a fresh checkout
+   * works from `npm run dev` without a separate step — the alternative is a
+   * 500 saying `relation "users" does not exist`, which tells a newcomer
+   * nothing. The file lock below keeps two dev processes from racing.
+   */
+  const db = await openPglite(process.env.PGLITE_DIR || '.data/pg')
+  shared = db
+  const { migrate } = await import('./migrate.ts')
+  await migrate(db)
   return shared
 }
 

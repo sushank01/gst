@@ -70,11 +70,17 @@ export default function Onboarding() {
        */
       const result = await api.put<{ refused: { appCode: string; reason: string }[] }>('/apps', { apps })
       if (result.refused.length) {
+        /*
+         * Something the user ticked could not be installed. Stay here and say
+         * so: navigating away with a message nobody has time to read is the
+         * same as not telling them. The workspace itself is already created,
+         * so the button below just goes to it.
+         */
         setNotice(
-          `Your workspace is ready. ${result.refused
-            .map((entry) => entry.reason)
-            .join(' ')} You can install the rest from the marketplace later.`,
+          `Your workspace is ready. ${result.refused.map((entry) => entry.reason).join(' ')} You can install the rest from the marketplace later.`,
         )
+        setSubmitting(false)
+        return
       }
       navigate('/app', { replace: true })
     } catch (error) {
@@ -234,7 +240,12 @@ export default function Onboarding() {
             >
               ← Back
             </Button>
-            <Button type="button" onClick={next} loading={submitting} disabled={submitting}>
+            <Button
+              type="button"
+              onClick={notice ? () => navigate('/app', { replace: true }) : next}
+              loading={submitting}
+              disabled={submitting}
+            >
               {step === steps.length - 1 ? 'Open my workspace' : 'Continue'}
             </Button>
           </div>
