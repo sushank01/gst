@@ -64,6 +64,8 @@ export function useNotifications(options: { unreadOnly?: boolean } = {}) {
     unread: resource.data?.unread,
     loading: resource.loading,
     error: resource.error,
+    /** A network or server failure may be retried; a 403 may not. */
+    canRetry: resource.canRetry,
     refetch,
     markRead,
     markAllRead,
