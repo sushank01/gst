@@ -4,7 +4,6 @@ import { StatCard } from '../../components/StatCard'
 
 import { Link } from '../../lib/router'
 import { builderTiles, jumpCards, quickTools } from '../../lib/appData'
-import { useWorkspace } from '../../lib/workspace'
 import { useInstallations } from '../../lib/useInstallations'
 import { useOverview } from '../../lib/useWorkspaceSummary'
 import { api } from '../../lib/api'
@@ -51,8 +50,12 @@ export function RunsRangeFilter({ value, onChange }: { value: RunsRange; onChang
   )
 }
 
-export function OverviewPanel({ range }: { range: RunsRange }) {
-  const { runs, artifacts } = useWorkspace()
+/*
+ * The range filter above this panel now only governs the credit figures,
+ * which are a running total rather than a window — so the panel no longer
+ * takes it. Keeping the prop would imply the numbers change when it does.
+ */
+export function OverviewPanel() {
   /*
    * Installed apps and credits come from the server, so this row cannot
    * disagree with the plan card above it or with the marketplace.
@@ -60,15 +63,7 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
   const { entitlement } = useInstallations()
   const { data: report } = useOverview()
 
-  const since = (() => {
-    const now = new Date()
-    if (range === 'Today') return new Date(now.getFullYear(), now.getMonth(), now.getDate())
-    if (range === 'This month') return new Date(now.getFullYear(), now.getMonth(), 1)
-    if (range === '30 days') return new Date(now.getTime() - 30 * 86_400_000)
-    return new Date(0)
-  })()
 
-  const runsInRange = runs.filter((run) => new Date(run.startedAt) >= since)
 
   const installedCount = entitlement ? entitlement.used : 0
   const quotaHint =
@@ -86,13 +81,6 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
    */
   const creditPct = credits && credits.granted > 0 ? Math.round((credits.used / credits.granted) * 100) : null
 
-  const outcomes = [
-    { label: 'Succeeded', value: runsInRange.filter((run) => run.status === 'success').length, tone: 'text-ok' },
-    { label: 'Paused', value: runsInRange.filter((run) => run.status === 'needs-review').length, tone: 'text-warn' },
-    { label: 'Running', value: 0, tone: 'text-accent' },
-    { label: 'Failed', value: runsInRange.filter((run) => run.status === 'failed').length, tone: 'text-bad' },
-    { label: 'Cancelled', value: 0, tone: 'text-fg-muted' },
-  ]
 
   return (
     <div className="space-y-5">
@@ -105,7 +93,9 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
         */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Stat label="Apps installed" value={String(installedCount)} sub={quotaHint} />
-        <Stat label="Runs" value={String(runsInRange.length)} sub={`${range.toLowerCase()}`} />
+        {/* A "Runs" count over agent executions that never happen is a zero
+            reported as a measurement. Scheduled jobs are the work that does
+            run, and they have their own screen. */}
         <Stat label="AI credits available" value={creditsAvailable} sub={creditsHint} />
       </div>
 
@@ -118,22 +108,13 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
             </Link>
           </div>
 
-          {runsInRange.length ? (
-            <ul className="mt-4 divide-y divide-line">
-              {runsInRange.slice(0, 5).map((run) => (
-                <li key={run.id} className="flex items-center justify-between gap-4 py-3 text-[13px]">
-                  <span className="min-w-0 truncate font-medium">{run.agent}</span>
-                  <span className="shrink-0 text-fg-muted">
-                    {run.credits}c · {(run.ms / 1000).toFixed(1)}s · {run.status}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="py-16 text-center text-[13px] text-fg-muted">
-              No runs yet — fire a use case from the Apps section.
-            </p>
-          )}
+          <p className="py-16 text-center text-[13px] leading-relaxed text-fg-muted">
+            No agent has executed on this deployment — no model is connected. Scheduled work that does run is under{' '}
+            <Link to="/app/scheduled-jobs" className="font-medium text-accent hover:underline">
+              Scheduled Jobs
+            </Link>
+            .
+          </p>
         </section>
 
         <section className="rounded-2xl border border-line bg-surface p-5">
@@ -181,40 +162,9 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
           </ul>
         </section>
 
-        <section className="rounded-2xl border border-line bg-surface p-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-[15px] font-semibold">Workspace activity</h3>
-              <p className="mt-0.5 text-[12px] text-fg-muted">Latest across agents, pipelines, and reviews</p>
-            </div>
-            <Link to="/app/runs" className="shrink-0 text-[13px] font-medium text-accent hover:underline">
-              View all →
-            </Link>
-          </div>
-
-          {runsInRange.length || artifacts.length ? (
-            <ul className="mt-4 space-y-3 text-[13px]">
-              {artifacts.slice(0, 2).map((artifact) => (
-                <li key={artifact.id} className="flex justify-between gap-3">
-                  <span className="min-w-0 truncate">Built {artifact.name}</span>
-                  <span className="shrink-0 text-fg-muted">v{artifact.version}</span>
-                </li>
-              ))}
-              {runsInRange.slice(0, 3).map((run) => (
-                <li key={run.id} className="flex justify-between gap-3">
-                  <span className="min-w-0 truncate">Ran {run.agent}</span>
-                  <span className="shrink-0 text-fg-muted">{run.credits}c</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="py-14 text-center text-[13px] leading-relaxed text-fg-muted">
-              No activity yet.
-              <br />
-              Run an agent or build a canvas to see it here.
-            </p>
-          )}
-        </section>
+        {/* "Workspace activity — latest across agents, pipelines, and
+            reviews" listed built artifacts and agent runs. Neither exists:
+            the artifacts were localStorage objects and the runs never ran. */}
 
         <section className="rounded-2xl border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
@@ -292,21 +242,9 @@ export function OverviewPanel({ range }: { range: RunsRange }) {
         ))}
       </ul>
 
-      <section className="rounded-2xl border border-line bg-surface p-5">
-        <h3 className="text-[15px] font-semibold">Execution Status Breakdown</h3>
-        <p className="mt-0.5 text-[12px] text-fg-muted">Recent agent runs aggregated by outcome</p>
-
-        <ul className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-5">
-          {outcomes.map((outcome) => (
-            <li key={outcome.label} className="text-center">
-              <p className={`text-3xl font-bold ${outcome.tone}`}>
-                <CountUp value={outcome.value} />
-              </p>
-              <p className="mt-1 text-[12px] text-fg-muted">{outcome.label}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* "Execution Status Breakdown — recent agent runs aggregated by
+          outcome" showed five counts, of which two were hard-coded zeroes and
+          three counted runs that never happened. */}
     </div>
   )
 }

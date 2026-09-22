@@ -9,8 +9,7 @@ import { useApps } from '../../lib/useWorkspaceSummary'
 import { api } from '../../lib/api'
 import { useResource } from '../../lib/useResource'
 import { WorkspaceSummary } from './WorkspaceSummary'
-import { AppMetricsPanel, OverviewPanel, RunsRangeFilter } from './dashboardPanels'
-import type { RunsRange } from './dashboardPanels'
+import { AppMetricsPanel, OverviewPanel } from './dashboardPanels'
 
 function greeting() {
   const hour = new Date().getHours()
@@ -235,7 +234,6 @@ function DashboardTabs() {
   const apps = marketApps.filter((app) => installed.includes(app.code) && (app.code === 'CRM' || app.code === 'HR'))
 
   const [tab, setTab] = useState<'overview' | 'CRM' | 'HR'>('overview')
-  const [range, setRange] = useState<RunsRange>('This month')
   const [period, setPeriod] = useState<(typeof periods)[number]>('MTD')
 
   return (
@@ -306,8 +304,7 @@ function DashboardTabs() {
       {tab === 'overview' ? (
         <>
           <WorkspaceSummary />
-          <RunsRangeFilter value={range} onChange={setRange} />
-          <OverviewPanel range={range} />
+          <OverviewPanel />
         </>
       ) : (
         <AppMetricsPanel app={tab} />
