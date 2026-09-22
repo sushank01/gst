@@ -80,9 +80,12 @@ function TaxPane() {
 
   return (
     <div>
+      {/* There is no item or product record in this deployment — nothing but
+          an invoice line can point at a category — so the pane does not
+          describe a catalogue it would be managing. */}
       <PaneHead
         title="Tax categories"
-        blurb="Named tax rates. Items point at a category, so changing a rate is one edit here rather than an edit on every affected item."
+        blurb="Named tax rates an invoice line can be raised under, so a rate is defined in one place instead of being retyped on every line."
       />
 
       <Card>
@@ -144,7 +147,7 @@ function TaxPane() {
             ))}
           </ul>
         ) : (
-          <EmptyBox title="No tax categories yet. Items will fall back to whatever percentage is typed on each one." />
+          <EmptyBox title="No tax categories yet. A line is then taxed at whatever rate it was created with." />
         )}
 
         <WriteError error={categories.writeError} />
@@ -885,6 +888,13 @@ function HistoryPane() {
             onRetry={history.refetch}
           />
         </div>
+      ) : !visible.length && history.changes.length ? (
+        // Every change reverted is not the same as no change ever made.
+        <EmptyBox
+          icon="history"
+          title="Every recorded change has been reverted."
+          hint="Tick Show reverted to see them."
+        />
       ) : visible.length ? (
         <ul className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
           {visible.map((change) => (
@@ -973,12 +983,14 @@ export function PosSettingsPane() {
         <div className="max-w-3xl">
           <p className="flex items-center gap-2 text-[14px] font-semibold">
             <Icon name="sparkles" size={15} className="text-accent" />
-            Need a change? Just ask
+            Changing these settings
           </p>
+          {/* The dock this button raises has no model behind it, so the banner
+              does not invite a request it will then refuse. */}
           <p className="mt-1.5 text-[13px] leading-relaxed text-fg-muted">
-            Describe what you want in plain English — &ldquo;add a field for the customer&apos;s region&rdquo;,
-            &ldquo;rename the Status column&rdquo;. Changes to this app&apos;s settings are recorded in Change History
-            and can be reverted from there.
+            Change them on the panes here: every change is recorded in Change History with who made it, and can be
+            reverted from there. The Copilot has no AI provider connected on this deployment, so it cannot make a
+            change for you yet.
           </p>
         </div>
         <Button variant="accent" onClick={() => window.dispatchEvent(new Event('apragya:copilot'))}>

@@ -118,6 +118,41 @@ test('aging buckets by how late each invoice is, and does not guess a due date',
   await db.close()
 })
 
+test('receivables in two currencies are never added together', async () => {
+  const { db, ctx } = await shop()
+  const rupees = await createCustomer(ctx, { name: 'Nimbus', currency: 'INR' })
+  const dollars = await createCustomer(ctx, { name: 'Contoso', currency: 'USD' })
+
+  await invoice(ctx, rupees.id, '1000', -10)
+  await invoice(ctx, rupees.id, '2000', -10)
+  const abroad = await createDocument(ctx, {
+    kind: 'invoice',
+    customerId: dollars.id,
+    currency: 'USD',
+    dueOn: day(ctx, -10),
+    lines: [{ description: 'Services', quantity: '1', unitPrice: '5000' }],
+  })
+  await postDocument(ctx, abroad.id, abroad.version)
+
+  const aging = await agingReport(ctx, ctx.now)
+  // The old report summed every currency and then labelled the answer with
+  // whichever invoice the query happened to return first — 8000 of nothing.
+  assert.equal(aging.total, '3000.0000')
+  assert.equal(aging.currency, 'INR', 'the currency most of the debt is in')
+  assert.deepEqual(aging.otherCurrencies, ['USD'], 'named, not converted and not added in')
+  assert.equal(aging.buckets.find((bucket) => bucket.label === '1–30')!.count, 2)
+
+  // Asking for dollars narrows what is aged, not what is outstanding. The
+  // rupees are still named, because the question this field answers — "is
+  // there money owed that this figure leaves out?" — has the same answer
+  // whichever currency was asked for.
+  const asked = await agingReport(ctx, ctx.now, 'USD')
+  assert.equal(asked.total, '5000.0000')
+  assert.equal(asked.currency, 'USD')
+  assert.deepEqual(asked.otherCurrencies, ['INR'])
+  await db.close()
+})
+
 test('a paid invoice leaves the aging report', async () => {
   const { db, ctx } = await shop()
   const customer = await createCustomer(ctx, { name: 'Nimbus', currency: 'INR' })
@@ -149,6 +184,15 @@ test('a partly paid invoice ages only what is still owed', async () => {
     allocations: [{ documentId: document.id, amount: '400.0000' }],
   })
   assert.equal((await agingReport(ctx, ctx.now)).total, '600.0000')
+  await db.close()
+})
+
+test('an empty aging report names no currency and no others', async () => {
+  const { db, ctx } = await shop()
+  const aging = await agingReport(ctx, ctx.now)
+  assert.equal(aging.currency, null, '"INR 0" would assert a currency nothing is owed in')
+  assert.deepEqual(aging.otherCurrencies, [])
+  assert.equal(aging.total, '0.0000')
   await db.close()
 })
 

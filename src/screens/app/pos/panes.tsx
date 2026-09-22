@@ -59,6 +59,24 @@ const NOT_OVERDUE = ['Current', 'Not due']
 /** The two buckets the "aged over 60 days" figure covers. */
 const AGED_BUCKETS = ['61–90', '90+']
 
+/**
+ * One bar per day of the window, including the days nothing was invoiced.
+ *
+ * The server returns only the days that have invoices on them. Drawing those
+ * side by side closes up every gap, so three trading days in a month render as
+ * three adjacent bars under a heading that says "daily over the last 30 days".
+ */
+function dailySeries(from: string, to: string, buckets: { bucket: string; amount: string }[]) {
+  const byDay = new Map(buckets.map((bucket) => [bucket.bucket, bucket.amount]))
+  const days: { day: string; amount: string }[] = []
+  const end = Date.parse(`${to}T00:00:00Z`)
+  for (let time = Date.parse(`${from}T00:00:00Z`); time <= end; time += 86_400_000) {
+    const day = new Date(time).toISOString().slice(0, 10)
+    days.push({ day, amount: byDay.get(day) ?? '0' })
+  }
+  return days
+}
+
 /* ------------------------------- dashboard -------------------------------- */
 
 export function PosDashboard() {
@@ -78,6 +96,7 @@ export function PosDashboard() {
   const returns = useSalesDocuments({ kind: 'return', limit: 1 })
 
   const buckets = aging.data?.buckets ?? []
+  const otherAging = aging.data?.otherCurrencies ?? []
   const overdue = buckets.filter((bucket) => !NOT_OVERDUE.includes(bucket.label))
   const overdueTotal = addAmounts(...overdue.map((bucket) => bucket.amount))
   const overdueCount = overdue.reduce((sum, bucket) => sum + bucket.count, 0)
@@ -85,6 +104,8 @@ export function PosDashboard() {
 
   const average = revenue.data && revenue.data.invoices > 0 ? divideAmount(revenue.data.total, revenue.data.invoices) : null
   const returned = rollupValue(returns.byStatus)
+  const daily = dailySeries(from, to, revenue.data?.buckets ?? [])
+  const dailyMax = maxAmount(...daily.map((day) => day.amount))
 
   const stages = funnel.data
     ? [
@@ -140,19 +161,41 @@ export function PosDashboard() {
           label="Average invoice"
           currency={average ? (revenue.data?.currency ?? undefined) : undefined}
           value={average ? money(average, null) : '—'}
-          sub={average ? 'Across the period' : 'Nothing invoiced in this period'}
+          sub={
+            average
+              ? 'Across the period'
+              : revenue.loading
+                ? 'Loading…'
+                : revenue.data
+                  ? 'Nothing invoiced in this period'
+                  : 'Not available'
+          }
         />
         <Stat
           label="AR outstanding"
           currency={aging.data?.currency ?? undefined}
           value={aging.data ? money(aging.data.total, null) : '—'}
-          sub={aging.data ? `${openCount} open invoice${openCount === 1 ? '' : 's'}` : 'Not available'}
+          sub={
+            aging.data
+              ? `${openCount} open invoice${openCount === 1 ? '' : 's'}${otherAging.length ? ` · ${otherAging.join(', ')} not included` : ''}`
+              : aging.loading
+                ? 'Loading…'
+                : 'Not available'
+          }
         />
         <Stat
           label="Overdue"
           currency={aging.data?.currency ?? undefined}
           value={aging.data ? money(overdueTotal, null) : '—'}
-          sub={aging.data ? (overdueCount ? `${overdueCount} past due` : 'Nothing past due') : 'Not available'}
+          sub={
+            aging.data
+              ? overdueCount
+                ? `${overdueCount} past due`
+                : 'Nothing past due'
+              : aging.loading
+                ? 'Loading…'
+                : 'Not available'
+          }
         />
       </div>
 
@@ -175,16 +218,18 @@ export function PosDashboard() {
           ) : revenue.data?.buckets.length ? (
             <>
               <div className="mt-6 flex h-32 items-end gap-1">
-                {revenue.data.buckets.map((bucket) => (
-                  <div
-                    key={bucket.bucket}
-                    title={`${bucket.bucket} · ${money(bucket.amount, revenue.data?.currency ?? null)}`}
-                    className="flex-1 rounded-t bg-accent"
-                    style={{
-                      height: `${Math.max(4, barPercent(bucket.amount, maxAmount(...revenue.data!.buckets.map((item) => item.amount))))}%`,
-                    }}
-                  />
-                ))}
+                {daily.map((day) => {
+                  const share = barPercent(day.amount, dailyMax)
+                  const traded = compareAmounts(day.amount, '0') > 0
+                  return (
+                    <div
+                      key={day.day}
+                      title={`${day.day} · ${money(day.amount, revenue.data?.currency ?? null)}`}
+                      className={`flex-1 rounded-t ${traded ? 'bg-accent' : 'bg-surface-2'}`}
+                      style={{ height: `${traded ? Math.max(4, share) : 2}%` }}
+                    />
+                  )
+                })}
               </div>
               <p className="mt-4 text-center font-mono text-[18px] font-bold">
                 {money(revenue.data.total, revenue.data.currency)}
@@ -246,7 +291,13 @@ export function PosDashboard() {
             label={`Invoiced ${year}`}
             currency={thisYear.data?.currency ?? undefined}
             value={thisYear.data ? money(thisYear.data.total, null) : '—'}
-            sub={thisYear.data ? `${thisYear.data.invoices} invoices` : 'Not available'}
+            sub={
+              thisYear.data
+                ? `${thisYear.data.invoices} invoice${thisYear.data.invoices === 1 ? '' : 's'}`
+                : thisYear.loading
+                  ? 'Loading…'
+                  : 'Not available'
+            }
           />
           <YearOnYear
             current={thisYear.data?.total}
@@ -258,10 +309,12 @@ export function PosDashboard() {
             label="Still outstanding"
             currency={aging.data?.currency ?? undefined}
             value={aging.data ? money(aging.data.total, null) : '—'}
-            sub={aging.data ? `As at ${aging.data.asOf}` : 'Not available'}
+            sub={aging.data ? `As at ${aging.data.asOf}` : aging.loading ? 'Loading…' : 'Not available'}
           />
+          {/* Sales returns only. Credit notes are a different kind and are not
+              counted here, so the tile does not say they are. */}
           <Stat
-            label="Returns and credits"
+            label="Sales returns"
             currency={returns.loaded && returned.currencies.length === 1 ? returned.currencies[0] : undefined}
             value={
               returns.loaded
@@ -270,28 +323,50 @@ export function PosDashboard() {
                   : money(returned.total, null)
                 : '—'
             }
-            sub={returns.loaded ? `${returns.total} raised` : 'Not available'}
+            sub={
+              returns.loaded
+                ? `${returns.total} raised · credit notes counted separately`
+                : returns.loading
+                  ? 'Loading…'
+                  : 'Not available'
+            }
           />
         </div>
 
-        <div className="mt-6 flex items-end gap-2">
-          {monthly.map((amount, index) => (
-            <div key={months[index]} className="flex flex-1 flex-col items-center gap-2">
-              <div
-                className={`w-full rounded-t ${compareAmounts(amount, '0') > 0 ? 'bg-accent' : 'bg-surface-2'}`}
-                style={{ height: `${Math.max(8, (barPercent(amount, monthMax) * 120) / 100)}px` }}
-                title={`${months[index]} · ${money(amount, thisYear.data?.currency ?? null)}`}
-              />
-              <span
-                className={`text-[11px] ${
-                  index === new Date().getMonth() ? 'font-semibold text-fg' : 'text-fg-muted'
-                }`}
-              >
-                {months[index]}
-              </span>
-            </div>
-          ))}
-        </div>
+        {/* Twelve empty months are a claim about the year. They are drawn only
+            once the year's figures have actually arrived. */}
+        {thisYear.loading ? (
+          <p className="mt-6 py-12 text-center text-[14px] text-fg-muted">Loading…</p>
+        ) : thisYear.error ? (
+          <div className="mt-6">
+            <Failure
+              what={`${year} revenue`}
+              error={thisYear.error}
+              denied={thisYear.denied}
+              canRetry={thisYear.canRetry}
+              onRetry={thisYear.refetch}
+            />
+          </div>
+        ) : (
+          <div className="mt-6 flex items-end gap-2">
+            {monthly.map((amount, index) => (
+              <div key={months[index]} className="flex flex-1 flex-col items-center gap-2">
+                <div
+                  className={`w-full rounded-t ${compareAmounts(amount, '0') > 0 ? 'bg-accent' : 'bg-surface-2'}`}
+                  style={{ height: `${Math.max(8, (barPercent(amount, monthMax) * 120) / 100)}px` }}
+                  title={`${months[index]} · ${money(amount, thisYear.data?.currency ?? null)}`}
+                />
+                <span
+                  className={`text-[11px] ${
+                    index === new Date().getMonth() ? 'font-semibold text-fg' : 'text-fg-muted'
+                  }`}
+                >
+                  {months[index]}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
@@ -521,6 +596,18 @@ export function CustomersPane() {
           </ul>
         ) : query ? (
           <Empty title="No customers match that search." />
+        ) : !showInactive ? (
+          // "No customers yet" would be a claim about every customer, and this
+          // list is only showing the active ones.
+          <Empty
+            title="No active customers."
+            hint={
+              <>
+                Tick <strong className="font-semibold text-fg-2">Show inactive</strong> to include archived accounts,
+                or click <strong className="font-semibold text-fg-2">New customer</strong>.
+              </>
+            }
+          />
         ) : (
           <Empty
             title="No customers yet."
@@ -534,14 +621,11 @@ export function CustomersPane() {
       </div>
 
       {open && <NewCustomerDialog customers={customers} onClose={() => setOpen(false)} />}
+      {/* The dialog stays open after the commit: closing it here would refresh
+          the list over the only statement of how many rows were written and
+          how many were refused. */}
       {importing && (
-        <ImportCustomersDialog
-          onClose={() => setImporting(false)}
-          onImported={() => {
-            customers.refetch()
-            setImporting(false)
-          }}
-        />
+        <ImportCustomersDialog onClose={() => setImporting(false)} onImported={() => customers.refetch()} />
       )}
     </div>
   )
@@ -735,10 +819,22 @@ function ImportCustomersDialog({ onClose, onImported }: { onClose: () => void; o
       )}
 
       {result && (
-        <p className="mt-5 text-[13px]">
-          Imported {result.created} customer{result.created === 1 ? '' : 's'}.
-          {result.failed.length > 0 && ` ${result.failed.length} row(s) were refused.`}
-        </p>
+        <div className="mt-5 rounded-xl border border-line px-4 py-3 text-[13px]">
+          <p>
+            Imported {result.created} customer{result.created === 1 ? '' : 's'}
+            {result.failed.length > 0 ? `; ${result.failed.length} row${result.failed.length === 1 ? '' : 's'} refused.` : '.'}
+          </p>
+          {result.failed.length > 0 && (
+            <ul className="mt-3 space-y-1 text-[12px] text-bad">
+              {result.failed.slice(0, 10).map((problem) => (
+                <li key={`${problem.line}-${problem.message}`}>
+                  Line {problem.line}: {problem.message}
+                </li>
+              ))}
+              {result.failed.length > 10 && <li>…and {result.failed.length - 10} more.</li>}
+            </ul>
+          )}
+        </div>
       )}
 
       <div className="mt-6 flex justify-end gap-3">
@@ -784,9 +880,15 @@ export function QuotationsPane() {
   return (
     <div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Total quotes" value={quotes.loaded ? String(totalQuotes) : '—'} />
         <Stat
-          label="Pipeline value"
+          label="Total quotes"
+          value={quotes.loaded ? String(totalQuotes) : '—'}
+          sub={quotes.loaded ? undefined : quotes.loading ? 'Loading…' : 'Not available'}
+        />
+        {/* Every quotation ever raised, rejected and expired ones included —
+            which is not what "pipeline" means, so it does not say that. */}
+        <Stat
+          label="Total quoted"
           currency={quotes.loaded && pipeline.currencies.length === 1 ? pipeline.currencies[0] : undefined}
           value={
             !quotes.loaded
@@ -795,7 +897,7 @@ export function QuotationsPane() {
                 ? 'Several currencies'
                 : money(pipeline.total, null)
           }
-          sub={pipeline.currencies.length > 1 ? pipeline.currencies.join(', ') : undefined}
+          sub={pipeline.currencies.length > 1 ? pipeline.currencies.join(', ') : 'Every quotation, whatever became of it'}
         />
         {/* 0 of 0 is not a win rate. Until something has been decided there is
             nothing to measure, and printing "0.0%" asserts that there is. */}
@@ -1038,17 +1140,23 @@ function NewContractDialog({
   onClose: () => void
 }) {
   const customers = useSalesCustomers({ activeOnly: true, limit: 200 })
+  const groups = useCustomerGroups()
   const workspaceCurrency = useWorkspaceCurrency()
   const [draft, setDraft] = useState({
     reference: '',
-    customerId: '',
+    /** `customer:<id>` or `group:<id>`. */
+    scope: '',
     validFrom: today(),
     validTo: '',
     itemCode: '',
     unitPrice: '',
     minQuantity: '',
   })
-  const selected = customers.customers.find((customer) => customer.id === draft.customerId)
+  // The server refuses a contract that names neither a customer nor a group,
+  // so the form does not offer an "everybody" scope it cannot save.
+  const customerId = draft.scope.startsWith('customer:') ? draft.scope.slice('customer:'.length) : ''
+  const groupId = draft.scope.startsWith('group:') ? draft.scope.slice('group:'.length) : ''
+  const selected = customers.customers.find((customer) => customer.id === customerId)
   const currency = selected?.currency ?? workspaceCurrency ?? ''
   const set = (key: keyof typeof draft, value: string) => setDraft((prev) => ({ ...prev, [key]: value }))
 
@@ -1060,15 +1168,30 @@ function NewContractDialog({
           <input value={draft.reference} onChange={(event) => set('reference', event.target.value)} className={inputClass} />
         </label>
         <label>
-          <Label>Customer</Label>
-          <select value={draft.customerId} onChange={(event) => set('customerId', event.target.value)} className={inputClass}>
-            <option value="">Every customer</option>
-            {customers.customers.map((customer) => (
-              <option key={customer.id} value={customer.id}>
-                {customer.name} · {customer.currency}
-              </option>
-            ))}
+          <Label>Applies to</Label>
+          <select value={draft.scope} onChange={(event) => set('scope', event.target.value)} className={inputClass}>
+            <option value="">Select a customer or a group…</option>
+            <optgroup label="Customer">
+              {customers.customers.map((customer) => (
+                <option key={customer.id} value={`customer:${customer.id}`}>
+                  {customer.name} · {customer.currency}
+                </option>
+              ))}
+            </optgroup>
+            {groups.rows.length > 0 && (
+              <optgroup label="Customer group">
+                {groups.rows.map((group) => (
+                  <option key={group.id} value={`group:${group.id}`}>
+                    {group.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
           </select>
+          <span className="mt-1.5 block text-[12px] leading-relaxed text-fg-muted">
+            A rate contract prices for one customer or one group. There is no contract covering everybody — where
+            none applies, the price list does.
+          </span>
         </label>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
@@ -1113,14 +1236,22 @@ function NewContractDialog({
         </Button>
         <Button
           variant="accent"
-          disabled={!draft.reference.trim() || !draft.itemCode.trim() || !draft.unitPrice.trim() || !currency || contracts.writing}
+          disabled={
+            !draft.reference.trim() ||
+            !draft.scope ||
+            !draft.itemCode.trim() ||
+            !draft.unitPrice.trim() ||
+            !currency ||
+            contracts.writing
+          }
           onClick={async () => {
             const created = await contracts.createContract({
               reference: draft.reference.trim(),
               currency,
               validFrom: draft.validFrom,
               validTo: draft.validTo || undefined,
-              customerId: draft.customerId || undefined,
+              customerId: customerId || undefined,
+              groupId: groupId || undefined,
               lines: [
                 {
                   itemCode: draft.itemCode.trim(),
@@ -1149,7 +1280,15 @@ export function SalesInvoicesPane({ onViewReturns }: { onViewReturns: () => void
       <DocListPane
         kind="invoice"
         title="Sales invoices"
-        blurb="Draft, post to GL, refund, and chase outstanding. A posted invoice is corrected by a credit note, never edited."
+        blurb="What has been billed, what it is worth and what has been paid. A posted invoice is corrected by a credit note, never edited."
+        note={
+          <>
+            This screen raises drafts. Posting an invoice and recording a payment against it are API operations on
+            this deployment — there is no Post or Payment action here, and nothing writes to a general ledger. The{' '}
+            <strong className="font-semibold text-fg-2">Return / credit note</strong> action appears once an invoice
+            has been posted.
+          </>
+        }
         createLabel="New invoice"
         statuses={['All statuses', 'Draft', 'Posted', 'Paid', 'Cancelled']}
         searchable
@@ -1656,14 +1795,26 @@ export function ShiftsPane() {
   const closed = useShifts({ closed: true, closedFrom: from, limit: 200 })
   const open = useShifts({ open: true, limit: 200 })
   const variance = useVarianceReport(from)
+  const workspaceCurrency = useWorkspaceCurrency()
 
   const currencies = [...new Set(closed.shifts.map((shift) => shift.currency))]
   const currency = currencies.length === 1 ? currencies[0] : null
+  /*
+   * Tills in two currencies cannot be added up. Adding them anyway and leaving
+   * the currency off the answer does not make the answer true — it only stops
+   * the screen from naming the unit it got wrong — so a mixed set says so and
+   * the per-till figures below keep their own currencies.
+   */
+  const mixed = currencies.length > 1
+  /** The bands are workspace thresholds, so they are stated in its currency. */
+  const bandCurrency = currency ?? workspaceCurrency
 
   const byMethod = new Map<string, string>()
-  for (const shift of closed.shifts) {
-    for (const [method, amount] of Object.entries(shift.totals.byMethod)) {
-      byMethod.set(method, addAmounts(byMethod.get(method) ?? '0', amount))
+  if (!mixed) {
+    for (const shift of closed.shifts) {
+      for (const [method, amount] of Object.entries(shift.totals.byMethod)) {
+        byMethod.set(method, addAmounts(byMethod.get(method) ?? '0', amount))
+      }
     }
   }
   const takings = addAmounts(...byMethod.values())
@@ -1679,7 +1830,8 @@ export function ShiftsPane() {
           open.refetch()
           variance.refetch()
         }}>
-          <Icon name="refresh" size={14} /> {closed.refreshing || open.refreshing ? 'Refreshing…' : 'Refresh'}
+          <Icon name="refresh" size={14} />{' '}
+          {closed.refreshing || open.refreshing || variance.refreshing ? 'Refreshing…' : 'Refresh'}
         </Button>
       </div>
 
@@ -1695,43 +1847,62 @@ export function ShiftsPane() {
         </div>
       ) : (
         <>
+          {/* A failed variance report is a failure, not five dashes and a
+              spinner that never stops. */}
+          {variance.error && (
+            <div className="mt-5">
+              <Failure
+                what="the variance report"
+                error={variance.error}
+                denied={variance.denied}
+                canRetry={variance.canRetry}
+                onRetry={variance.refetch}
+              />
+            </div>
+          )}
+
           <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <Stat
               label="Cashiers"
               value={variance.data ? String(variance.data.cashiers) : '—'}
-              sub="With a closed till in this period"
+              sub={variance.data ? 'With a closed till in this period' : variance.loading ? 'Loading…' : 'Not available'}
             />
             <Stat
               label="Open shifts"
               value={open.loaded ? String(open.total) : '—'}
-              sub={open.loaded ? (open.total ? 'Trading now' : 'All closed') : undefined}
+              sub={
+                open.loaded ? (open.total ? 'Trading now' : 'All closed') : open.loading ? 'Loading…' : 'Not available'
+              }
             />
             <Stat
               label="Red flags"
               value={variance.data ? String(variance.data.byBand.red) : '—'}
-              sub={bands ? `Variance at or over ${money(bands.redWorstShift, currency)}` : undefined}
+              sub={bands ? `Variance at or over ${money(bands.redWorstShift, bandCurrency)}` : undefined}
             />
             <Stat
               label="Amber"
               value={variance.data ? String(variance.data.byBand.amber) : '—'}
-              sub={bands ? `At or over ${money(bands.amberWorstShift, currency)}` : undefined}
+              sub={bands ? `At or over ${money(bands.amberWorstShift, bandCurrency)}` : undefined}
             />
             <Stat
               label="Net variance"
-              currency={currency ?? undefined}
-              value={variance.data ? money(variance.data.total, null) : '—'}
+              currency={!mixed && currency ? currency : undefined}
+              value={mixed ? 'Several currencies' : variance.data ? money(variance.data.total, null) : '—'}
               sub={
                 variance.data
                   ? `Across ${variance.data.shifts} closed shift${variance.data.shifts === 1 ? '' : 's'}`
-                  : undefined
+                  : variance.loading
+                    ? 'Loading…'
+                    : undefined
               }
             />
           </div>
 
-          {currencies.length > 1 && (
+          {mixed && (
             <NotAvailable>
-              These tills traded in {currencies.join(', ')}. Amounts are never converted, so the figures above cover
-              every currency without stating one.
+              These tills traded in {currencies.join(', ')}. Amounts in different currencies are never converted or
+              added together, so the totals on this pane are left unstated and each till keeps its own currency below.
+              The red and amber counts do compare every till against one set of thresholds, whatever it traded in.
             </NotAvailable>
           )}
           {closed.total > closed.shifts.length && (
@@ -1761,22 +1932,33 @@ export function ShiftsPane() {
             <section className="rounded-2xl border border-line bg-surface p-6">
               <h2 className="text-[17px] font-semibold">Till takings</h2>
               <p className="mt-1 text-[13px] text-fg-muted">
-                {closed.shifts.length} shift{closed.shifts.length === 1 ? '' : 's'} closed · {salesCount} sale
-                {salesCount === 1 ? '' : 's'} in the last {days} days
+                {closed.loading
+                  ? 'Counting closed tills…'
+                  : `${closed.shifts.length} shift${closed.shifts.length === 1 ? '' : 's'} closed · ${salesCount} sale${salesCount === 1 ? '' : 's'} in the last ${days} days`}
               </p>
               {closed.loading ? (
                 <p className="py-20 text-center text-[14px] text-fg-muted">Loading…</p>
-              ) : closed.shifts.length ? (
-                <p className="mt-10 text-center font-mono text-[22px] font-bold">{money(takings, currency)}</p>
-              ) : (
+              ) : !closed.shifts.length ? (
                 <p className="py-20 text-center text-[14px] text-fg-muted">No shifts closed in this period</p>
+              ) : mixed ? (
+                <p className="py-20 text-center text-[14px] text-fg-muted">
+                  Several currencies — see each till below.
+                </p>
+              ) : (
+                <p className="mt-10 text-center font-mono text-[22px] font-bold">{money(takings, currency)}</p>
               )}
             </section>
 
             <section className="rounded-2xl border border-line bg-surface p-6">
               <h2 className="text-[17px] font-semibold">Tender mix</h2>
               <p className="mt-1 text-[13px] text-fg-muted">How much of the take can physically go missing</p>
-              {byMethod.size ? (
+              {closed.loading ? (
+                <p className="py-16 text-center text-[14px] text-fg-muted">Loading…</p>
+              ) : mixed ? (
+                <p className="py-16 text-center text-[14px] text-fg-muted">
+                  Not shown: these tills traded in more than one currency.
+                </p>
+              ) : byMethod.size ? (
                 <ul className="mt-5 space-y-4">
                   {[...byMethod].map(([method, amount]) => (
                     <li key={method}>
@@ -1800,7 +1982,9 @@ export function ShiftsPane() {
             <section className="rounded-2xl border border-line bg-surface p-6">
               <h2 className="text-[17px] font-semibold">Cash variance by shift</h2>
               <p className="mt-1 text-[13px] text-fg-muted">Above the line is over the count, below is short</p>
-              {closed.shifts.length ? (
+              {closed.loading ? (
+                <p className="py-16 text-center text-[14px] text-fg-muted">Loading…</p>
+              ) : closed.shifts.length ? (
                 <ul className="mt-5 space-y-2">
                   {closed.shifts.map((shift) => (
                     <li key={shift.id} className="flex items-center justify-between gap-3 text-[13px]">
@@ -1836,7 +2020,9 @@ export function ShiftsPane() {
                   ))}
                 </div>
               ) : (
-                <p className="py-16 text-center text-[14px] text-fg-muted">Loading…</p>
+                <p className="py-16 text-center text-[14px] text-fg-muted">
+                  {variance.loading ? 'Loading…' : 'Not available'}
+                </p>
               )}
             </section>
           </div>
@@ -1844,7 +2030,9 @@ export function ShiftsPane() {
           <section className="mt-4 rounded-2xl border border-line bg-surface p-6">
             <h2 className="text-[17px] font-semibold">Takings by cashier</h2>
             <p className="mt-1 text-[13px] text-fg-muted">Tenders taken on each closed shift</p>
-            {closed.shifts.length ? (
+            {closed.loading ? (
+              <p className="py-14 text-center text-[14px] text-fg-muted">Loading…</p>
+            ) : closed.shifts.length ? (
               <ul className="mt-5 space-y-2">
                 {closed.shifts.map((shift) => (
                   <li key={shift.id} className="flex items-center justify-between gap-3 text-[13px]">
@@ -1863,9 +2051,27 @@ export function ShiftsPane() {
           <div className="mt-6">
             <h2 className="text-[17px] font-semibold">Live open shifts</h2>
             <p className="mt-1 text-[13px] text-fg-muted">
-              {open.loaded ? (open.total ? `${open.total} till(s) open.` : 'No tills open right now.') : 'Loading…'}
+              {open.loaded
+                ? open.total
+                  ? `${open.total} till(s) open.`
+                  : 'No tills open right now.'
+                : open.error
+                  ? 'The open tills could not be loaded.'
+                  : 'Loading…'}
             </p>
-            {open.shifts.length ? (
+            {open.error ? (
+              <div className="mt-4">
+                <Failure
+                  what="the open tills"
+                  error={open.error}
+                  denied={open.denied}
+                  canRetry={open.canRetry}
+                  onRetry={open.refetch}
+                />
+              </div>
+            ) : open.loading ? (
+              <p className="mt-5 py-10 text-center text-[14px] text-fg-muted">Loading…</p>
+            ) : open.shifts.length ? (
               <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-surface">
                 {open.shifts.map((shift) => (
                   <li key={shift.id} className="flex flex-wrap items-center gap-4 px-6 py-3.5 text-[13px]">
@@ -1886,10 +2092,14 @@ export function ShiftsPane() {
             <h2 className="text-[17px] font-semibold">Cashier scorecard</h2>
             <p className="mt-1 text-[13px] text-fg-muted">
               {bands
-                ? `Red at or over ${money(bands.redWorstShift, currency)} variance · amber at or over ${money(bands.amberWorstShift, currency)}.`
-                : 'Loading the thresholds this workspace closes tills against…'}
+                ? `Red at or over ${money(bands.redWorstShift, bandCurrency)} variance · amber at or over ${money(bands.amberWorstShift, bandCurrency)}.`
+                : variance.loading
+                  ? 'Loading the thresholds this workspace closes tills against…'
+                  : 'The thresholds this workspace closes tills against could not be loaded.'}
             </p>
-            {closed.shifts.length && bands ? (
+            {closed.loading || variance.loading ? (
+              <p className="mt-5 py-10 text-center text-[14px] text-fg-muted">Loading…</p>
+            ) : closed.shifts.length && bands ? (
               <ul className="mt-4 divide-y divide-line rounded-2xl border border-line bg-surface">
                 {closed.shifts.map((shift) => {
                   const magnitude = absAmount(shift.variance ?? '0')
@@ -1912,6 +2122,11 @@ export function ShiftsPane() {
                   )
                 })}
               </ul>
+            ) : !bands ? (
+              <p className="mt-5 py-10 text-center text-[14px] text-fg-muted">
+                A score is a variance against a threshold, and the thresholds could not be loaded — so there is
+                nothing to score against rather than nothing to score.
+              </p>
             ) : (
               <p className="mt-5 py-10 text-center text-[14px] text-fg-muted">
                 No cashier activity yet. Once shifts close with a counted-cash reconciliation, scores appear here.
@@ -1926,14 +2141,23 @@ export function ShiftsPane() {
 
 /* -------------------------------- AR aging -------------------------------- */
 
+/** What `topDebtors` will return at most, so the screen can say when it is capped. */
+const DEBTOR_LIMIT = 50
+
 export function ArAgingPane() {
   const aging = useAging()
-  const debtors = useTopDebtors(50)
+  const debtors = useTopDebtors(DEBTOR_LIMIT)
 
   const buckets = aging.data?.buckets ?? []
   const openCount = buckets.reduce((sum, bucket) => sum + bucket.count, 0)
   const aged = buckets.filter((bucket) => AGED_BUCKETS.includes(bucket.label))
   const agedTotal = addAmounts(...aged.map((bucket) => bucket.amount))
+  // A customer owing in two currencies is two rows here, so the accounts are
+  // counted by customer rather than by row — and the list is capped, which the
+  // tile says rather than presenting the cap as the answer.
+  const rows = debtors.data?.debtors ?? []
+  const accounts = new Set(rows.map((debtor) => debtor.customerId)).size
+  const capped = rows.length >= DEBTOR_LIMIT
 
   return (
     <div>
@@ -1967,8 +2191,16 @@ export function ArAgingPane() {
             />
             <Stat
               label="Customers with balance"
-              value={debtors.data ? String(debtors.data.debtors.length) : '—'}
-              sub="Distinct accounts"
+              value={debtors.error ? '—' : debtors.data ? `${accounts}${capped ? '+' : ''}` : '—'}
+              sub={
+                debtors.error
+                  ? 'Not available'
+                  : debtors.loading
+                    ? 'Loading…'
+                    : capped
+                      ? `Top ${DEBTOR_LIMIT} balances only`
+                      : 'Distinct accounts'
+              }
             />
             <Stat
               label="Aged over 60 days"
@@ -1977,6 +2209,13 @@ export function ArAgingPane() {
               sub="Likely collection issues"
             />
           </div>
+
+          {aging.data && aging.data.otherCurrencies.length > 0 && (
+            <NotAvailable>
+              {aging.data.otherCurrencies.join(', ')} is also outstanding and is not counted above. Amounts in
+              different currencies are never converted or added together.
+            </NotAvailable>
+          )}
 
           <section className="mt-6">
             <h2 className="text-[17px] font-semibold">Aging by bucket</h2>
@@ -2009,7 +2248,11 @@ export function ArAgingPane() {
             <p className="mt-1 text-[13px] text-fg-muted">
               Sorted by amount owed, with what is merely owed separated from what is late.
             </p>
-            {debtors.error ? (
+            {debtors.loading ? (
+              <div className="mt-5">
+                <Loading what="the debtor list" />
+              </div>
+            ) : debtors.error ? (
               <div className="mt-5">
                 <Failure
                   what="the debtor list"

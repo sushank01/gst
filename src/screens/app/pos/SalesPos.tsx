@@ -154,9 +154,12 @@ export default function SalesPos() {
         </span>
         <div className="min-w-[18rem] flex-1">
           <h1 className="text-[20px] font-bold tracking-tight">{entry.name}</h1>
+          {/* What these screens do, not what the category does: this
+              deployment has no general ledger to post to and no payment
+              screen, so the header no longer offers either. */}
           <p className="mt-1 max-w-5xl text-[13.5px] leading-relaxed text-fg-2">
-            Order-to-cash for retail and B2B: customers, sales orders, delivery notes, sales invoices with GL post, AR
-            aging, payments, plus a point-of-sale till with shift reconciliation.
+            Order-to-cash for retail and B2B: customers, quotations, sales orders, delivery notes, sales invoices,
+            returns and AR aging, plus a point-of-sale till with shift reconciliation.
           </p>
         </div>
         {/* Shown only while the workspace is actually on a trial with a

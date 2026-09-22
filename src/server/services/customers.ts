@@ -248,7 +248,10 @@ export type AgingBucket = { label: string; amount: string; count: number }
 
 export type Aging = {
   asOf: string
+  /** The currency every figure below is in. Null when nothing is outstanding. */
   currency: string | null
+  /** Currencies outstanding but NOT counted here. Never converted, never summed in. */
+  otherCurrencies: string[]
   buckets: AgingBucket[]
   total: string
 }
@@ -270,13 +273,20 @@ export async function agingReport(ctx: TenantContext, asOf: Date, currency?: str
   ctx.require('record.read')
   const on = asOf.toISOString().slice(0, 10)
 
+  /*
+   * Every open invoice, in every currency — the requested one is picked out
+   * below rather than in the `where` clause. Filtering here would mean asking
+   * for dollars and being told, truthfully, "USD 500 outstanding" while three
+   * thousand in rupees goes unmentioned: the report cannot name what it never
+   * fetched. The row ceiling is the same either way, since the unfiltered call
+   * reads all of them regardless.
+   */
   const { rows } = await ctx.db.query<{ due_on: Date | null; outstanding: string; currency: string }>(
     `select due_on, (grand_total - paid_total)::text as outstanding, currency
        from sales_documents
       where tenant_id = $1 and kind = 'invoice' and posted_at is not null
-        and grand_total > paid_total
-        and ($2::char(3) is null or currency = $2)`,
-    [ctx.tenantId, currency?.toUpperCase() ?? null],
+        and grand_total > paid_total`,
+    [ctx.tenantId],
   )
 
   const totals = new Map<string, { amount: bigint; count: number }>()
@@ -284,8 +294,25 @@ export async function agingReport(ctx: TenantContext, asOf: Date, currency?: str
     totals.set(entry, { amount: 0n, count: 0 })
   }
 
+  /*
+   * One currency is aged, and the rest are named rather than added in. A
+   * receivables total of "USD 90,000" when a third of it is in rupees is not a
+   * number anybody can chase, and labelling that sum with whichever invoice the
+   * query happened to return first makes it worse than useless. Unasked, the
+   * currency with the most open invoices wins — ties alphabetically, so the
+   * answer does not move about between calls.
+   */
+  const present = new Map<string, number>()
+  for (const row of rows) present.set(row.currency, (present.get(row.currency) ?? 0) + 1)
+  const chosen =
+    currency?.toUpperCase() ??
+    [...present.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ??
+    null
+  const otherCurrencies = [...present.keys()].filter((code) => code !== chosen).sort()
+
   let total = 0n
   for (const row of rows) {
+    if (row.currency !== chosen) continue
     const amount = toMinor(row.outstanding)
     total += amount
     let label = 'Not due'
@@ -300,7 +327,8 @@ export async function agingReport(ctx: TenantContext, asOf: Date, currency?: str
 
   return {
     asOf: on,
-    currency: currency?.toUpperCase() ?? rows[0]?.currency ?? null,
+    currency: chosen,
+    otherCurrencies,
     buckets: [...totals].map(([label, bucket]) => ({ label, amount: toDecimal(bucket.amount), count: bucket.count })),
     total: toDecimal(total),
   }

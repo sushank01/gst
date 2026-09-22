@@ -393,7 +393,10 @@ const unwrapProgrammes = (body: { programmes: LoyaltyProgramme[] }) => body.prog
 
 export type Aging = {
   asOf: string
+  /** The currency the buckets and the total are in; null when nothing is owed. */
   currency: string | null
+  /** Owed in other currencies, and deliberately not added in. */
+  otherCurrencies: string[]
   buckets: { label: string; amount: string; count: number }[]
   total: string
 }
@@ -594,9 +597,20 @@ function usePolicy<T extends { updatedAt: string | null }, Body>(key: string, pa
     useCallback((signal) => api.get<Body>(path, undefined, signal), [path]),
   )
   const [save, saveState] = useMutation(async (value: T) => {
-    const saved = await api.put(path, value)
-    resource.refetch()
-    return saved
+    try {
+      const saved = await api.put(path, value)
+      resource.refetch()
+      return saved
+    } catch (error) {
+      /*
+       * A stale write cannot be fixed by pressing Save again — the same
+       * timestamp would lose the same race for ever. The current row is read
+       * back so the next attempt carries it; the conflict message stays on
+       * screen, and the edits in the form are still the editor's own.
+       */
+      if (error instanceof ApiClientError && error.isConflict) resource.refetch()
+      throw error
+    }
   })
 
   return useMemo(
@@ -644,14 +658,21 @@ export function useAppSettings<T extends Record<string, unknown>>(section: strin
   )
 
   const [save, saveState] = useMutation(async (value: T, summary: string) => {
-    const saved = await api.put<{ settings: SettingsDocument<T> }>('/settings/POS', {
-      section,
-      value,
-      version: resource.data?.settings.version ?? 0,
-      summary,
-    })
-    resource.refetch()
-    return saved.settings
+    try {
+      const saved = await api.put<{ settings: SettingsDocument<T> }>('/settings/POS', {
+        section,
+        value,
+        version: resource.data?.settings.version ?? 0,
+        summary,
+      })
+      resource.refetch()
+      return saved.settings
+    } catch (error) {
+      // Re-read on a lost race: pressing Save again with the version that has
+      // just been refused would fail the same way every time.
+      if (error instanceof ApiClientError && error.isConflict) resource.refetch()
+      throw error
+    }
   })
 
   return useMemo(
@@ -735,7 +756,9 @@ export function useRateContracts() {
       currency: string
       validFrom: string
       validTo?: string
+      /** A contract prices for one customer or one group; the server refuses neither. */
       customerId?: string
+      groupId?: string
       lines: { itemCode: string; unitPrice: string; minQuantity?: string }[]
     }) => {
       const created = await api.post<{ contract: RateContract }>('/sales/rate-contracts', {
@@ -744,6 +767,7 @@ export function useRateContracts() {
         validFrom: input.validFrom,
         validTo: input.validTo || undefined,
         customerId: input.customerId || undefined,
+        groupId: input.groupId || undefined,
         lines: input.lines,
       })
       resource.refetch()

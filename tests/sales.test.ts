@@ -241,7 +241,7 @@ async function activeSubscription(ctx: any, customerId: string, db: any) {
   return subscription
 }
 
-test('THE BUG: repeated sweeps bill each period exactly once', async () => {
+test('repeated sweeps bill each period exactly once', async () => {
   const { db, ctx, customerId } = await shop()
   const subscription = await activeSubscription(ctx, customerId, db)
   await scheduleSubscriptionPeriods(ctx, subscription.id, new Date('2026-01-01T00:00:00Z'), 3, 30)
