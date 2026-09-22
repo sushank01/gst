@@ -21,6 +21,23 @@ import type { TenantContext } from '../tenancy/context.ts'
 const SCALE = 4n
 const pow10 = (n: bigint) => 10n ** n
 
+/**
+ * A numeric column's value as a decimal string.
+ *
+ * `pg` and PGlite return `numeric` as a string precisely so no value is lost
+ * to a float, but a `select *` row is typed `unknown` and `String(x)` on an
+ * unknown would happily stringify an object. This narrows explicitly, so a
+ * column that is somehow not a number is a loud failure rather than the text
+ * "[object Object]" reaching an invoice.
+ */
+export function decimalText(value: unknown): string | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'bigint') return value.toString()
+  throw new TypeError(`Expected a numeric column value, got ${typeof value}`)
+}
+
 export function toMinor(value: string | number): bigint {
   const text = String(value).trim()
   if (!/^-?\d+(\.\d+)?$/.test(text)) throw unprocessable('invalid_amount', `"${value}" is not a valid amount.`)
