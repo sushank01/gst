@@ -1,0 +1,3969 @@
+{
+  "domain": "Workspace store (tenant runtime state) \u2014 src/lib/workspace.tsx, browser localStorage key `apragya.workspace`, STORAGE_VERSION 2. Every type below is persisted as one JSON blob in the visitor's browser only; there is no server, no tenant column, no user table, no referential integrity. All proposed SQL assumes each table gains `tenant_id uuid not null` plus `created_at/updated_at timestamptz`.",
+  "entities": [
+    {
+      "name": "Persisted",
+      "sourceType": "internal type alias (root localStorage blob)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "The whole tenant workspace serialised to one localStorage string. Not exported, but it is the de-facto schema root: every collection field below becomes its own table.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "installed",
+          "tsType": "string[]",
+          "sqlType": "child table tenant_installed_app(app_code text)",
+          "nullable": false,
+          "notes": "App codes from marketApps ('CRM','HR'). Display/catalogue code string, not an FK."
+        },
+        {
+          "name": "disabledApps",
+          "tsType": "string[]",
+          "sqlType": "boolean column `disabled` on tenant_installed_app",
+          "nullable": false,
+          "notes": "Second array keyed by the same app code; disabling is not uninstalling."
+        },
+        {
+          "name": "creditsUsed",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "Single shared AI-credit counter. No ledger \u2014 only a running total, so spend cannot be attributed or reversed."
+        },
+        {
+          "name": "creditsAllocated",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "invitedTeammate",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "usedCopilot",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "dismissedChecklist",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "twoFactor",
+          "tsType": "'pending' | 'on' | 'snoozed'",
+          "sqlType": "text not null default 'pending' + CHECK",
+          "nullable": false,
+          "notes": "Tenant-level flag; real 2FA is per-user."
+        },
+        {
+          "name": "artifacts",
+          "tsType": "Artifact[]",
+          "sqlType": "child table artifact",
+          "nullable": false
+        },
+        {
+          "name": "runs",
+          "tsType": "Run[]",
+          "sqlType": "child table agent_run",
+          "nullable": false,
+          "notes": "Capped at 25 in memory (slice(0,25)); a DB must not inherit that cap."
+        },
+        {
+          "name": "notifications",
+          "tsType": "Notification[]",
+          "sqlType": "child table notification",
+          "nullable": false,
+          "notes": "Capped at 50 (slice(0,50))."
+        },
+        {
+          "name": "approvals",
+          "tsType": "Record<string, ApprovalDecision>",
+          "sqlType": "child table run_approval(approval_id text, decision text, decided_at timestamptz, decided_by uuid)",
+          "nullable": false,
+          "notes": "Map keyed by approval id with no decider, no timestamp, no note \u2014 the decision is the whole row today."
+        },
+        {
+          "name": "schedules",
+          "tsType": "Schedule[]",
+          "sqlType": "child table schedule",
+          "nullable": false
+        },
+        {
+          "name": "audit",
+          "tsType": "AuditEvent[]",
+          "sqlType": "child table audit_event",
+          "nullable": false,
+          "notes": "Append-only, newest first, truncated to 500 by logAudit."
+        },
+        {
+          "name": "companies",
+          "tsType": "Company[]",
+          "sqlType": "child table company",
+          "nullable": false,
+          "notes": "Excludes the primary entity, which is derived from the session org name and never stored."
+        },
+        {
+          "name": "intercompanyPairs",
+          "tsType": "IntercompanyPair[]",
+          "sqlType": "child table intercompany_pair",
+          "nullable": false
+        },
+        {
+          "name": "primaryOverride",
+          "tsType": "Partial<Company> | null",
+          "sqlType": "model the primary entity as a real company row instead",
+          "nullable": true,
+          "notes": "A sparse patch over a derived record. Unrepresentable as a column set; the primary company must become a first-class row."
+        },
+        {
+          "name": "policies",
+          "tsType": "GuardrailPolicy[]",
+          "sqlType": "child table guardrail_policy",
+          "nullable": false
+        },
+        {
+          "name": "runners",
+          "tsType": "Runner[]",
+          "sqlType": "child table runner",
+          "nullable": false
+        },
+        {
+          "name": "connections",
+          "tsType": "Connection[]",
+          "sqlType": "child table connection",
+          "nullable": false
+        },
+        {
+          "name": "customConnectors",
+          "tsType": "CustomConnector[]",
+          "sqlType": "child table custom_connector",
+          "nullable": false
+        },
+        {
+          "name": "portalTabs",
+          "tsType": "string[] | null",
+          "sqlType": "child table portal_tab(tab_key text, enabled boolean)",
+          "nullable": true,
+          "notes": "null is a sentinel meaning 'every tab on'; an empty array means 'all off'. Null vs empty carries opposite meaning \u2014 must not survive into SQL."
+        },
+        {
+          "name": "portalRoles",
+          "tsType": "PortalRole[]",
+          "sqlType": "child table portal_role",
+          "nullable": false
+        },
+        {
+          "name": "dataInventory",
+          "tsType": "InventoryField[]",
+          "sqlType": "child table data_inventory_field",
+          "nullable": false,
+          "notes": "Seeded from the platform catalogue in complianceData.ts, then tenant-editable \u2014 seed rows and tenant rows are indistinguishable."
+        },
+        {
+          "name": "dataFlows",
+          "tsType": "DataFlow[]",
+          "sqlType": "child table data_flow",
+          "nullable": false,
+          "notes": "Same seed-vs-tenant ambiguity."
+        },
+        {
+          "name": "dpias",
+          "tsType": "Dpia[]",
+          "sqlType": "child table dpia",
+          "nullable": false
+        },
+        {
+          "name": "automatedDecisions",
+          "tsType": "AutomatedDecision[]",
+          "sqlType": "child table automated_decision",
+          "nullable": false
+        },
+        {
+          "name": "retentionPolicies",
+          "tsType": "RetentionPolicy[]",
+          "sqlType": "child table retention_policy",
+          "nullable": false
+        },
+        {
+          "name": "expenseReports",
+          "tsType": "ExpenseReport[]",
+          "sqlType": "child table expense_report",
+          "nullable": false
+        },
+        {
+          "name": "travelRequests",
+          "tsType": "TravelRequest[]",
+          "sqlType": "child table travel_request",
+          "nullable": false
+        },
+        {
+          "name": "cardTransactions",
+          "tsType": "CardTransaction[]",
+          "sqlType": "child table card_transaction",
+          "nullable": false
+        },
+        {
+          "name": "reimbursementRuns",
+          "tsType": "ReimbursementRun[]",
+          "sqlType": "child table reimbursement_run",
+          "nullable": false
+        },
+        {
+          "name": "teSettings",
+          "tsType": "TeSettings",
+          "sqlType": "singleton row travel_expense_settings (one per tenant)",
+          "nullable": false
+        },
+        {
+          "name": "tickets",
+          "tsType": "Ticket[]",
+          "sqlType": "child table ticket",
+          "nullable": false
+        },
+        {
+          "name": "kbArticles",
+          "tsType": "KbArticle[]",
+          "sqlType": "child table kb_article",
+          "nullable": false
+        },
+        {
+          "name": "kbCategories",
+          "tsType": "string[]",
+          "sqlType": "child table kb_category(id uuid, name text)",
+          "nullable": false,
+          "notes": "Bare name strings; KbArticle.category points at one by name, not id."
+        },
+        {
+          "name": "cannedResponses",
+          "tsType": "CannedResponse[]",
+          "sqlType": "child table canned_response",
+          "nullable": false
+        },
+        {
+          "name": "supportSettings",
+          "tsType": "SupportSettings",
+          "sqlType": "singleton row support_settings + several child tables",
+          "nullable": false
+        },
+        {
+          "name": "assets",
+          "tsType": "Asset[]",
+          "sqlType": "child table asset",
+          "nullable": false
+        },
+        {
+          "name": "assetRequests",
+          "tsType": "AssetRequest[]",
+          "sqlType": "child table asset_request",
+          "nullable": false
+        },
+        {
+          "name": "assetSettings",
+          "tsType": "AssetSettings",
+          "sqlType": "singleton row asset_settings + child tables",
+          "nullable": false
+        },
+        {
+          "name": "rfps",
+          "tsType": "Rfp[]",
+          "sqlType": "child table rfp",
+          "nullable": false
+        },
+        {
+          "name": "kbDocs",
+          "tsType": "KbDoc[]",
+          "sqlType": "child table pitch_kb_doc",
+          "nullable": false
+        },
+        {
+          "name": "pitchTemplates",
+          "tsType": "PitchTemplate[]",
+          "sqlType": "child table pitch_template",
+          "nullable": false
+        },
+        {
+          "name": "brandKit",
+          "tsType": "BrandKit",
+          "sqlType": "singleton row brand_kit",
+          "nullable": false
+        },
+        {
+          "name": "customSchemas",
+          "tsType": "CustomSchema[]",
+          "sqlType": "child table pitch_custom_schema",
+          "nullable": false
+        },
+        {
+          "name": "pitchSampleLoaded",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "Demo-data flag. Should not exist in a production schema; sample rows need an `is_sample` column instead."
+        },
+        {
+          "name": "posCustomers",
+          "tsType": "PosCustomer[]",
+          "sqlType": "child table pos_customer",
+          "nullable": false
+        },
+        {
+          "name": "posDocs",
+          "tsType": "PosDoc[]",
+          "sqlType": "child table pos_document",
+          "nullable": false
+        },
+        {
+          "name": "posShifts",
+          "tsType": "PosShift[]",
+          "sqlType": "child table pos_shift",
+          "nullable": false
+        },
+        {
+          "name": "matchSettings",
+          "tsType": "MatchSettings",
+          "sqlType": "singleton row pos_match_settings",
+          "nullable": false
+        },
+        {
+          "name": "posSettings",
+          "tsType": "PosSettings",
+          "sqlType": "singleton row pos_settings + child tables",
+          "nullable": false
+        },
+        {
+          "name": "appRecords",
+          "tsType": "Record<string, AppRecord[]>",
+          "sqlType": "child table app_record(surface_key text, ...)",
+          "nullable": false,
+          "notes": "Untyped escape hatch keyed by surface string ('crm.leads','hr.employees'). Every CRM and HR record lives here with no schema at all."
+        },
+        {
+          "name": "version",
+          "tsType": "number | undefined",
+          "sqlType": "drop \u2014 replaced by real migrations",
+          "nullable": true,
+          "notes": "Absent on pre-v2 blobs; `stored.version ?? 1` is the migration hook."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "has-many",
+          "target": "every child entity below",
+          "via": "one JSON blob",
+          "gap": "No tenant_id anywhere. The blob IS the tenant, so a multi-tenant DB must add tenant_id to all ~50 tables and backfill it from the single workspace."
+        }
+      ]
+    },
+    {
+      "name": "Artifact",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A build output from Vibe Studio / the agent builder.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "draft",
+        "published"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false,
+          "notes": "crypto.randomUUID()."
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "skill",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free-text skill name, not an FK to any skill/agent catalogue row."
+        },
+        {
+          "name": "kind",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Unconstrained string \u2014 no enum exists for artifact kinds."
+        },
+        {
+          "name": "version",
+          "tsType": "number",
+          "sqlType": "integer not null default 1",
+          "nullable": false,
+          "notes": "Incremented on publish; there is no version history table, so older versions are lost."
+        },
+        {
+          "name": "status",
+          "tsType": "'draft' | 'published'",
+          "sqlType": "text not null default 'draft' + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "ISO 8601 from new Date().toISOString()."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "skill / agent catalogue",
+          "via": "skill (text)",
+          "gap": "Stored as a display name; no skill_id."
+        }
+      ]
+    },
+    {
+      "name": "Notification",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "An in-product bell notification.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "body",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Pre-rendered English sentence, not a template key + params \u2014 untranslatable and unlinkable."
+        },
+        {
+          "name": "at",
+          "tsType": "string",
+          "sqlType": "timestamptz not null",
+          "nullable": false
+        },
+        {
+          "name": "read",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "Per-tenant, not per-user; when real users exist this becomes notification_read(user_id, notification_id)."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "user",
+          "via": "\u2014",
+          "gap": "No recipient. Every notification is workspace-wide."
+        },
+        {
+          "kind": "missing",
+          "target": "the object notified about",
+          "via": "\u2014",
+          "gap": "No resource_type/resource_id, so a notification cannot deep-link."
+        }
+      ]
+    },
+    {
+      "name": "Run",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One agent execution with its trace and credit cost.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "success",
+        "needs-review",
+        "failed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false,
+          "notes": "NOT a uuid today: `run_${Math.random().toString(36).slice(2,8)}` \u2014 6 base-36 chars, collision-prone."
+        },
+        {
+          "name": "agent",
+          "tsType": "string",
+          "sqlType": "text not null (should be agent_id uuid)",
+          "nullable": false,
+          "notes": "Agent display name string."
+        },
+        {
+          "name": "source",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Where the run was triggered from; unconstrained."
+        },
+        {
+          "name": "status",
+          "tsType": "'success' | 'needs-review' | 'failed'",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "recordRun always writes 'success'; the other two are never produced."
+        },
+        {
+          "name": "startedAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null",
+          "nullable": false,
+          "notes": "No finishedAt \u2014 duration lives in `ms` instead."
+        },
+        {
+          "name": "credits",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "Credits, not money \u2014 no currency. Summed from the trace."
+        },
+        {
+          "name": "ms",
+          "tsType": "number",
+          "sqlType": "integer not null",
+          "nullable": false,
+          "notes": "Duration in milliseconds, summed from trace steps rather than measured."
+        },
+        {
+          "name": "trace",
+          "tsType": "RunStep[]",
+          "sqlType": "child table run_step (or jsonb if steps are never queried)",
+          "nullable": false,
+          "notes": "Always the imported constant `sampleTrace` \u2014 every run shares the identical six steps."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "Agent",
+          "via": "agent (text)",
+          "gap": "Display name instead of agent_id."
+        },
+        {
+          "kind": "has-many",
+          "target": "RunStep",
+          "via": "trace",
+          "gap": "Embedded array; needs run_step(run_id, seq)."
+        }
+      ]
+    },
+    {
+      "name": "RunStep",
+      "sourceType": "exported type alias (imported into Run.trace)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/appData.ts",
+      "purpose": "One node in an agent run's execution trace.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "llm",
+        "tool",
+        "guardrail",
+        "hitl",
+        "output"
+      ],
+      "fields": [
+        {
+          "name": "node",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "tsType": "'llm' | 'tool' | 'guardrail' | 'hitl' | 'output'",
+          "sqlType": "text not null + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "detail",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Pre-formatted human sentence including token counts; nothing is machine-readable."
+        },
+        {
+          "name": "ms",
+          "tsType": "number",
+          "sqlType": "integer not null",
+          "nullable": false
+        },
+        {
+          "name": "credits",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "Run",
+          "via": "(none)",
+          "gap": "No run_id and no sequence number; order is array position only."
+        }
+      ]
+    },
+    {
+      "name": "ApprovalDecision",
+      "sourceType": "exported union type",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A reviewer's verdict on a paused human-in-the-loop run.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "approved",
+        "modified",
+        "rejected"
+      ],
+      "fields": [],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "Approval (appData.ts sample data)",
+          "via": "Persisted.approvals key",
+          "gap": "The approval queue itself is a static constant; only the decision is persisted, with no decider, timestamp, or modified payload. 'modified' has nowhere to store what was modified."
+        }
+      ]
+    },
+    {
+      "name": "AuditEvent",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One row of the tenant audit trail; written by nearly every mutator via auditEvent().",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Success",
+        "Failed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "at",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        },
+        {
+          "name": "user",
+          "tsType": "'owner' | ''",
+          "sqlType": "uuid references app_user(id)",
+          "nullable": true,
+          "notes": "Literal sentinel: 'owner' renders as the signed-in admin's email, '' means system. No actor id is ever recorded."
+        },
+        {
+          "name": "role",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Defaults to the literal 'Org_admin'; '' for system rows."
+        },
+        {
+          "name": "action",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Dotted verb ('app.installed','pos.invoice_created'). Some are built by interpolation (`asset.request_${status.toLowerCase()}`, `${key}.created`) so the vocabulary is open-ended and unenumerable."
+        },
+        {
+          "name": "status",
+          "tsType": "'Success' | 'Failed'",
+          "sqlType": "text not null default 'Success' + CHECK",
+          "nullable": false,
+          "notes": "Always 'Success' in practice \u2014 no mutator ever writes 'Failed'."
+        },
+        {
+          "name": "resource",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Resource type name; open string set."
+        },
+        {
+          "name": "resourceId",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Wildly inconsistent: sometimes a uuid, sometimes a reference ('SUP-0001'), sometimes an app code ('POS'), sometimes a person's name (pos.shift_opened writes shift.cashier), sometimes a sentence ('4 rows'). Defaults to a fresh random uuid pointing at nothing."
+        },
+        {
+          "name": "ip",
+          "tsType": "string",
+          "sqlType": "inet",
+          "nullable": true,
+          "notes": "Always '' \u2014 a browser cannot see its own IP. Must be captured server-side."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "app_user",
+          "via": "user ('owner' literal)",
+          "gap": "No actor_user_id."
+        },
+        {
+          "kind": "polymorphic",
+          "target": "any entity",
+          "via": "resource + resourceId",
+          "gap": "Untyped and inconsistent; not enforceable as an FK without normalising resourceId."
+        }
+      ]
+    },
+    {
+      "name": "Connection",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A configured link to an external system.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "connectorId",
+          "tsType": "string",
+          "sqlType": "text not null references connector(code)",
+          "nullable": false,
+          "notes": "Catalogue slug from connectorData.ts, not a DB id."
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "account",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Account/tenant identifier at the far end, free text."
+        },
+        {
+          "name": "secretHint",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Last four characters of the credential. The real secret is deliberately never stored \u2014 a server schema needs a separate secret reference (vault key / KMS handle), which does not exist yet."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "connector catalogue",
+          "via": "connectorId",
+          "gap": "Points at a hardcoded TS catalogue, not a table."
+        },
+        {
+          "kind": "missing",
+          "target": "connection health/sync state",
+          "via": "\u2014",
+          "gap": "No status, lastSyncAt, or error column \u2014 the row cannot say whether it works."
+        }
+      ]
+    },
+    {
+      "name": "CustomConnector",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A REST API the tenant registered itself.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "manual",
+        "openapi"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "baseUrl",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Unvalidated URL string."
+        },
+        {
+          "name": "auth",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Auth scheme label only; no credential storage."
+        },
+        {
+          "name": "operations",
+          "tsType": "number",
+          "sqlType": "integer not null default 0",
+          "nullable": false,
+          "notes": "A COUNT stored as a scalar \u2014 the operations themselves are never persisted, so the number cannot be verified or drilled into."
+        },
+        {
+          "name": "source",
+          "tsType": "'manual' | 'openapi'",
+          "sqlType": "text not null + CHECK",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "connector_operation",
+          "via": "operations (count)",
+          "gap": "Needs a real child table; the count is currently the only evidence operations exist."
+        }
+      ]
+    },
+    {
+      "name": "Runner",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A self-hosted runner paired into the tenant's network.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "pending",
+        "online",
+        "offline"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Typed non-null but written as '' when blank."
+        },
+        {
+          "name": "status",
+          "tsType": "'pending' | 'online' | 'offline'",
+          "sqlType": "text not null default 'pending' + CHECK",
+          "nullable": false,
+          "notes": "Only ever 'pending' \u2014 nothing transitions it, because no agent can call home to a localStorage store."
+        },
+        {
+          "name": "token",
+          "tsType": "string",
+          "sqlType": "text not null (store a hash, not the token)",
+          "nullable": false,
+          "notes": "Pairing secret generated in the browser as `apr_rnr_` + 24 hex chars. A real schema stores a hash + issued/expiry/consumed columns; a plaintext one-time secret must never be a persisted column."
+        },
+        {
+          "name": "pairedAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null",
+          "nullable": false,
+          "notes": "Misnamed: set at creation, before pairing actually happens. Needs createdAt + pairedAt + lastHeartbeatAt as three separate columns."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "heartbeat history",
+          "via": "\u2014",
+          "gap": "No lastSeenAt, version, or host columns."
+        }
+      ]
+    },
+    {
+      "name": "PosCustomer",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A trading partner in the Sales & POS master directory.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "The de-facto join key: PosDoc.customer stores this string."
+        },
+        {
+          "name": "email",
+          "tsType": "string",
+          "sqlType": "citext",
+          "nullable": true,
+          "notes": "Typed non-null, written '' when blank; unvalidated."
+        },
+        {
+          "name": "taxId",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Free text. No jurisdiction/format column \u2014 do not assume any national tax-id scheme."
+        },
+        {
+          "name": "active",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "PosCustomerGroup",
+          "via": "\u2014",
+          "gap": "Customer groups exist in PosSettings but no customer row references one."
+        },
+        {
+          "kind": "missing",
+          "target": "addresses / contacts",
+          "via": "\u2014",
+          "gap": "No billing or shipping address at all."
+        }
+      ]
+    },
+    {
+      "name": "PosDoc",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One order-to-cash document; `kind` decides which list it appears in.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "quotation",
+        "order",
+        "delivery",
+        "invoice",
+        "return",
+        "credit",
+        "refund",
+        "contract",
+        "subscription"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "tsType": "'quotation'|'order'|'delivery'|'invoice'|'return'|'credit'|'refund'|'contract'|'subscription'",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Nine very different documents in one table; contract/subscription have no term or renewal columns at all."
+        },
+        {
+          "name": "reference",
+          "tsType": "string",
+          "sqlType": "text not null + UNIQUE(tenant_id, reference)",
+          "nullable": false,
+          "notes": "Generated as `${prefix}-${(count of same kind)+1}` zero-padded to 4. Derived from array length, so deleting a document makes the next one reuse a reference. Needs a per-tenant per-kind sequence."
+        },
+        {
+          "name": "customer",
+          "tsType": "string",
+          "sqlType": "uuid references pos_customer(id)",
+          "nullable": false,
+          "notes": "DISPLAY NAME STRING, not an FK. Renaming a customer orphans every document; a document can name a customer that was never created."
+        },
+        {
+          "name": "status",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Unconstrained free string shared across all nine kinds \u2014 no per-kind state machine exists in the type."
+        },
+        {
+          "name": "total",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "MONEY WITH NO CURRENCY COLUMN. The UI hardcodes 'USD' in pos/panes.tsx. Needs numeric(18,4) + currency char(3)."
+        },
+        {
+          "name": "source",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Channel/origin label, free text."
+        },
+        {
+          "name": "payment",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Payment method/term label. No payment records, amounts paid, or settlement dates exist \u2014 a document cannot be partially paid."
+        },
+        {
+          "name": "reason",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Only meaningful for return/credit/refund; empty for the rest."
+        },
+        {
+          "name": "dueDate",
+          "tsType": "string",
+          "sqlType": "date",
+          "nullable": true,
+          "notes": "Date-only ('' when unset); compared as a string against today() in pos/panes.tsx. Not a timestamp."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "PosCustomer",
+          "via": "customer (text name)",
+          "gap": "Must become customer_id uuid NOT NULL REFERENCES pos_customer(id)."
+        },
+        {
+          "kind": "missing",
+          "target": "line items",
+          "via": "\u2014",
+          "gap": "A sales document has no lines: no product, quantity, unit price, discount, or tax rows. `total` is a typed-in scalar with nothing behind it."
+        },
+        {
+          "kind": "missing",
+          "target": "predecessor document",
+          "via": "\u2014",
+          "gap": "No quote\u2192order\u2192delivery\u2192invoice chain; MatchSettings.requireOrder/requireDelivery gate a link that the schema cannot express."
+        },
+        {
+          "kind": "missing",
+          "target": "PosTaxCategory",
+          "via": "\u2014",
+          "gap": "Tax categories are configured but no document or line references one."
+        }
+      ]
+    },
+    {
+      "name": "PosShift",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A till session; closing it records the counted cash and its variance.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "cashier",
+          "tsType": "string",
+          "sqlType": "uuid references app_user(id)",
+          "nullable": false,
+          "notes": "DISPLAY NAME STRING, not an FK. Also used verbatim as the audit resourceId for pos.shift_opened."
+        },
+        {
+          "name": "openingFloat",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "Money \u2014 pair with the row's `currency`."
+        },
+        {
+          "name": "currency",
+          "tsType": "string",
+          "sqlType": "char(3) not null",
+          "nullable": false,
+          "notes": "The only money-bearing POS type that carries a currency; PosDoc and the variance thresholds do not."
+        },
+        {
+          "name": "warehouse",
+          "tsType": "string",
+          "sqlType": "uuid references warehouse(id)",
+          "nullable": true,
+          "notes": "Display-name string; no warehouse/location entity exists anywhere in the store."
+        },
+        {
+          "name": "notes",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "openedAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        },
+        {
+          "name": "closedAt",
+          "tsType": "string | undefined",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "Absent while the shift is open \u2014 the open/closed state is encoded only by this field's presence."
+        },
+        {
+          "name": "cashTaken",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "Money. Initialised to 0 by openPosShift and NEVER incremented by any code path \u2014 no sale posts to a shift."
+        },
+        {
+          "name": "cardTaken",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "Money. Same: always 0."
+        },
+        {
+          "name": "countedCash",
+          "tsType": "number | undefined",
+          "sqlType": "numeric(18,4)",
+          "nullable": true,
+          "notes": "Money, set only at close. Variance is computed on the fly from openingFloat + cashTaken - countedCash and is not stored."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "app_user",
+          "via": "cashier",
+          "gap": "Needs cashier_user_id."
+        },
+        {
+          "kind": "missing",
+          "target": "PosDoc",
+          "via": "\u2014",
+          "gap": "No shift_id on sales documents, so takings can never be reconciled to a shift."
+        }
+      ]
+    },
+    {
+      "name": "MatchSettings",
+      "sourceType": "exported type alias (singleton)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Three-way-match tolerances for POS posting.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "priceTolerance",
+          "tsType": "number",
+          "sqlType": "numeric(9,4) not null",
+          "nullable": false,
+          "notes": "A percentage (default 5), not money."
+        },
+        {
+          "name": "priceAction",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Stores the whole UI sentence: 'Warn \u2014 flag it, allow the post'. The enum value and its label are the same string, so changing copy breaks stored data."
+        },
+        {
+          "name": "quantityTolerance",
+          "tsType": "number",
+          "sqlType": "numeric(9,4) not null",
+          "nullable": false,
+          "notes": "Percentage (default 2)."
+        },
+        {
+          "name": "quantityAction",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Same sentence-as-enum problem."
+        },
+        {
+          "name": "requireOrder",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "requireDelivery",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "PosTaxCategory",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A named tax slab items point at instead of carrying a loose percentage.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "rate",
+          "tsType": "number",
+          "sqlType": "numeric(9,4) not null",
+          "nullable": false,
+          "notes": "Percentage, not money."
+        },
+        {
+          "name": "withinState",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Free-text component label. Its tax meaning is not defined anywhere in the code \u2014 see openQuestions; do not infer a statutory split."
+        },
+        {
+          "name": "interState",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Same: an uninterpreted label, no computation attached."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "PosDoc / line items",
+          "via": "\u2014",
+          "gap": "Nothing references a tax category; the comment says items point at one, but no item entity exists."
+        }
+      ]
+    },
+    {
+      "name": "PosCustomerGroup",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A customer segment configured in POS settings.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "PosCustomer",
+          "via": "\u2014",
+          "gap": "No membership column or join table \u2014 a group can never contain a customer."
+        }
+      ]
+    },
+    {
+      "name": "PosLoyaltyProgramme",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Points accrue on net subtotal and are spent at the till as a bill discount.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "pointsPer",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "Points earned per unit of spend \u2014 a ratio, not money."
+        },
+        {
+          "name": "pointValue",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "MONEY per point, with no currency column."
+        },
+        {
+          "name": "tiers",
+          "tsType": "{ name: string; threshold: number }[]",
+          "sqlType": "child table loyalty_tier(programme_id uuid, name text, threshold numeric(18,4), seq int)",
+          "nullable": false,
+          "notes": "Inline anonymous array. `threshold` is a money/points amount with no unit recorded \u2014 ambiguous which."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "customer point balances",
+          "via": "\u2014",
+          "gap": "No ledger, balance, or accrual rows \u2014 points can be configured but never earned or spent."
+        }
+      ]
+    },
+    {
+      "name": "PosCashVariance",
+      "sourceType": "exported type alias (singleton inside PosSettings)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Where a drawer count stops being silent and where the manager board colours.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "reasonAbove",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "MONEY (default 1) with no currency column \u2014 the code comment says 'in the till's own currency', which differs per shift, so a single tenant threshold is already ambiguous."
+        },
+        {
+          "name": "amberWorst",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "Money, no currency."
+        },
+        {
+          "name": "redWorst",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "Money, no currency."
+        },
+        {
+          "name": "amberAverage",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "Money, no currency."
+        },
+        {
+          "name": "redAverage",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "Money, no currency."
+        }
+      ]
+    },
+    {
+      "name": "PosCustomField",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A tenant-defined extra field on POS records.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "label",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Unconstrained string; no enum of supported field types, no required flag, no target entity, and no storage for the values themselves."
+        }
+      ]
+    },
+    {
+      "name": "PosChange",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One entry in the POS app's Change History, which is what makes a change undoable.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "at",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        },
+        {
+          "name": "by",
+          "tsType": "string",
+          "sqlType": "uuid references app_user(id)",
+          "nullable": false,
+          "notes": "Hardcoded literal 'owner' at the call site \u2014 never a real actor."
+        },
+        {
+          "name": "summary",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "A one-line English sentence supplied by the caller. It is the ONLY record of what changed."
+        },
+        {
+          "name": "reverted",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "Claims undoability, but no before/after payload is stored, so a revert is not reconstructible. Needs before_value/after_value jsonb."
+        }
+      ]
+    },
+    {
+      "name": "AppRecord",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One record captured by a generic create dialog (CRM leads, HR employees, etc.).",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Also used verbatim as the audit resourceId."
+        },
+        {
+          "name": "fields",
+          "tsType": "Record<string, string>",
+          "sqlType": "jsonb not null default '{}'",
+          "nullable": false,
+          "notes": "EVERY value is a string \u2014 dates, amounts, emails, booleans all collapse to text. CRM and HR have no real schema behind them, so this bag is the entire data model for those apps."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "keyed-by-string",
+          "target": "surface",
+          "via": "Persisted.appRecords key ('crm.leads','hr.employees')",
+          "gap": "The owning surface is a map key, not a column; it must become surface_key text NOT NULL with an index."
+        }
+      ]
+    },
+    {
+      "name": "PosSettings",
+      "sourceType": "exported type alias (singleton)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Everything the Sales & POS settings tabs edit.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "taxCategories",
+          "tsType": "PosTaxCategory[]",
+          "sqlType": "child table pos_tax_category",
+          "nullable": false
+        },
+        {
+          "name": "customerGroups",
+          "tsType": "PosCustomerGroup[]",
+          "sqlType": "child table pos_customer_group",
+          "nullable": false
+        },
+        {
+          "name": "loyalty",
+          "tsType": "PosLoyaltyProgramme[]",
+          "sqlType": "child table pos_loyalty_programme",
+          "nullable": false
+        },
+        {
+          "name": "cashVariance",
+          "tsType": "PosCashVariance",
+          "sqlType": "5 numeric(18,4) columns on pos_settings + currency",
+          "nullable": false
+        },
+        {
+          "name": "customFields",
+          "tsType": "PosCustomField[]",
+          "sqlType": "child table pos_custom_field",
+          "nullable": false
+        },
+        {
+          "name": "agents",
+          "tsType": "{ pauseAll: boolean; autoRunOnNew: boolean; autoPauseAt: string; disabled: string[] }",
+          "sqlType": "pause_all boolean, auto_run_on_new boolean, auto_pause_at ???, + child table pos_disabled_agent(agent_key text)",
+          "nullable": false,
+          "notes": "Inline anonymous object. `autoPauseAt` is a string with no documented format (time of day? credit threshold? date?) \u2014 see openQuestions. `disabled` holds agent key strings, not FKs."
+        },
+        {
+          "name": "changes",
+          "tsType": "PosChange[]",
+          "sqlType": "child table pos_change",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "Rfp",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "An inbound RFP on its way to becoming a pitch deck.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "prospect",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Company name string; no prospect/account entity exists to point at."
+        },
+        {
+          "name": "summary",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "stage",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Unconstrained string; the sample loader uses 'Your turn','Drafting','Out for client','Extracting' but no union type pins them down."
+        },
+        {
+          "name": "vertical",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Industry label, free text."
+        },
+        {
+          "name": "estimate",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "MONEY WITH NO CURRENCY COLUMN (sample values 180000, 320000, 95000, 60000)."
+        },
+        {
+          "name": "schema",
+          "tsType": "string",
+          "sqlType": "uuid references pitch_custom_schema(id)",
+          "nullable": true,
+          "notes": "DISPLAY NAME STRING naming a CustomSchema ('Government / Municipal'), not its id. Renaming a schema orphans every RFP."
+        },
+        {
+          "name": "deadline",
+          "tsType": "string",
+          "sqlType": "date",
+          "nullable": true,
+          "notes": "Date-only; written as '' by the sample loader and the create form, never populated."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "CustomSchema",
+          "via": "schema (text name)",
+          "gap": "Must become schema_id uuid."
+        },
+        {
+          "kind": "missing",
+          "target": "generated deck / artifact",
+          "via": "\u2014",
+          "gap": "An RFP never links to the deck it produces."
+        }
+      ]
+    },
+    {
+      "name": "KbDoc",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A source document in the Pitch Pilot knowledge base.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Free-text category name, not an FK."
+        },
+        {
+          "name": "addedAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "file / blob",
+          "via": "\u2014",
+          "gap": "No storage key, filename, size, MIME type, or extracted text \u2014 the 'document' is a title only. Nothing is uploaded anywhere."
+        }
+      ]
+    },
+    {
+      "name": "PitchTemplate",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A deck template; one per tenant can be the default.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "isDefault",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "First template added becomes default. Uniqueness needs a partial unique index (tenant_id) WHERE is_default."
+        },
+        {
+          "name": "addedAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "template content",
+          "via": "\u2014",
+          "gap": "No slides, layout, or file \u2014 a template is a name and a flag."
+        }
+      ]
+    },
+    {
+      "name": "BrandKit",
+      "sourceType": "exported type alias (singleton)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Firm identity applied to generated decks; defaults imported from pitchData.brandDefaults.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "firmName",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Defaults to ''."
+        },
+        {
+          "name": "logoUrl",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "A URL string; no upload/asset table behind it."
+        },
+        {
+          "name": "primary",
+          "tsType": "string",
+          "sqlType": "text + CHECK (~ '^#[0-9A-Fa-f]{6}$')",
+          "nullable": false,
+          "notes": "Hex colour, default '#1E3A8A'."
+        },
+        {
+          "name": "accent",
+          "tsType": "string",
+          "sqlType": "text + CHECK hex",
+          "nullable": false,
+          "notes": "Default '#F59E0B'."
+        },
+        {
+          "name": "dark",
+          "tsType": "string",
+          "sqlType": "text + CHECK hex",
+          "nullable": false,
+          "notes": "Default '#0F172A'."
+        },
+        {
+          "name": "contactName",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "contactTitle",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "contactEmail",
+          "tsType": "string",
+          "sqlType": "citext",
+          "nullable": true
+        },
+        {
+          "name": "contactPhone",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Free text, no country code or normalisation."
+        }
+      ]
+    },
+    {
+      "name": "CustomSchema",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A tenant-defined RFP extraction schema.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Rfp.schema stores this name, so it is a de-facto natural key and must be unique per tenant."
+        },
+        {
+          "name": "fields",
+          "tsType": "string[]",
+          "sqlType": "child table pitch_schema_field(schema_id uuid, label text, seq int)",
+          "nullable": false,
+          "notes": "Bare label strings \u2014 no type, no required flag, no extracted values stored anywhere."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "has-many",
+          "target": "Rfp",
+          "via": "Rfp.schema (name)",
+          "gap": "Reverse link is by display name."
+        }
+      ]
+    },
+    {
+      "name": "Asset",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One individually tagged unit in the IT asset register.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "tagNo",
+          "tsType": "string",
+          "sqlType": "text not null + UNIQUE(tenant_id, tag_no)",
+          "nullable": false,
+          "notes": "Generated as taxonomy tagPrefix + (count of same-type assets + 1) padded to 4, falling back to 'AST-'. Derived from array length, so deleting an asset makes the next one reuse a tag. Needs a per-type sequence."
+        },
+        {
+          "name": "type",
+          "tsType": "string",
+          "sqlType": "text not null references asset_taxonomy(value)",
+          "nullable": false,
+          "notes": "TaxonomyEntry.value slug ('laptop'), looked up in assetSettings.taxonomies.asset_types. A slug FK, not a uuid."
+        },
+        {
+          "name": "stage",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Lifecycle stage as an unconstrained string; no union type defines the allowed stages."
+        },
+        {
+          "name": "project",
+          "tsType": "string",
+          "sqlType": "uuid references project(id)",
+          "nullable": true,
+          "notes": "Display-name string; no project entity exists in the store."
+        },
+        {
+          "name": "purchase",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "NOT the mode_of_purchase taxonomy despite the name overlap \u2014 the form placeholder is 'PO-1042', so it is a free-text purchase-order reference. The mode_of_purchase taxonomy is configured but nothing references it."
+        },
+        {
+          "name": "assignedTo",
+          "tsType": "string | null",
+          "sqlType": "uuid references app_user(id)",
+          "nullable": true,
+          "notes": "DISPLAY NAME STRING or null. No assignment history table, so custody changes are invisible."
+        },
+        {
+          "name": "warrantyEnd",
+          "tsType": "string",
+          "sqlType": "date",
+          "nullable": true,
+          "notes": "From an <input type=\"date\"> \u2014 date-only 'YYYY-MM-DD', '' when unset. daysUntil() parses it directly."
+        },
+        {
+          "name": "acquiredAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "Set to the moment the row was created, NOT the real acquisition date \u2014 no purchase date, cost, depreciation, or supplier column exists anywhere."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "app_user",
+          "via": "assignedTo",
+          "gap": "Needs assigned_to_user_id uuid."
+        },
+        {
+          "kind": "denormalised-name",
+          "target": "project",
+          "via": "project",
+          "gap": "Needs project_id; no project table exists."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "TaxonomyEntry (asset_types)",
+          "via": "type (slug)",
+          "gap": "Slug reference into a JSON settings blob, not a table."
+        }
+      ]
+    },
+    {
+      "name": "AssetRequest",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A request raised against the asset register (new kit, support, retirement).",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "reference",
+          "tsType": "string",
+          "sqlType": "text not null + UNIQUE(tenant_id, reference)",
+          "nullable": false,
+          "notes": "`REQ-` + (array length + 1) padded to 4 \u2014 same delete-and-reuse flaw."
+        },
+        {
+          "name": "type",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Unconstrained request-type string."
+        },
+        {
+          "name": "status",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Unconstrained; decideAssetRequest accepts any string and lowercases it into the audit action, so the status vocabulary is defined by call sites only."
+        },
+        {
+          "name": "raisedBy",
+          "tsType": "string",
+          "sqlType": "uuid references app_user(id)",
+          "nullable": false,
+          "notes": "DISPLAY NAME STRING."
+        },
+        {
+          "name": "approvedBy",
+          "tsType": "string | null",
+          "sqlType": "uuid references app_user(id)",
+          "nullable": true,
+          "notes": "DISPLAY NAME STRING or null. Set together with status but with no decided_at timestamp and no comment."
+        },
+        {
+          "name": "detail",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "Asset",
+          "via": "\u2014",
+          "gap": "A request never references the asset it concerns."
+        },
+        {
+          "kind": "missing",
+          "target": "ApprovalLevel",
+          "via": "\u2014",
+          "gap": "Multi-level approval is configured in AssetSettings but a request stores a single approver name and no level."
+        }
+      ]
+    },
+    {
+      "name": "ApprovalLevel",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One rung of the asset-request approval ladder.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false,
+          "notes": "Seeded as the literal 'l1', not a uuid."
+        },
+        {
+          "name": "level",
+          "tsType": "number",
+          "sqlType": "integer not null",
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Default 'By Role'; no union type enumerates the alternatives."
+        },
+        {
+          "name": "approvers",
+          "tsType": "string[]",
+          "sqlType": "child table approval_level_approver(level_id uuid, approver text)",
+          "nullable": false,
+          "notes": "Display-name strings \u2014 the seeded value is literally 'Manager (unknown)', a placeholder persisted as data."
+        }
+      ]
+    },
+    {
+      "name": "AssetSettings",
+      "sourceType": "exported type alias (singleton)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Everything the ITAM settings tab edits.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "approvalLevels",
+          "tsType": "ApprovalLevel[]",
+          "sqlType": "child table asset_approval_level",
+          "nullable": false
+        },
+        {
+          "name": "customFields",
+          "tsType": "{ id: string; label: string; type: string }[]",
+          "sqlType": "child table asset_custom_field",
+          "nullable": false,
+          "notes": "Inline anonymous shape, identical to PosCustomField but separately declared. No required flag, no value storage."
+        },
+        {
+          "name": "taxonomies",
+          "tsType": "Record<string, TaxonomyEntry[]>",
+          "sqlType": "child table asset_taxonomy(group_key text, value text, label text, tag_prefix text, seq int)",
+          "nullable": false,
+          "notes": "Nine fixed group keys seeded in `empty`: asset_types, makes, models, mode_of_purchase, retirement_reasons, warranty, numbering, reasons, notification. The key is a map key today and must become a column."
+        },
+        {
+          "name": "agents",
+          "tsType": "{ pauseAll: boolean; autoRunOnNew: boolean; autoPauseAt: string; disabled: string[] }",
+          "sqlType": "columns on asset_settings + child table asset_disabled_agent",
+          "nullable": false,
+          "notes": "Duplicate of the PosSettings.agents shape, declared inline in both places. `autoPauseAt` format undocumented."
+        }
+      ]
+    },
+    {
+      "name": "SupportRule",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A rule-shaped record in Support settings \u2014 escalations, inboxes, channels, business hours, auto-responses, shift handoffs, report schedules.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "detail",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "The ENTIRE rule body as one English sentence. Seven functionally different concepts (an IMAP inbox, a business-hours window, an SLA escalation, a report schedule) share this one shape, so none of them has the columns it actually needs \u2014 a mailbox has no host/port/credentials, a business-hours rule has no timezone or day/time columns, a report schedule has no cron or recipient."
+        },
+        {
+          "name": "enabled",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "keyed-by-collection",
+          "target": "SupportSettings",
+          "via": "which array it sits in",
+          "gap": "The rule's kind is the name of the containing array; it must become rule_kind text NOT NULL."
+        }
+      ]
+    },
+    {
+      "name": "SupportSettings",
+      "sourceType": "exported type alias (singleton)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Everything the Support & Ticketing settings tab edits.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "statuses",
+          "tsType": "FieldRow[]",
+          "sqlType": "child table support_field_row WHERE kind='status'",
+          "nullable": false,
+          "notes": "Seeded from supportData.defaultStatuses."
+        },
+        {
+          "name": "categories",
+          "tsType": "FieldRow[]",
+          "sqlType": "child table support_field_row WHERE kind='category'",
+          "nullable": false
+        },
+        {
+          "name": "priorities",
+          "tsType": "FieldRow[]",
+          "sqlType": "child table support_field_row WHERE kind='priority'",
+          "nullable": false
+        },
+        {
+          "name": "types",
+          "tsType": "FieldRow[]",
+          "sqlType": "child table support_field_row WHERE kind='type'",
+          "nullable": false
+        },
+        {
+          "name": "channels",
+          "tsType": "FieldRow[]",
+          "sqlType": "child table support_field_row WHERE kind='channel'",
+          "nullable": false
+        },
+        {
+          "name": "widget.enabled",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "widget.panelTitle",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "widget.launcherText",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "widget.subtitle",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "widget.confirmation",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Default copy promises an email that nothing sends \u2014 see falseSuccessCopy."
+        },
+        {
+          "name": "widget.accent",
+          "tsType": "string",
+          "sqlType": "text + CHECK hex",
+          "nullable": false,
+          "notes": "Default '#0f766e'."
+        },
+        {
+          "name": "widget.position",
+          "tsType": "string",
+          "sqlType": "text + CHECK",
+          "nullable": false,
+          "notes": "Human label 'Bottom right' stored as the value."
+        },
+        {
+          "name": "widget.showHelpTab",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        },
+        {
+          "name": "widget.requireEmail",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        },
+        {
+          "name": "csat.sendOnResolve",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        },
+        {
+          "name": "csat.waitHours",
+          "tsType": "number",
+          "sqlType": "integer not null default 1",
+          "nullable": false
+        },
+        {
+          "name": "csat.skipOlderDays",
+          "tsType": "number",
+          "sqlType": "integer not null default 14",
+          "nullable": false
+        },
+        {
+          "name": "csat.lowScore",
+          "tsType": "number",
+          "sqlType": "integer not null default 3",
+          "nullable": false,
+          "notes": "Threshold on Ticket.csat; the scale's bounds are never declared \u2014 see openQuestions."
+        },
+        {
+          "name": "csat.slaWarnPercent",
+          "tsType": "number",
+          "sqlType": "numeric(5,2) not null default 75",
+          "nullable": false
+        },
+        {
+          "name": "csat.portalUrl",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "escalationRules",
+          "tsType": "SupportRule[]",
+          "sqlType": "support_rule WHERE kind='escalation'",
+          "nullable": false
+        },
+        {
+          "name": "inboxAccounts",
+          "tsType": "SupportRule[]",
+          "sqlType": "support_rule WHERE kind='inbox'",
+          "nullable": false,
+          "notes": "A mail account modelled as name + one sentence: no host, port, protocol, username, or secret reference."
+        },
+        {
+          "name": "inboundChannels",
+          "tsType": "SupportRule[]",
+          "sqlType": "support_rule WHERE kind='inbound_channel'",
+          "nullable": false
+        },
+        {
+          "name": "businessHours",
+          "tsType": "SupportRule[]",
+          "sqlType": "support_rule WHERE kind='business_hours'",
+          "nullable": false,
+          "notes": "No timezone, weekday, or open/close time columns."
+        },
+        {
+          "name": "autoResponses",
+          "tsType": "SupportRule[]",
+          "sqlType": "support_rule WHERE kind='auto_response'",
+          "nullable": false
+        },
+        {
+          "name": "shiftHandoffs",
+          "tsType": "SupportRule[]",
+          "sqlType": "support_rule WHERE kind='shift_handoff'",
+          "nullable": false
+        },
+        {
+          "name": "reportSchedules",
+          "tsType": "SupportRule[]",
+          "sqlType": "support_rule WHERE kind='report_schedule'",
+          "nullable": false,
+          "notes": "No cadence or recipient columns."
+        },
+        {
+          "name": "tierPolicies",
+          "tsType": "Record<string, string>",
+          "sqlType": "child table support_tier_policy(tier text, policy_name text)",
+          "nullable": false,
+          "notes": "Tier name \u2192 SLA policy NAME. Both sides are display strings; no SLA policy entity exists at all. Empty means 'fall back to default'."
+        },
+        {
+          "name": "indexedArticles",
+          "tsType": "string[]",
+          "sqlType": "boolean column `indexed` on kb_article",
+          "nullable": false,
+          "notes": "Array of KbArticle ids held on the settings object instead of a flag on the article."
+        }
+      ]
+    },
+    {
+      "name": "Ticket",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One support ticket.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "reference",
+          "tsType": "string",
+          "sqlType": "text not null + UNIQUE(tenant_id, reference)",
+          "nullable": false,
+          "notes": "`SUP-` + (tickets.length + 1) padded to 4 \u2014 reuses references after a delete."
+        },
+        {
+          "name": "subject",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "requester",
+          "tsType": "string",
+          "sqlType": "uuid references contact(id)",
+          "nullable": false,
+          "notes": "DISPLAY NAME/EMAIL STRING \u2014 no contact or user record behind it."
+        },
+        {
+          "name": "status",
+          "tsType": "string",
+          "sqlType": "text not null references support_field_row(slug)",
+          "nullable": false,
+          "notes": "Should hold a FieldRow slug, but the type is a bare string with no constraint; a ticket can hold a status the tenant later deletes."
+        },
+        {
+          "name": "priority",
+          "tsType": "string",
+          "sqlType": "text not null references support_field_row(slug)",
+          "nullable": false,
+          "notes": "Same unconstrained slug reference. SLA hours live on the FieldRow, not the ticket."
+        },
+        {
+          "name": "category",
+          "tsType": "string",
+          "sqlType": "text references support_field_row(slug)",
+          "nullable": true,
+          "notes": "Same."
+        },
+        {
+          "name": "source",
+          "tsType": "string",
+          "sqlType": "text references support_field_row(slug)",
+          "nullable": true,
+          "notes": "Channel slug, unconstrained."
+        },
+        {
+          "name": "tags",
+          "tsType": "string[]",
+          "sqlType": "child table ticket_tag(ticket_id, tag text) or text[]",
+          "nullable": false
+        },
+        {
+          "name": "assignee",
+          "tsType": "string | null",
+          "sqlType": "uuid references app_user(id)",
+          "nullable": true,
+          "notes": "DISPLAY NAME STRING or null. No team/queue column either."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        },
+        {
+          "name": "resolvedAt",
+          "tsType": "string | undefined",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "Set on the first transition into a resolved state and then preserved (`item.resolvedAt ?? now`)."
+        },
+        {
+          "name": "slaBreached",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "A STORED flag, always written false at create, and no code ever flips it \u2014 no SLA due-date column exists to compute it from. Needs sla_due_at timestamptz and derivation."
+        },
+        {
+          "name": "csat",
+          "tsType": "number | null",
+          "sqlType": "integer",
+          "nullable": true,
+          "notes": "Always null at create; no survey flow writes it. Scale bounds undeclared."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "app_user",
+          "via": "assignee",
+          "gap": "Needs assignee_user_id."
+        },
+        {
+          "kind": "denormalised-name",
+          "target": "contact",
+          "via": "requester",
+          "gap": "Needs requester_contact_id."
+        },
+        {
+          "kind": "missing",
+          "target": "ticket conversation",
+          "via": "\u2014",
+          "gap": "No messages, replies, notes, or attachments \u2014 a ticket is a header row with no body."
+        },
+        {
+          "kind": "missing",
+          "target": "SLA policy",
+          "via": "SupportSettings.tierPolicies (names)",
+          "gap": "Tickets have no tier and no policy link."
+        }
+      ]
+    },
+    {
+      "name": "KbArticle",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A support knowledge-base article.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "draft",
+        "published",
+        "archived"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "category",
+          "tsType": "string",
+          "sqlType": "uuid references kb_category(id)",
+          "nullable": true,
+          "notes": "DISPLAY NAME STRING matching an entry in Persisted.kbCategories, not an id."
+        },
+        {
+          "name": "state",
+          "tsType": "'draft' | 'published' | 'archived'",
+          "sqlType": "text not null default 'draft' + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "body",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Format unknown \u2014 no markdown/html flag."
+        },
+        {
+          "name": "updatedAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "Only timestamp on the row; there is no createdAt, author, or revision history."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "kb_category",
+          "via": "category",
+          "gap": "Category is a bare string in a string[] register."
+        }
+      ]
+    },
+    {
+      "name": "CannedResponse",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A reusable reply snippet for agents.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "body",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "No shortcut/keyword, no placeholder variables, no createdAt."
+        }
+      ]
+    },
+    {
+      "name": "TeSettings",
+      "sourceType": "exported type alias (singleton)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Travel & Expense configuration.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "warn",
+        "block"
+      ],
+      "fields": [
+        {
+          "name": "enforcement",
+          "tsType": "'warn' | 'block'",
+          "sqlType": "text not null default 'warn' + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "receiptRequiredAbove",
+          "tsType": "string",
+          "sqlType": "numeric(18,4) + currency char(3)",
+          "nullable": true,
+          "notes": "MONEY STORED AS A STRING, default ''. Empty string means 'no threshold', which a numeric column must express as NULL."
+        },
+        {
+          "name": "flagDuplicates",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        },
+        {
+          "name": "categoryLimits",
+          "tsType": "Record<string, string>",
+          "sqlType": "child table te_category_limit(category text, limit_amount numeric(18,4), currency char(3))",
+          "nullable": false,
+          "notes": "Category NAME \u2192 money-as-STRING. Both key and value need retyping."
+        },
+        {
+          "name": "receiptEmail.enabled",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "receiptEmail.address",
+          "tsType": "string",
+          "sqlType": "citext",
+          "nullable": true,
+          "notes": "Default 'expenses@apragya-tenant.mail' \u2014 a non-routable placeholder domain persisted as if it were a live inbox."
+        },
+        {
+          "name": "travel.advancePercent",
+          "tsType": "number",
+          "sqlType": "numeric(5,2) not null default 80",
+          "nullable": false,
+          "notes": "Percentage."
+        },
+        {
+          "name": "travel.approvalAbove",
+          "tsType": "string",
+          "sqlType": "numeric(18,4) + currency",
+          "nullable": true,
+          "notes": "MONEY AS STRING, default ''."
+        },
+        {
+          "name": "travel.perDiem",
+          "tsType": "string",
+          "sqlType": "numeric(18,4) + currency",
+          "nullable": true,
+          "notes": "MONEY AS STRING, default ''. No per-destination or per-grade dimension \u2014 a single flat value."
+        },
+        {
+          "name": "travelNotifications",
+          "tsType": "Record<string, boolean>",
+          "sqlType": "child table te_travel_notification(event_key text, enabled boolean)",
+          "nullable": false,
+          "notes": "Five seeded keys: submitted, approved, rejected, advance, settle. Map keys must become rows."
+        },
+        {
+          "name": "approvalLevels",
+          "tsType": "{ id: string; label: string; threshold: string }[]",
+          "sqlType": "child table te_approval_level(id uuid, seq int, label text, threshold_amount numeric(18,4), currency char(3))",
+          "nullable": false,
+          "notes": "Inline anonymous shape. Seeded ids are 'l1'/'l2', not uuids; `threshold` is MONEY AS STRING ('1000', or '' for no threshold). No level number \u2014 order is array position."
+        },
+        {
+          "name": "slaDays",
+          "tsType": "number",
+          "sqlType": "integer not null default 21",
+          "nullable": false
+        },
+        {
+          "name": "glAccounts",
+          "tsType": "Record<string, string>",
+          "sqlType": "child table te_gl_account(category text, gl_code text)",
+          "nullable": false,
+          "notes": "Category NAME \u2192 GL code string. No chart-of-accounts entity exists to validate against."
+        },
+        {
+          "name": "customFields",
+          "tsType": "{ id: string; label: string; type: string; required: boolean }[]",
+          "sqlType": "child table te_custom_field",
+          "nullable": false,
+          "notes": "Third separately-declared custom-field shape in this file (differs from PosCustomField/AssetSettings by having `required`). No value storage."
+        },
+        {
+          "name": "segmentFields",
+          "tsType": "Record<string, string[]>",
+          "sqlType": "child table te_segment_field(segment_key text, value text, seq int)",
+          "nullable": false,
+          "notes": "Map of segment name \u2192 allowed values; both are free strings."
+        }
+      ]
+    },
+    {
+      "name": "ExpenseReport",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A trip's worth of expenses, submitted and reimbursed once.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Draft",
+        "Submitted",
+        "Approved",
+        "Reimbursed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "currency",
+          "tsType": "string",
+          "sqlType": "char(3) not null",
+          "nullable": false,
+          "notes": "One of only two money-bearing types in the file that carries a currency (with PosShift)."
+        },
+        {
+          "name": "status",
+          "tsType": "'Draft'|'Submitted'|'Approved'|'Reimbursed'",
+          "sqlType": "text not null default 'Draft' + CHECK",
+          "nullable": false,
+          "notes": "Title-cased values used as stored data. advanceExpenseReport walks the array one step forward and clamps at the end \u2014 there is no reject/return path, so an approval cannot be refused."
+        },
+        {
+          "name": "total",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "A typed-in scalar \u2014 there are no expense LINES anywhere in the store, so the total has nothing behind it and no receipt, category, date, or tax breakdown."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        },
+        {
+          "name": "reimbursedAt",
+          "tsType": "string | undefined",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "Set when status reaches 'Reimbursed', from either advanceExpenseReport or a run disbursal."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "employee / claimant",
+          "via": "\u2014",
+          "gap": "An expense report has NO owner column at all \u2014 not even a name string. Who is being reimbursed is unrepresentable."
+        },
+        {
+          "kind": "missing",
+          "target": "expense lines + receipts",
+          "via": "\u2014",
+          "gap": "No child rows; `total` is the entire claim."
+        },
+        {
+          "kind": "missing",
+          "target": "approver + approval timestamps",
+          "via": "status only",
+          "gap": "Who approved, and when, is never recorded."
+        },
+        {
+          "kind": "missing",
+          "target": "TravelRequest",
+          "via": "\u2014",
+          "gap": "A report cannot be linked to the trip it belongs to."
+        }
+      ]
+    },
+    {
+      "name": "TravelRequest",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A pre-trip travel authorisation.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Active",
+        "Closed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "purpose",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "start",
+          "tsType": "string",
+          "sqlType": "date",
+          "nullable": true,
+          "notes": "From <input type=\"date\"> in travel/panes.tsx \u2014 date-only 'YYYY-MM-DD'. Reserved word; name the column start_date."
+        },
+        {
+          "name": "end",
+          "tsType": "string",
+          "sqlType": "date",
+          "nullable": true,
+          "notes": "Date-only. Reserved word; name it end_date. No CHECK (end_date >= start_date) exists anywhere."
+        },
+        {
+          "name": "type",
+          "tsType": "'domestic' | 'international'",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "No origin or destination columns, so 'international' is an assertion, not a derivation."
+        },
+        {
+          "name": "estimatedCost",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "MONEY WITH NO CURRENCY COLUMN, unlike ExpenseReport which has one."
+        },
+        {
+          "name": "project",
+          "tsType": "string",
+          "sqlType": "uuid references project(id)",
+          "nullable": true,
+          "notes": "Display-name string; no project entity exists."
+        },
+        {
+          "name": "budgetHead",
+          "tsType": "string",
+          "sqlType": "uuid references budget_head(id)",
+          "nullable": true,
+          "notes": "Display-name string; no budget entity exists."
+        },
+        {
+          "name": "status",
+          "tsType": "'Active' | 'Closed'",
+          "sqlType": "text not null default 'Active' + CHECK",
+          "nullable": false,
+          "notes": "Only two states \u2014 no submitted/approved/rejected, despite TeSettings configuring travel approvals and advances."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "traveller",
+          "via": "\u2014",
+          "gap": "No employee column \u2014 like ExpenseReport, the person is unrepresentable."
+        },
+        {
+          "kind": "missing",
+          "target": "advance payment",
+          "via": "\u2014",
+          "gap": "TeSettings.travel.advancePercent configures an advance with no row to record it on."
+        }
+      ]
+    },
+    {
+      "name": "CardTransaction",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A row imported from a corporate card statement CSV.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "date",
+          "tsType": "string",
+          "sqlType": "date",
+          "nullable": false,
+          "notes": "Raw CSV cell, trimmed, never parsed or validated (travel/panes.tsx:305). Format is whatever the file contained."
+        },
+        {
+          "name": "merchant",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "amount",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "MONEY WITH NO CURRENCY COLUMN. Parsed from CSV as a JS float."
+        },
+        {
+          "name": "matchedTo",
+          "tsType": "string | null",
+          "sqlType": "uuid references expense_report(id)",
+          "nullable": true,
+          "notes": "A real ExpenseReport.id \u2014 one of the few genuine id references in the file. Auto-matching picks the FIRST report whose total is within 0.005 of the amount, ignoring date and merchant, and the same report can be matched by several transactions (no uniqueness)."
+        },
+        {
+          "name": "\u2014",
+          "tsType": "(absent)",
+          "sqlType": "card_id / last4 / statement_id",
+          "nullable": true,
+          "notes": "No card, cardholder, statement batch, or import id \u2014 re-importing is deduped only by date|merchant|amount string equality."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "ExpenseReport",
+          "via": "matchedTo (real id)",
+          "gap": "Nullable, unenforced, and many-to-one in practice though the match is conceptually one-to-one."
+        }
+      ]
+    },
+    {
+      "name": "ReimbursementRun",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A batch that pays out a set of approved expense reports.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Request Processed",
+        "Moved to Accounts",
+        "Batch Generation",
+        "Disbursed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "stage",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Typed as a bare string; the four stages exist only as a local array inside advanceReimbursementRun. Forward-only, clamped at 'Disbursed' \u2014 no failure or reversal stage."
+        },
+        {
+          "name": "reportIds",
+          "tsType": "string[]",
+          "sqlType": "join table reimbursement_run_report(run_id uuid, report_id uuid)",
+          "nullable": false,
+          "notes": "An array of FKs where a join table belongs \u2014 cannot be constrained, indexed, or carry a per-report paid amount."
+        },
+        {
+          "name": "total",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "MONEY WITH NO CURRENCY COLUMN, summed across reports that may each carry a DIFFERENT currency \u2014 the sum is arithmetically wrong the moment two currencies are mixed."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "No disbursedAt, no payment reference, no bank/batch file id."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "many-to-many",
+          "target": "ExpenseReport",
+          "via": "reportIds array",
+          "gap": "Needs a join table."
+        }
+      ]
+    },
+    {
+      "name": "Dpia",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A Data Protection Impact Assessment record in the Compliance Center.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Draft",
+        "In review",
+        "Approved"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "activity",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Free-text processing activity; not linked to DataFlow or InventoryField."
+        },
+        {
+          "name": "risk",
+          "tsType": "'Low' | 'Medium' | 'High'",
+          "sqlType": "text not null + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "status",
+          "tsType": "'Draft' | 'In review' | 'Approved'",
+          "sqlType": "text not null default 'Draft' + CHECK",
+          "nullable": false,
+          "notes": "No owner, reviewer, review date, or next-review date \u2014 a compliance register with no accountability columns."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "DataFlow / InventoryField",
+          "via": "activity (text)",
+          "gap": "The assessed processing is a sentence, not a reference."
+        }
+      ]
+    },
+    {
+      "name": "AutomatedDecision",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "An automated decision / profiling activity register entry.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Registered",
+        "Needs review"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "profiling",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "humanReview",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "A claim recorded as a flag; nothing links it to the GuardrailPolicy 'hitl' machinery that would implement it."
+        },
+        {
+          "name": "status",
+          "tsType": "'Registered' | 'Needs review'",
+          "sqlType": "text not null + CHECK",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "Agent / GuardrailPolicy",
+          "via": "\u2014",
+          "gap": "The registered decision is a name only; it cannot point at the agent that makes it."
+        }
+      ]
+    },
+    {
+      "name": "RetentionPolicy",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "How long data pulled through a connector is kept before purge.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "connectorId",
+          "tsType": "string",
+          "sqlType": "text not null references connector(code)",
+          "nullable": false,
+          "notes": "Catalogue slug, not a Connection.id \u2014 the policy binds to a connector TYPE, so two connections of the same type cannot differ."
+        },
+        {
+          "name": "keepForDays",
+          "tsType": "number",
+          "sqlType": "integer not null",
+          "nullable": false
+        },
+        {
+          "name": "enabled",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        },
+        {
+          "name": "lastRun",
+          "tsType": "string",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "Always written '' at creation (ComplianceCenter.tsx:847) and never updated \u2014 no purge job exists. Empty string must become NULL."
+        }
+      ]
+    },
+    {
+      "name": "PortalPermission",
+      "sourceType": "exported type alias (embedded)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "What a portal role may do on one tab.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "read",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "comment",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "download",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false
+        },
+        {
+          "name": "hidden",
+          "tsType": "string[]",
+          "sqlType": "child table portal_role_hidden_field(role_id uuid, tab_key text, field_key text)",
+          "nullable": false,
+          "notes": "Field keys hidden from this role on this tab, as bare strings with no schema to validate against."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "embedded",
+          "target": "PortalRole",
+          "via": "PortalRole.permissions[tabKey]",
+          "gap": "The tab it applies to is a map key; needs portal_role_permission(role_id, tab_key, ...)."
+        }
+      ]
+    },
+    {
+      "name": "PortalRole",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A role a partner-portal user is assigned, deciding which tabs and fields they see.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "description",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "isDefault",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "Mutually exclusive per tenant (addPortalRole clears the flag on all others); needs a partial unique index."
+        },
+        {
+          "name": "scope",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Unconstrained scope string; no union defines the options."
+        },
+        {
+          "name": "permissions",
+          "tsType": "Record<string, PortalPermission>",
+          "sqlType": "child table portal_role_permission(role_id, tab_key, read, comment, download)",
+          "nullable": false,
+          "notes": "Keyed by tab key string, which must match Persisted.portalTabs entries \u2014 no constraint links them."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "missing",
+          "target": "portal user",
+          "via": "\u2014",
+          "gap": "No portal-user entity exists, so a role can never actually be assigned to anyone."
+        }
+      ]
+    },
+    {
+      "name": "GuardrailPolicy",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One guardrail policy gating agent inputs and outputs.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Keyword Block",
+        "Content Filter",
+        "PII Redaction",
+        "Spend Cap",
+        "Rate Limit",
+        "Schema Validation",
+        "warn",
+        "block",
+        "redact",
+        "hitl",
+        "Input",
+        "Output",
+        "Both"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Seeded names carry the actual parameters in the text \u2014 'Approval cap \u2014 \u20b950,000', 'Max tool calls 8/12'. There is no threshold/limit column, so the rule's numbers exist only inside a display string and cannot be enforced."
+        },
+        {
+          "name": "type",
+          "tsType": "GuardrailType",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Union from guardrailData.ts: Keyword Block | Content Filter | PII Redaction | Spend Cap | Rate Limit | Schema Validation. Stored as the human label, spaces and all."
+        },
+        {
+          "name": "action",
+          "tsType": "GuardrailAction",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "warn | block | redact | hitl."
+        },
+        {
+          "name": "checkPoint",
+          "tsType": "CheckPoint",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Input | Output | Both."
+        },
+        {
+          "name": "scope",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "'Global' or an installed app's code \u2014 a sentinel value mixed into what is otherwise an FK column."
+        },
+        {
+          "name": "active",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "installed app",
+          "via": "scope",
+          "gap": "'Global' sentinel + app code in one text column; needs scope_kind + app_code."
+        },
+        {
+          "kind": "missing",
+          "target": "policy parameters",
+          "via": "name (text)",
+          "gap": "Thresholds live in the display name; a real schema needs typed config (jsonb or per-type columns)."
+        }
+      ]
+    },
+    {
+      "name": "Company",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "A legal entity under the tenant.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "ACTIVE",
+        "INACTIVE"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "code",
+          "tsType": "string",
+          "sqlType": "text not null + UNIQUE(tenant_id, code)",
+          "nullable": false,
+          "notes": "Uppercased in the form; no uniqueness is enforced today."
+        },
+        {
+          "name": "currency",
+          "tsType": "string",
+          "sqlType": "char(3) not null default 'USD'",
+          "nullable": false,
+          "notes": "Free string in the type; the form defaults to 'USD'. The parent's currency is the reporting currency, but no FX rate table exists."
+        },
+        {
+          "name": "country",
+          "tsType": "string",
+          "sqlType": "char(2) not null",
+          "nullable": false,
+          "notes": "Free string; no ISO constraint."
+        },
+        {
+          "name": "parentId",
+          "tsType": "string | null",
+          "sqlType": "uuid references company(id)",
+          "nullable": true,
+          "notes": "Genuine self-referencing FK \u2014 one of the few in the file. No cycle check exists."
+        },
+        {
+          "name": "status",
+          "tsType": "'ACTIVE' | 'INACTIVE'",
+          "sqlType": "text not null default 'ACTIVE' + CHECK",
+          "nullable": false,
+          "notes": "Screaming-case, unlike every other status vocabulary in this file (Title Case or lower-case) \u2014 inconsistent conventions to reconcile before they become CHECK constraints."
+        },
+        {
+          "name": "\u2014",
+          "tsType": "(absent)",
+          "sqlType": "is_primary boolean",
+          "nullable": true,
+          "notes": "The PRIMARY entity is not a row at all: it is derived from the session org name and patched by Persisted.primaryOverride. A DB needs it as a real company row with is_primary."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "self-reference",
+          "target": "Company",
+          "via": "parentId",
+          "gap": "Real id FK; needs ON DELETE handling and a cycle guard."
+        }
+      ]
+    },
+    {
+      "name": "IntercompanyPair",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Two entities that transact internally, and the account their postings net into.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "fromId",
+          "tsType": "string",
+          "sqlType": "uuid not null references company(id)",
+          "nullable": false,
+          "notes": "Real Company.id \u2014 a genuine FK. But the derived primary entity has no id, so it can never be one side of a pair."
+        },
+        {
+          "name": "toId",
+          "tsType": "string",
+          "sqlType": "uuid not null references company(id)",
+          "nullable": false,
+          "notes": "No CHECK (fromId <> toId) and no uniqueness on the pair."
+        },
+        {
+          "name": "eliminationAccount",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "A GL account code as free text; no chart-of-accounts table exists to reference."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "Company",
+          "via": "fromId / toId",
+          "gap": "Real ids; needs FKs plus a unique (tenant_id, fromId, toId)."
+        }
+      ]
+    },
+    {
+      "name": "ScheduleKind",
+      "sourceType": "exported union type",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "What kind of thing a schedule runs.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Agent",
+        "Pipeline",
+        "Bot",
+        "Canvas Workflow"
+      ],
+      "fields": []
+    },
+    {
+      "name": "Schedule",
+      "sourceType": "exported type alias",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "An agent, pipeline or bot running on a timer.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "Agent",
+        "Pipeline",
+        "Bot",
+        "Canvas Workflow"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "tsType": "ScheduleKind",
+          "sqlType": "text not null + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "target",
+          "tsType": "string",
+          "sqlType": "uuid (polymorphic: target_kind + target_id)",
+          "nullable": false,
+          "notes": "DISPLAY NAME STRING of the agent/pipeline/bot to run \u2014 not an id, and not validated against any catalogue."
+        },
+        {
+          "name": "cadence",
+          "tsType": "string",
+          "sqlType": "text not null + CHECK",
+          "nullable": false,
+          "notes": "Human label ('Hourly','Daily','Weekly','Monthly') used as the stored value. No cron expression and no timezone column, though nextRun() computes in UTC."
+        },
+        {
+          "name": "nextRun",
+          "tsType": "string",
+          "sqlType": "timestamptz not null",
+          "nullable": false,
+          "notes": "A PRE-FORMATTED HUMAN STRING, e.g. '22 Sep, 14:00 UTC' from toLocaleString('en-GB',\u2026) in AdminScheduledJobs.tsx:32-50. Unsortable and unqueryable \u2014 must become a real timestamptz, with last_run_at and a separate display formatter."
+        },
+        {
+          "name": "active",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false,
+          "notes": "Toggling it does not recompute nextRun, so a reactivated schedule keeps a stale past due-time."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "denormalised-name",
+          "target": "Agent / Pipeline / Bot / Canvas Workflow",
+          "via": "target (text name)",
+          "gap": "Polymorphic reference by display name; needs target_kind + target_id."
+        }
+      ]
+    },
+    {
+      "name": "ChecklistTask",
+      "sourceType": "exported type alias (derived, not persisted)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "One onboarding-checklist row, recomputed from tenant state on every render.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "text (static key: agent|app|credits|invite|copilot)",
+          "nullable": false,
+          "notes": "Hardcoded key, not stored."
+        },
+        {
+          "name": "icon",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "An emoji literal held as content."
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": false
+        },
+        {
+          "name": "blurb",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "done",
+          "tsType": "boolean",
+          "sqlType": "(derived \u2014 do not store)",
+          "nullable": false,
+          "notes": "Computed from artifacts.length / installed.length / three boolean flags. Only the underlying flags belong in the DB."
+        },
+        {
+          "name": "to",
+          "tsType": "string | undefined",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "An in-app route path baked into data."
+        },
+        {
+          "name": "action",
+          "tsType": "'allocate' | 'invite' | undefined",
+          "sqlType": "text + CHECK",
+          "nullable": true
+        }
+      ]
+    },
+    {
+      "name": "WorkspaceValue",
+      "sourceType": "internal type alias (React context surface)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "purpose": "Persisted plus derived values and ~95 mutator functions; what useWorkspace() returns. Only the derived data fields are listed \u2014 the rest are callbacks, not columns.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "creditsTotal",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) on plan/subscription",
+          "nullable": false,
+          "notes": "Hardcoded module constant MONTHLY_CREDITS = 1000. Not per-tenant, not stored, not tied to a plan \u2014 a real schema needs a subscription/plan row."
+        },
+        {
+          "name": "creditsLeft",
+          "tsType": "number",
+          "sqlType": "(derived: creditsTotal - creditsUsed)",
+          "nullable": false
+        },
+        {
+          "name": "appQuota",
+          "tsType": "number",
+          "sqlType": "integer on plan",
+          "nullable": false,
+          "notes": "Hardcoded APP_QUOTA = 5."
+        },
+        {
+          "name": "trialDaysLeft",
+          "tsType": "number",
+          "sqlType": "(derived from trial_ends_at date)",
+          "nullable": false,
+          "notes": "Hardcoded TRIAL_DAYS = 13 \u2014 a FROZEN number that never counts down, because no trial start/end date is stored anywhere."
+        },
+        {
+          "name": "checklist",
+          "tsType": "ChecklistTask[]",
+          "sqlType": "(derived)",
+          "nullable": false
+        },
+        {
+          "name": "checklistDone",
+          "tsType": "number",
+          "sqlType": "(derived)",
+          "nullable": false
+        },
+        {
+          "name": "unreadCount",
+          "tsType": "number",
+          "sqlType": "(derived)",
+          "nullable": false
+        }
+      ]
+    },
+    {
+      "name": "InventoryField",
+      "sourceType": "exported type alias (imported; persisted in Persisted.dataInventory)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/complianceData.ts",
+      "purpose": "One catalogued personal-data field in the compliance inventory.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "basic",
+        "contact",
+        "identifier",
+        "location",
+        "behavioural",
+        "special_category"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false,
+          "notes": "Seed rows use `${entity}.${field}` as the id, not a uuid \u2014 so seeded and user-added rows have incompatible id formats in one column."
+        },
+        {
+          "name": "entity",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Physical table name string ('users','audit_logs'), unvalidated."
+        },
+        {
+          "name": "field",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Column name string. UNIQUE(tenant_id, entity, field) is implied by the seed id but not enforced."
+        },
+        {
+          "name": "category",
+          "tsType": "InventoryCategory",
+          "sqlType": "text not null + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "sensitive",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "Redundant with category='special_category' in the seed data but set independently, so the two can disagree."
+        },
+        {
+          "name": "legalBasis",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free text ('Consent','Legitimate interests','Consent / Legitimate interests'). Not an enum, and the compound value shows why. Do not infer statutory meaning from these strings."
+        },
+        {
+          "name": "retention",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "A human phrase, not a duration: 'Per KYC policy', '90 days (6y for PHI access)', 'Life of account + 730d post-erasure'. Unenforceable as written; a real schema needs a machine-readable interval plus this text as a note."
+        }
+      ]
+    },
+    {
+      "name": "DataFlow",
+      "sourceType": "exported type alias (imported; persisted in Persisted.dataFlows)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/complianceData.ts",
+      "purpose": "One catalogued data movement in or out of the platform.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "ingress",
+        "egress",
+        "internal"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false,
+          "notes": "Seed ids are slugified names ('ai-inference'), not uuids \u2014 same mixed-format problem as InventoryField."
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "type",
+          "tsType": "FlowType",
+          "sqlType": "text not null + CHECK",
+          "nullable": false
+        },
+        {
+          "name": "source",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free-text description, not a reference to a connector or system."
+        },
+        {
+          "name": "destination",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free text, sometimes naming vendors ('Sentry','Object storage (MinIO/S3)')."
+        },
+        {
+          "name": "crossBorder",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Transfer-safeguard label ('SCC + DPA') defaulting to ''. A legal classification held as free text \u2014 treat as a label, not an assertion."
+        }
+      ]
+    },
+    {
+      "name": "FieldRow",
+      "sourceType": "exported type alias (imported; persisted in SupportSettings)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/supportData.ts",
+      "purpose": "One configurable Support picklist entry (status, category, priority, type, channel).",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false,
+          "notes": "Seeded as the slug itself ('new','urgent')."
+        },
+        {
+          "name": "label",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "slug",
+          "tsType": "string",
+          "sqlType": "text not null + UNIQUE(tenant_id, kind, slug)",
+          "nullable": false,
+          "notes": "What Ticket.status/priority/category/source should reference."
+        },
+        {
+          "name": "color",
+          "tsType": "string | undefined",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "A Tailwind palette key ('sky','rose') mapped through statusDot \u2014 presentation stored as data."
+        },
+        {
+          "name": "behaviour",
+          "tsType": "string | undefined",
+          "sqlType": "text + CHECK",
+          "nullable": true,
+          "notes": "Only on statuses: 'active' | 'waiting' | 'closed'. Untyped in TS, so the closed-state semantics that drive resolvedAt are unconstrained."
+        },
+        {
+          "name": "slaHours",
+          "tsType": "number | undefined",
+          "sqlType": "integer",
+          "nullable": true,
+          "notes": "Only on priorities (4/8/24/72). The SLA target lives here, not on the ticket, so changing a priority retroactively changes history."
+        },
+        {
+          "name": "\u2014",
+          "tsType": "(absent)",
+          "sqlType": "kind text not null",
+          "nullable": false,
+          "notes": "Which picklist a row belongs to is the containing array name; it must become a column."
+        }
+      ]
+    },
+    {
+      "name": "TaxonomyEntry",
+      "sourceType": "exported type alias (imported; persisted in AssetSettings.taxonomies)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/assetData.ts",
+      "purpose": "One entry in an ITAM master taxonomy.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "value",
+          "tsType": "string",
+          "sqlType": "text not null + UNIQUE(tenant_id, group_key, value)",
+          "nullable": false,
+          "notes": "Slug; Asset.type references it. Note this type has NO id field \u2014 value is the key."
+        },
+        {
+          "name": "label",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false
+        },
+        {
+          "name": "tagPrefix",
+          "tsType": "string | undefined",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Drives Asset.tagNo generation ('LAP-'). Changing it mid-life silently renumbers nothing but changes future tags."
+        },
+        {
+          "name": "hasConfig",
+          "tsType": "boolean | undefined",
+          "sqlType": "boolean default false",
+          "nullable": true
+        },
+        {
+          "name": "configCount",
+          "tsType": "number | undefined",
+          "sqlType": "integer",
+          "nullable": true,
+          "notes": "A stored COUNT of configurations that are not themselves stored anywhere."
+        },
+        {
+          "name": "\u2014",
+          "tsType": "(absent)",
+          "sqlType": "group_key text not null",
+          "nullable": false,
+          "notes": "The taxonomy group (asset_types, makes, \u2026) is the Record key; it must become a column."
+        }
+      ]
+    },
+    {
+      "name": "GuardrailType / GuardrailAction / CheckPoint",
+      "sourceType": "exported union types (imported)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/guardrailData.ts",
+      "purpose": "Guardrail vocabularies used by GuardrailPolicy.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "Keyword Block",
+        "Content Filter",
+        "PII Redaction",
+        "Spend Cap",
+        "Rate Limit",
+        "Schema Validation",
+        "warn",
+        "block",
+        "redact",
+        "hitl",
+        "Input",
+        "Output",
+        "Both"
+      ],
+      "fields": []
+    },
+    {
+      "name": "InventoryCategory / FlowType",
+      "sourceType": "exported union types (imported)",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/complianceData.ts",
+      "purpose": "Compliance vocabularies used by InventoryField and DataFlow.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "basic",
+        "contact",
+        "identifier",
+        "location",
+        "behavioural",
+        "special_category",
+        "ingress",
+        "egress",
+        "internal"
+      ],
+      "fields": []
+    }
+  ],
+  "operations": [],
+  "surfaces": [],
+  "falseSuccessCopy": [
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 981,
+      "text": "`${name} has been installed successfully. You can access it from the Enterprise sidebar.`",
+      "why": "install() only pushes an app code string into a localStorage array. Nothing is provisioned, no schema or tenant data is created, and the word 'successfully' describes a browser-localStorage-only write."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 1117,
+      "text": "`You ${decision} a paused run. The decision is recorded in the audit trail with actor and timestamp.`",
+      "why": "Claims an actor is recorded. auditEvent() writes the literal string 'owner' as `user` and '' as `ip` \u2014 there is no actor id and no IP. The 'paused run' is a static constant in appData.ts, so nothing resumes, and a 'modified' decision has nowhere to store what was modified."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 795,
+      "text": "\"Thanks \u2014 we've got your message and emailed you a copy.\"",
+      "why": "Default support-widget confirmation promising an email. No mail is sent by anything in this store; the widget is a browser-localStorage-only config object."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 768,
+      "text": "receiptEmail: { enabled: false, address: 'expenses@apragya-tenant.mail' }",
+      "why": "A non-routable placeholder domain shipped as a real default inbox address. Enabling the toggle forwards nothing \u2014 no mail ingestion exists."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 1566,
+      "text": "// Disbursing a run is what actually reimburses the reports inside it",
+      "why": "advanceReimbursementRun() sets stage to 'Disbursed' and flips each ExpenseReport.status to 'Reimbursed' with a timestamp. No payment instruction, bank file, payment reference, or amount-paid is recorded \u2014 the word 'Disbursed' is a status string, and the reports have no claimant to pay in the first place."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 1205,
+      "text": "// A pairing token is a one-time secret; this one is generated locally.",
+      "why": "pairRunner() mints `apr_rnr_<24 hex>` in the browser and shows it as a pairing token. No server ever issued or can verify it, Runner.status is hardcoded 'pending' and nothing transitions it, so the pairing screen can never succeed."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 306,
+      "text": "export type PosChange = { \u2026 reverted: boolean }",
+      "why": "The type comment says Change History 'is what makes a change undoable', but the row stores only an English `summary` \u2014 no before/after payload \u2014 so a revert cannot be reconstructed from the data."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 446,
+      "text": "slaBreached: boolean",
+      "why": "Presented as an SLA breach indicator but hardcoded false at creation and never written again; no sla_due_at exists to derive it from. Any UI reading it reports 'within SLA' unconditionally."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 1513,
+      "text": "/** Matches unmatched charges to reports of the same amount. Returns how many matched. */",
+      "why": "autoMatchCards() matches on |report.total - txn.amount| < 0.005 alone \u2014 ignoring date, merchant and currency \u2014 takes the FIRST match, and lets many transactions match the same report. The returned count is reported to the user as successful reconciliation."
+    },
+    {
+      "file": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx",
+      "line": 574,
+      "text": "{ name: 'Approval cap \u2014 \u20b950,000', \u2026 }  /  { name: 'Max tool calls 8/12', \u2026 }",
+      "why": "Seeded guardrails display concrete limits, but GuardrailPolicy has no threshold, limit or config column \u2014 the numbers exist only inside the display name and nothing can enforce them."
+    }
+  ],
+  "openQuestions": [
+    "Tenancy: the entire store is a single browser-localStorage blob under key 'apragya.workspace'. Every one of the ~50 tables needs tenant_id added, plus a users table \u2014 today the only actor is the literal string 'owner'.",
+    "Money: 9 numeric money fields carry NO currency (PosDoc.total, Rfp.estimate, TravelRequest.estimatedCost, CardTransaction.amount, ReimbursementRun.total, all 5 PosCashVariance thresholds, PosLoyaltyProgramme.pointValue). Only ExpenseReport and PosShift have one. Is currency per-row, per-company (Company.currency), or a single tenant currency? ReimbursementRun.total sums reports that each carry their own currency \u2014 what is the intended behaviour when they differ, and is an FX rate table needed?",
+    "Money stored as text: TeSettings.receiptRequiredAbove, travel.approvalAbove, travel.perDiem, approvalLevels[].threshold and every value in categoryLimits are strings with '' meaning 'unset'. Confirm these become numeric(18,4) + currency with NULL for unset.",
+    "Credits: MONTHLY_CREDITS (1000), APP_QUOTA (5) and TRIAL_DAYS (13) are module constants, not tenant data. Should they become plan/subscription columns? Are credits integral or fractional (proposed numeric(18,4))? There is no credit ledger \u2014 only creditsUsed \u2014 so spend cannot be attributed, refunded, or reported per app/agent. Is a ledger table in scope?",
+    "Trial: trialDaysLeft is the frozen constant 13. A real schema needs trial_started_at / trial_ends_at. What is the trial length and what happens at expiry?",
+    "Expense and travel records have NO claimant/traveller column of any kind. Who owns an ExpenseReport and a TravelRequest, and against which employee entity? This is the single largest missing relation.",
+    "ExpenseReport has no line items, receipts, categories or per-line dates; `total` is a typed-in scalar. Are expense lines in scope, and what fields does a line carry?",
+    "Expense approval is forward-only (Draft \u2192 Submitted \u2192 Approved \u2192 Reimbursed, clamped). There is no reject, recall or return-for-edit path, and no approver or approved_at column. What is the real approval state machine?",
+    "PosDoc has no line items, no tax lines, no predecessor-document link and no payments. MatchSettings.requireOrder/requireDelivery gate a document chain the schema cannot express. What is the intended order-to-cash document graph?",
+    "PosTaxCategory.withinState / interState are uninterpreted labels with no computation attached anywhere. Their tax meaning must be specified by the product owner \u2014 do not infer any statutory split.",
+    "PosLoyaltyProgramme tier `threshold`: points or money? No accrual/balance storage exists; is a points ledger in scope?",
+    "PosShift.cashTaken and cardTaken are initialised to 0 and never incremented \u2014 no sale posts to a shift. Should sales documents carry shift_id so takings reconcile?",
+    "Reference generation: Ticket ('SUP-nnnn'), AssetRequest ('REQ-nnnn'), PosDoc (per-kind prefix) and Asset.tagNo all derive from array length + 1, so deleting a record makes the next one reuse a reference. Confirm these become per-tenant (and per-kind/per-type) database sequences, and whether existing references must be preserved.",
+    "Ticket.csat and SupportSettings.csat.lowScore: the scale's bounds are never declared (1-5? 1-10? 0-100?).",
+    "FieldRow.behaviour ('active'|'waiting'|'closed') drives whether a ticket counts as resolved but is typed as an optional bare string. Is it a required enum on statuses?",
+    "SLA: SupportSettings.tierPolicies maps a tier NAME to an SLA policy NAME, but no SLA policy entity and no ticket tier column exist. What is the SLA model?",
+    "AssetSettings.agents.autoPauseAt and PosSettings.agents.autoPauseAt are strings with no documented format \u2014 time of day, a date, or a credit threshold?",
+    "Asset.purchase holds a free-text PO reference ('PO-1042' placeholder) while a mode_of_purchase taxonomy is configured but referenced by nothing. Which is intended, and where do purchase date, cost, supplier and depreciation live? The asset register currently has no financial columns at all.",
+    "Asset.acquiredAt is set to row-creation time, not the real acquisition date. Should they be separate columns?",
+    "Schedule.nextRun is a pre-formatted display string ('22 Sep, 14:00 UTC') and cadence is a human label with no timezone column. Confirm nextRun becomes timestamptz, cadence becomes a cron expression or enum + a timezone, and add last_run_at.",
+    "Schedule.target, Run.agent, Artifact.skill and GuardrailPolicy.scope are all display-name strings for agents/pipelines/bots/apps. Where does the authoritative agent catalogue live, and what is its key?",
+    "GuardrailPolicy has no parameter storage \u2014 'Approval cap \u2014 \u20b950,000' and 'Max tool calls 8/12' keep their limits inside the name. What typed config does each GuardrailType need?",
+    "Persisted.approvals is a bare map of approvalId \u2192 decision. Where do the paused runs themselves live, who decided, when, and what payload did a 'modified' decision write?",
+    "Persisted.portalTabs uses null to mean 'all tabs enabled' and [] to mean 'none' \u2014 opposite meanings. Confirm the intended default before this becomes rows.",
+    "PortalRole has no portal-user entity to be assigned to. Are portal users in scope?",
+    "Company: the PRIMARY entity is not a row \u2014 it is derived from the session org name and patched by primaryOverride (a Partial<Company>). It must become a real row with is_primary; what backfills its code, currency and country?",
+    "Company.status is 'ACTIVE'/'INACTIVE' (screaming case) while every other status vocabulary in the file is Title Case or lower-case. Pick one convention before writing CHECK constraints.",
+    "InventoryField.retention holds human phrases ('Per KYC policy', '90 days (6y for PHI access)', 'Life of account + 730d post-erasure') that are not machine-readable, and legalBasis includes a compound value ('Consent / Legitimate interests'). These are compliance labels transcribed from a live console \u2014 they need product/legal sign-off before being turned into enforceable enums or intervals. Do not synthesise statutory meaning from them.",
+    "RetentionPolicy binds to a connector TYPE slug, not a Connection.id, and lastRun is always ''. Should policies be per-connection, and what job updates lastRun?",
+    "Connection stores only secretHint (last four chars); the real credential has no home. What secret store / vault reference column is expected?",
+    "Seed vs tenant data: dataInventory, dataFlows, supportSettings picklists, assetSettings taxonomies and defaultPolicies are all seeded from TS constants into the tenant blob with slug/composite ids, then edited in place. Seeded and user-created rows become indistinguishable and use different id formats. Should seeds be a separate catalogue table, or copied per tenant with an is_seed flag?",
+    "CRM and HR have no schema at all: every record goes into Persisted.appRecords[surfaceKey] as AppRecord with Record<string,string> fields. Real tables are needed \u2014 what are the CRM lead/contact/deal and HR employee schemas?",
+    "KbDoc, PitchTemplate and BrandKit.logoUrl imply file storage that does not exist (no storage key, filename, size, MIME type or extracted text). What is the file/blob model?",
+    "Custom fields are declared three separate times with three slightly different inline shapes (PosCustomField, AssetSettings.customFields, TeSettings.customFields \u2014 the last adds `required`), and none stores values. Should there be one custom-field system with typed values?",
+    "Notification has no recipient and no resource link; `read` is per-tenant. Confirm the per-user read model and deep-link columns.",
+    "Array caps baked into the store \u2014 notifications 50, runs 25, audit 500 \u2014 are UI conveniences. Confirm they are dropped in the DB and handled by pagination/retention instead."
+  ]
+}

@@ -1,7 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { mkdtempSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 
 /**
@@ -37,10 +38,18 @@ const pathOf = (file: string) =>
     .join('/')}`
 
 test('the committed document is exactly what the generator produces', () => {
-  const before = readFileSync(DOCUMENT, 'utf8')
-  execFileSync('node', ['scripts/openapi.mjs'], { stdio: 'pipe' })
-  const after = readFileSync(DOCUMENT, 'utf8')
-  assert.equal(after, before, 'docs/api/openapi.json is stale — run `npm run openapi` and commit the result')
+  /*
+   * Generated to a scratch file, never over the committed one. A check that
+   * repairs what it is checking passes on the second run, which means CI goes
+   * green on a retry and the staleness is never noticed.
+   */
+  const scratch = join(mkdtempSync(join(tmpdir(), 'openapi-')), 'openapi.json')
+  execFileSync('node', ['scripts/openapi.mjs', scratch], { stdio: 'pipe' })
+  assert.equal(
+    readFileSync(scratch, 'utf8'),
+    readFileSync(DOCUMENT, 'utf8'),
+    'docs/api/openapi.json is stale — run `npm run openapi` and commit the result',
+  )
 })
 
 test('every route on disk is described', () => {

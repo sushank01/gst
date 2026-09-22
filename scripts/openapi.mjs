@@ -16,7 +16,7 @@
  * Run: npm run openapi
  */
 import { readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 
 const API_ROOT = 'src/app/api'
 
@@ -269,6 +269,12 @@ const document = {
   paths,
 }
 
-mkdirSync('docs/api', { recursive: true })
-writeFileSync('docs/api/openapi.json', `${JSON.stringify(document, null, 2)}\n`)
-console.log(`openapi: ${files.length} route files, ${operations} operations -> docs/api/openapi.json`)
+/*
+ * An output path may be given, so a test can generate to a scratch file and
+ * compare rather than overwriting the committed document. A check that repairs
+ * what it is checking passes on the second run and tells you nothing.
+ */
+const target = process.argv[2] ?? 'docs/api/openapi.json'
+mkdirSync(dirname(target), { recursive: true })
+writeFileSync(target, `${JSON.stringify(document, null, 2)}\n`)
+console.log(`openapi: ${files.length} route files, ${operations} operations -> ${target}`)

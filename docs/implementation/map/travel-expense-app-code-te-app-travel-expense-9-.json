@@ -1,0 +1,3204 @@
+{
+  "domain": "Travel & Expense (app code TE) \u2014 /app/travel-expense, 9 tabs + 13 settings panes. Entire surface is client-only React state persisted to a single browser localStorage key `apragya.workspace` (src/lib/workspace.tsx:68, read() :912, update() :940). There is NO server route for this app: src/app/api/v1 contains only auth, crm/leads, members, tenants. Nothing in the domain reaches a database, a mail system, a card provider, a bank file, or a ledger. Existing SQL conventions to follow live in migrations/0001_identity_and_tenancy.sql (uuid PKs, timestamptz, numeric(18,4) + char(3) currency, tenant_id on every business table, archived_at instead of DELETE, version column for optimistic concurrency); migrations/0004_platform.sql already provides app_settings / app_settings_changes (tenant_id, company_id, app_code, section, jsonb value, version, before/after) which is where TeSettings belongs.",
+  "entities": [
+    {
+      "name": "ExpenseReport",
+      "sourceType": "ExpenseReport",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:478-487",
+      "purpose": "A trip's worth of expenses submitted and reimbursed once. Today it is a title + a single flat total; there is no line-item table, no receipt, no claimant and no approver. Created by ExpenseReportsPane, advanced one status per click, and flipped to Reimbursed either by that button or by disbursing a run.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "Draft",
+        "Submitted",
+        "Approved",
+        "Reimbursed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false,
+          "notes": "crypto.randomUUID() minted in the browser (workspace.tsx:1424). Server must mint its own."
+        },
+        {
+          "name": "title",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free text. Dialog requires non-empty via disabled={!title.trim()} (panes.tsx:279) but the value is .trim()'d with no length cap and no uniqueness. Also abused as the category seed on the Dashboard (see notes on category)."
+        },
+        {
+          "name": "currency",
+          "tsType": "string",
+          "sqlType": "char(3) not null",
+          "nullable": false,
+          "notes": "Free-choice from 6 hardcoded currencies (travelExpenseData.ts:17-24). No FX rate, no base-currency amount, yet every total in the app is summed across currencies. Needs a companion base_amount numeric(18,4) + fx_rate numeric(18,8) + fx_rate_at timestamptz."
+        },
+        {
+          "name": "status",
+          "tsType": "'Draft' | 'Submitted' | 'Approved' | 'Reimbursed'",
+          "sqlType": "text not null default 'Draft' check (status in ('draft','submitted','approved','rejected','reimbursed','cancelled'))",
+          "nullable": false,
+          "notes": "Prototype has no Rejected and no Cancelled state \u2014 a submitted report can only move forward (workspace.tsx:1441-1452). Production needs at minimum rejected + cancelled, plus a returned-for-edit state, or approvers have no way to say no."
+        },
+        {
+          "name": "total",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "JS float today. Set once at create: 0 for a 'report', Number(amount)||0 for a 'quick' expense (panes.tsx:164). Never recomputed, never editable \u2014 a full report is permanently 0.00. Must become a derived/maintained sum of expense_items."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string (ISO)",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "Client clock (workspace.tsx:1424). Also used as the Reports-tab date filter key and as the start of 'avg turnaround'."
+        },
+        {
+          "name": "reimbursedAt",
+          "tsType": "string | undefined",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "Written by advanceExpenseReport (:1450) and by advanceReimbursementRun on Disbursed (:1569). Client clock."
+        },
+        {
+          "name": "category",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid references expense_categories (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMN. The Quick-expense dialog has a category <select> (panes.tsx:252-259) whose state is captured and then silently dropped \u2014 create() never passes it to addExpenseReport (panes.tsx:160-165). The Dashboard's 'Spend by category' chart therefore fabricates a category from expenseCategories[title.length % 8] (panes.tsx:67)."
+        },
+        {
+          "name": "employee_user_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references users (id)",
+          "nullable": false,
+          "notes": "MISSING COLUMN. No report has a claimant. Policy copy promises duplicate detection by 'same employee' (settings.tsx:79) and receipt email-in promises 'against the sender's employee record' (settings.tsx:115) \u2014 neither is expressible."
+        },
+        {
+          "name": "tenant_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references tenants (id) on delete cascade",
+          "nullable": false,
+          "notes": "MISSING COLUMN. Isolation today is 'one localStorage blob per browser'."
+        },
+        {
+          "name": "company_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid references companies (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMN. migrations/0001 models legal entities per tenant; reports must post to one."
+        },
+        {
+          "name": "report_number",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "MISSING COLUMN. No human-readable reference anywhere in the UI; rows are identified by raw uuid. workspace.tsx:1600 shows the tenant-ordered reference pattern used for Tickets \u2014 reuse it."
+        },
+        {
+          "name": "submitted_at",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "MISSING COLUMN. The Dashboard labels turnaround 'submit \u2192 reimbursed' (panes.tsx:79) but measures createdAt \u2192 reimbursedAt because no submit timestamp exists."
+        },
+        {
+          "name": "approved_at",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "MISSING COLUMN. Reimbursement SLA is defined as 'days from approval to disbursement' (settings.tsx:335-337) and cannot be computed."
+        },
+        {
+          "name": "travel_request_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid references travel_requests (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMN. Travel blurb promises settling actuals against a trip's advance (panes.tsx:496); nothing links a report to a trip."
+        },
+        {
+          "name": "project_id / cost_center_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid references projects (id) / uuid references cost_centers (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. Reports have no coding dimensions at all, so the GL-account mapping pane has nothing to post against."
+        },
+        {
+          "name": "policy_state",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text check (policy_state in ('clean','warned','blocked'))",
+          "nullable": true,
+          "notes": "MISSING COLUMN. Expense policy pane promises warn/block at submission (settings.tsx:38-45); no submission-time evaluation and no place to record the verdict."
+        },
+        {
+          "name": "custom_field_values",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "jsonb not null default '{}'::jsonb",
+          "nullable": false,
+          "notes": "MISSING COLUMN. teSettings.customFields claims to capture extra fields 'on every expense report' (settings.tsx:403); no form renders them and no report stores them."
+        },
+        {
+          "name": "version / created_by / updated_at / archived_at",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "integer not null default 1 / uuid references users (id) / timestamptz not null default now() / timestamptz",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. Repo convention (migrations/0003_crm.sql parties). There is no delete or edit path in the UI at all, so nothing is recoverable or concurrency-safe today."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "users",
+          "via": "employee_user_id",
+          "gap": "Relationship does not exist. Every expense report is ownerless; the approval inbox, duplicate detection and receipt email-in copy all assume an employee."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "tenants",
+          "via": "tenant_id",
+          "gap": "Relationship does not exist. Scoping is the browser profile."
+        },
+        {
+          "kind": "has-many",
+          "target": "expense_items",
+          "via": "expense_report_id",
+          "gap": "expense_items does not exist. The panel blurb 'Group several expenses into one report' (panes.tsx:176) is unbacked \u2014 no control adds a line, so total is permanently the create-time number."
+        },
+        {
+          "kind": "has-many",
+          "target": "receipts",
+          "via": "expense_item_id",
+          "gap": "receipts does not exist anywhere in the codebase (grep 'receipt' in workspace.tsx returns only two settings keys). The app name promises 'receipt capture' (TravelExpense.tsx:50)."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "travel_requests",
+          "via": "travel_request_id",
+          "gap": "Not modelled."
+        },
+        {
+          "kind": "referenced-by",
+          "target": "card_transactions",
+          "via": "matchedTo",
+          "gap": "card_transactions.matchedTo holds a raw report uuid string with no FK, no cascade and no unique constraint \u2014 deleting a report (no delete exists yet) would orphan it, and several transactions can point at one report."
+        },
+        {
+          "kind": "referenced-by",
+          "target": "reimbursement_runs",
+          "via": "reportIds string[]",
+          "gap": "Membership is a denormalised uuid array inside the run row, not a join table. No constraint stops one report appearing in two runs, i.e. being paid twice."
+        }
+      ]
+    },
+    {
+      "name": "TravelRequest",
+      "sourceType": "TravelRequest",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:489-499",
+      "purpose": "A trip request. Today it is Active-or-Closed only: there is no submit, no approval, no per-leg segment, no advance and no settlement, despite the pane blurb promising all four.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "Active",
+        "Closed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false,
+          "notes": "Browser-minted (workspace.tsx:1465)."
+        },
+        {
+          "name": "purpose",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Not required by the dialog; falls back to the literal 'Travel request' when blank (panes.tsx:641), so blank purposes become indistinguishable rows."
+        },
+        {
+          "name": "start",
+          "tsType": "string (YYYY-MM-DD)",
+          "sqlType": "date not null",
+          "nullable": false,
+          "notes": "<input type=date>. Required only in the sense that Create is disabled without it (panes.tsx:638). Calendar-day fact \u2192 date, per migrations/0001 conventions."
+        },
+        {
+          "name": "end",
+          "tsType": "string (YYYY-MM-DD)",
+          "sqlType": "date not null",
+          "nullable": false,
+          "notes": "No check that end >= start; a backwards trip saves cleanly. Needs check (end_date >= start_date)."
+        },
+        {
+          "name": "type",
+          "tsType": "'domestic' | 'international'",
+          "sqlType": "text not null check (trip_type in ('domestic','international'))",
+          "nullable": false,
+          "notes": "Rendered lowercase verbatim in the row (panes.tsx:525)."
+        },
+        {
+          "name": "estimatedCost",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null default 0",
+          "nullable": false,
+          "notes": "Number(draft.estimatedCost)||0 (panes.tsx:645). Displayed with money() and no symbol."
+        },
+        {
+          "name": "project",
+          "tsType": "string",
+          "sqlType": "uuid references projects (id)",
+          "nullable": true,
+          "notes": "DISPLAY-STRING RELATIONSHIP. Declared as a display name string; the <select> has exactly one option, '- None -' with value '' (panes.tsx:620), so it is always the empty string. There is no projects source anywhere."
+        },
+        {
+          "name": "budgetHead",
+          "tsType": "string",
+          "sqlType": "uuid references budget_heads (id)",
+          "nullable": true,
+          "notes": "DISPLAY-STRING RELATIONSHIP, and dead. The control is a permanently disabled <select> with a single '- Select -' placeholder (panes.tsx:625-627) and addTravelRequest is always called with budgetHead: '' (panes.tsx:647)."
+        },
+        {
+          "name": "status",
+          "tsType": "'Active' | 'Closed'",
+          "sqlType": "text not null default 'draft' check (status in ('draft','submitted','approved','rejected','booked','in_progress','settled','cancelled'))",
+          "nullable": false,
+          "notes": "Prototype has only two states and they are not an approval lifecycle \u2014 yet ApprovalInboxPane lists every Active request as 'waiting on your approval' (panes.tsx:684,716-722) and the Dashboard counts them as 'Travel pending'."
+        },
+        {
+          "name": "currency",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "char(3) not null",
+          "nullable": false,
+          "notes": "MISSING COLUMN. estimatedCost is money with no currency, unlike ExpenseReport which has one."
+        },
+        {
+          "name": "requester_user_id / approver_user_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references users (id) / uuid references users (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. Travel notifications settings promise to notify 'the requester and their approver' (settings.tsx:237)."
+        },
+        {
+          "name": "tenant_id / company_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references tenants (id) on delete cascade / uuid references companies (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS."
+        },
+        {
+          "name": "request_number",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "MISSING COLUMN. No human reference."
+        },
+        {
+          "name": "origin / destination",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text / text",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. A trip request with no from/to; the row only shows purpose and dates."
+        },
+        {
+          "name": "advance_amount / advance_disbursed_at",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "numeric(18,4) / timestamptz",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. travelNotificationEvents includes 'Advance disbursed' and 'Actuals due for settlement' (travelExpenseData.ts:105-106), and travel policy sets an advancePercent \u2014 none of which has a record to live on."
+        },
+        {
+          "name": "submitted_at / approved_at / closed_at",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "timestamptz x3",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. closeTravelRequest flips the status with no timestamp and no actor (workspace.tsx:1478-1491)."
+        },
+        {
+          "name": "version / created_at / updated_at / archived_at",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "integer not null default 1 / timestamptz not null default now() x2 / timestamptz",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. TravelRequest is the one T&E type with no createdAt at all, so trips cannot be date-filtered or ordered by age."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "projects",
+          "via": "project (display string, always '')",
+          "gap": "Stored as a name string, and no projects table or data source exists in the repo."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "budget_heads",
+          "via": "budgetHead (display string, always '')",
+          "gap": "Stored as a name string; the control is permanently disabled so the value can never be anything but ''."
+        },
+        {
+          "kind": "has-many",
+          "target": "travel_segments",
+          "via": "travel_request_id",
+          "gap": "travel_segments does not exist. segmentModes (travelExpenseData.ts:94-99) defines flight/train/bus/hotel field sets, and TeSettings has a segmentFields key, but nothing reads or writes either and the request dialog has no segment editor."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "users",
+          "via": "requester_user_id",
+          "gap": "Not modelled."
+        },
+        {
+          "kind": "has-many",
+          "target": "expense_reports",
+          "via": "travel_request_id",
+          "gap": "Not modelled; actuals cannot be settled against a trip."
+        }
+      ]
+    },
+    {
+      "name": "CardTransaction",
+      "sourceType": "CardTransaction",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:502-508",
+      "purpose": "One row parsed out of an uploaded corporate-card statement file, optionally matched to an expense report by exact amount.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "Matched (matchedTo non-null)",
+        "Unmatched (matchedTo null)"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false,
+          "notes": "Browser-minted at import (workspace.tsx:1500)."
+        },
+        {
+          "name": "date",
+          "tsType": "string",
+          "sqlType": "date not null",
+          "nullable": false,
+          "notes": "Column 0 of the CSV, .trim()'d only (panes.tsx:305). No format parsing or validation \u2014 '13/02/2026', 'Feb 13' and '' all import identically and are then string-compared in the dedupe key."
+        },
+        {
+          "name": "merchant",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Column 1, with a naive strip of leading/trailing double quotes (panes.tsx:306). Because the parser is line.split(','), any merchant containing a comma shifts every later column."
+        },
+        {
+          "name": "amount",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "Number(cells[2])||0 (panes.tsx:307) \u2014 an unparseable amount silently becomes 0.00 and is then auto-matchable against any 0.00 report. No sign convention for refunds/credits."
+        },
+        {
+          "name": "matchedTo",
+          "tsType": "string | null",
+          "sqlType": "uuid references expense_items (id) on delete set null",
+          "nullable": true,
+          "notes": "Holds an expense_report uuid today (workspace.tsx:1522). Should point at a line item, not a whole report \u2014 the blurb says charges are matched to 'expense lines' (panes.tsx:326)."
+        },
+        {
+          "name": "currency",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "char(3) not null",
+          "nullable": false,
+          "notes": "MISSING COLUMN. The importer reads only 3 columns; a foreign-currency charge is matched against a report in a different currency purely on the number."
+        },
+        {
+          "name": "tenant_id / company_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references tenants (id) on delete cascade / uuid references companies (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS."
+        },
+        {
+          "name": "card_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references corporate_cards (id)",
+          "nullable": false,
+          "notes": "MISSING COLUMN, and corporate_cards does not exist. The tab is named 'Cards' but there is no card, no last-4, no cardholder and no issuing account anywhere \u2014 every imported row belongs to one anonymous pile."
+        },
+        {
+          "name": "statement_import_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references card_statement_imports (id)",
+          "nullable": false,
+          "notes": "MISSING COLUMN. Nothing records which file a row came from, when, by whom, how many rows were skipped as duplicates, or lets an import be reversed."
+        },
+        {
+          "name": "external_txn_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "MISSING COLUMN. Dedupe is a synthetic 'date|merchant|amount' string key (workspace.tsx:1497) \u2014 two genuine identical charges on the same day are treated as one and silently dropped."
+        },
+        {
+          "name": "posted_at / description / mcc",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "timestamptz / text / text",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. Only the transaction date is captured; no posting date, no raw descriptor, no merchant category code to drive auto-categorisation."
+        },
+        {
+          "name": "match_state / matched_at / matched_by",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text check (match_state in ('unmatched','auto_matched','confirmed','rejected','personal')) / timestamptz / uuid references users (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. Matched-ness is inferred from matchedTo being non-null, so a machine guess and a human confirmation are indistinguishable and an auto-match cannot be reviewed."
+        },
+        {
+          "name": "created_at",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "MISSING COLUMN. Rows carry no import timestamp."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "expense_reports",
+          "via": "matchedTo",
+          "gap": "Untyped string, no FK, no uniqueness \u2014 autoMatchCards can point many transactions at the same report (workspace.tsx:1519 uses .find, not a claim), so N charges can all 'match' one report."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "corporate_cards",
+          "via": "card_id",
+          "gap": "Does not exist; no card, cardholder or account is modelled."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "card_statement_imports",
+          "via": "statement_import_id",
+          "gap": "Does not exist; imports are not batched or reversible."
+        }
+      ]
+    },
+    {
+      "name": "ReimbursementRun",
+      "sourceType": "ReimbursementRun",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:510-516",
+      "purpose": "A batch of approved reports moved through 4 stages by clicking the row. Reaching the last stage is what actually flips the member reports to Reimbursed.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "Request Processed",
+        "Moved to Accounts",
+        "Batch Generation",
+        "Disbursed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false,
+          "notes": "Browser-minted (workspace.tsx:1536)."
+        },
+        {
+          "name": "stage",
+          "tsType": "string",
+          "sqlType": "text not null default 'request_processed' check (stage in ('request_processed','moved_to_accounts','batch_generation','disbursed','failed','cancelled'))",
+          "nullable": false,
+          "notes": "Typed as bare `string`, not a union, even though runStages exists as a const in travelExpenseData.ts:121 \u2014 advanceReimbursementRun re-declares the same four literals inline (workspace.tsx:1557), so the vocabulary is duplicated in two places and neither is type-enforced. No failure or cancellation stage."
+        },
+        {
+          "name": "reportIds",
+          "tsType": "string[]",
+          "sqlType": "\u2014 replace with reimbursement_run_items (run_id uuid, expense_report_id uuid, amount numeric(18,4), currency char(3), primary key (run_id, expense_report_id))",
+          "nullable": false,
+          "notes": "Denormalised uuid array. Membership cannot be queried from the report side, and nothing prevents one report joining two runs."
+        },
+        {
+          "name": "total",
+          "tsType": "number",
+          "sqlType": "numeric(18,4) not null",
+          "nullable": false,
+          "notes": "Summed at create time across whatever currencies the selected reports carry (workspace.tsx:1532-1534) with no conversion \u2014 a USD report and an INR report add as bare numbers."
+        },
+        {
+          "name": "createdAt",
+          "tsType": "string (ISO)",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "Client clock. Never displayed, and the Reports tab's 'reimbursement runs in range' summary ignores it (panes.tsx:751)."
+        },
+        {
+          "name": "currency",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "char(3) not null",
+          "nullable": false,
+          "notes": "MISSING COLUMN. A payment batch with a total and no currency."
+        },
+        {
+          "name": "tenant_id / company_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid not null references tenants (id) on delete cascade / uuid references companies (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS."
+        },
+        {
+          "name": "run_number",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "MISSING COLUMN. Runs render as '{n} reports' with no identifier at all (panes.tsx:458-460)."
+        },
+        {
+          "name": "payment_method / bank_account_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "text / uuid references bank_accounts (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. The blurb calls Batch Generation 'the bank file for disbursement' (panes.tsx:405) but nothing records how or from where money moves."
+        },
+        {
+          "name": "posted_at / gl_journal_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "timestamptz / uuid references gl_journals (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. 'Moved to Accounts (books the ledger)' (panes.tsx:404) books nothing; the glAccounts setting is never read by any code path."
+        },
+        {
+          "name": "disbursed_at / created_by / approved_by",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "timestamptz / uuid references users (id) x2",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. Stage transitions leave no timestamp and no actor; only a generic audit row with the run id."
+        },
+        {
+          "name": "export_file_id",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "uuid references files (id)",
+          "nullable": true,
+          "notes": "MISSING COLUMN. migrations/0004_platform.sql:12 already has a files table; no export artefact is ever produced to store in it."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "has-many",
+          "target": "expense_reports",
+          "via": "reportIds uuid array",
+          "gap": "Should be a join table. As an array there is no FK, no referential integrity, and no per-report paid amount \u2014 a partial payment cannot be expressed."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "users",
+          "via": "created_by",
+          "gap": "Not modelled."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "gl_journals",
+          "via": "gl_journal_id",
+          "gap": "Not modelled; no ledger exists in the repo."
+        }
+      ]
+    },
+    {
+      "name": "TeSettings",
+      "sourceType": "TeSettings",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:462-475 (defaults :763-779)",
+      "purpose": "The whole Settings tab's state, saved as one object into the workspace localStorage blob by updateTeSettings (workspace.tsx:1581-1592). Belongs in the existing app_settings table (app_code 'TE', one row per section) with app_settings_changes for history.",
+      "tenantScoped": false,
+      "fields": [
+        {
+          "name": "enforcement",
+          "tsType": "'warn' | 'block'",
+          "sqlType": "text not null default 'warn' check (enforcement in ('warn','block'))",
+          "nullable": false,
+          "notes": "Saved and never read. No submission-time policy evaluation exists anywhere in the app."
+        },
+        {
+          "name": "receiptRequiredAbove",
+          "tsType": "string",
+          "sqlType": "numeric(18,4)",
+          "nullable": true,
+          "notes": "A money threshold stored as a free-text string with placeholder 'disabled' and inputMode=decimal only \u2014 no numeric validation (settings.tsx:62-68). Empty string means disabled. Also has no currency."
+        },
+        {
+          "name": "flagDuplicates",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false,
+          "notes": "Label promises 'same employee, amount, date and category' (settings.tsx:79) \u2014 none of employee, date or category exists on an expense report."
+        },
+        {
+          "name": "categoryLimits",
+          "tsType": "Record<string, string>",
+          "sqlType": "\u2014 replace with expense_policy_limits (policy_id uuid, category_id uuid, limit_amount numeric(18,4), currency char(3), period text)",
+          "nullable": true,
+          "notes": "Keyed by the lowercase display labels in policyCategories (travelExpenseData.ts:78-91: 'general','travel','per diem','per km','hotel','meals','lodging','transport','office supplies','client entertainment','training','other'). Values are free-text strings. Note these 12 labels DO NOT match the 8 Title-Case labels in expenseCategories used by the quick-expense select and the GL pane \u2014 three category vocabularies that never align."
+        },
+        {
+          "name": "receiptEmail.enabled",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "Toggles nothing; no inbound mail path exists."
+        },
+        {
+          "name": "receiptEmail.address",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Free text, no email validation, default 'expenses@apragya-tenant.mail' (workspace.tsx:768). Should be a generated, tenant-unique, verified address \u2014 not a user-typed string."
+        },
+        {
+          "name": "travel.advancePercent",
+          "tsType": "number",
+          "sqlType": "numeric(5,2) not null default 80 check (advance_percent between 0 and 100)",
+          "nullable": false,
+          "notes": "min/max attrs on the input only (settings.tsx:166-167); Number('') yields NaN if cleared. Never read by the travel flow."
+        },
+        {
+          "name": "travel.approvalAbove",
+          "tsType": "string",
+          "sqlType": "numeric(18,4)",
+          "nullable": true,
+          "notes": "Money threshold as a free-text string, placeholder 'always'. No currency. Never read."
+        },
+        {
+          "name": "travel.perDiem",
+          "tsType": "string",
+          "sqlType": "numeric(18,4)",
+          "nullable": true,
+          "notes": "A single flat per-diem string with no currency, no destination band, no domestic/international split and no meal breakdown. Never read. See openQuestions."
+        },
+        {
+          "name": "travelNotifications",
+          "tsType": "Record<string, boolean>",
+          "sqlType": "\u2014 replace with notification_preferences rows (migrations/0004_platform.sql:87 already exists)",
+          "nullable": false,
+          "notes": "Keys are the 5 ids in travelNotificationEvents (submitted/approved/rejected/advance/settle). Defaults workspace.tsx:770. No travel action calls notify() \u2014 addTravelRequest and closeTravelRequest write audit only."
+        },
+        {
+          "name": "approvalLevels[].id",
+          "tsType": "string",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false,
+          "notes": "crypto.randomUUID() in the browser for new levels (settings.tsx:316); seeded rows use the literals 'l1'/'l2' (workspace.tsx:772-773), so the id space is mixed."
+        },
+        {
+          "name": "approvalLevels[].label",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free text, defaults 'New level'. The approver is a LABEL, not a user or role reference \u2014 'Reporting manager' is a sentence, not a resolvable approver."
+        },
+        {
+          "name": "approvalLevels[].threshold",
+          "tsType": "string",
+          "sqlType": "numeric(18,4)",
+          "nullable": true,
+          "notes": "Money as free-text string, placeholder 'always', no currency. Order is the array index and there is no explicit sequence column, so reordering is impossible in the UI and fragile in storage."
+        },
+        {
+          "name": "slaDays",
+          "tsType": "number",
+          "sqlType": "integer not null default 21",
+          "nullable": false,
+          "notes": "The one setting anything reads \u2014 only to print 'SLA {n}d' in the dashboard header (panes.tsx:98). Default also duplicated as the unused constant reimbursementSlaDays in travelExpenseData.ts:126."
+        },
+        {
+          "name": "glAccounts",
+          "tsType": "Record<string, string>",
+          "sqlType": "\u2014 replace with expense_category_gl_map (tenant_id uuid, category_id uuid, gl_account_id uuid references gl_accounts (id), company_id uuid)",
+          "nullable": true,
+          "notes": "Keyed by the 8 Title-Case expenseCategories display labels; the value is a free-typed account code string with no validation against any chart of accounts (settings.tsx:370-380). Never read by any code."
+        },
+        {
+          "name": "customFields[].id",
+          "tsType": "string",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false,
+          "notes": "crypto.randomUUID() (settings.tsx:465)."
+        },
+        {
+          "name": "customFields[].label",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free text, default 'New field'. No slug/key, so renaming a label loses any values that were keyed by it."
+        },
+        {
+          "name": "customFields[].type",
+          "tsType": "string",
+          "sqlType": "text not null check (field_type in ('text','number','date','select'))",
+          "nullable": false,
+          "notes": "Typed as bare string; the 4 options are an inline array literal (settings.tsx:428). 'select' has no options editor, so a select field can never have choices."
+        },
+        {
+          "name": "customFields[].required",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default false",
+          "nullable": false,
+          "notes": "Enforced nowhere \u2014 the field is never rendered on any form."
+        },
+        {
+          "name": "segmentFields",
+          "tsType": "Record<string, string[]>",
+          "sqlType": "\u2014 replace with travel_segment_field_defs (mode text, field_key text, label text, data_type text, required boolean, sort_order integer)",
+          "nullable": true,
+          "notes": "DEAD KEY. Declared in the type, defaulted to {} (workspace.tsx:778), and never read or written by anything. The Segment-fields pane renders the hardcoded segmentModes constant instead and says outright that the live editor was not transcribed (settings.tsx:206-209)."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "tenants",
+          "via": "tenant_id",
+          "gap": "Settings are global to the browser blob \u2014 not per tenant, not per company, no version, no updated_by, no history rows. app_settings/app_settings_changes in migrations/0004 already model all of that."
+        },
+        {
+          "kind": "references",
+          "target": "gl_accounts",
+          "via": "glAccounts values (free-text codes)",
+          "gap": "Display/free-text strings standing in for a chart-of-accounts FK."
+        },
+        {
+          "kind": "references",
+          "target": "users or roles",
+          "via": "approvalLevels[].label",
+          "gap": "Approvers are display strings ('Reporting manager', 'Finance'), not role or user references."
+        },
+        {
+          "kind": "references",
+          "target": "expense_categories",
+          "via": "categoryLimits keys and glAccounts keys",
+          "gap": "Both maps are keyed by display labels, from two DIFFERENT and non-overlapping label lists (12 lowercase vs 8 Title-Case). A real expense_categories table with a stable id must replace both."
+        }
+      ]
+    },
+    {
+      "name": "AuditEvent (shared, consumed by Change History)",
+      "sourceType": "AuditEvent",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:161-186",
+      "purpose": "Tenant audit row. The T&E Change History pane filters this array by action-string prefix. migrations/0001_identity_and_tenancy.sql:146 already has an audit_events table.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "Success",
+        "Failed"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false,
+          "notes": "Browser-minted."
+        },
+        {
+          "name": "at",
+          "tsType": "string (ISO)",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false,
+          "notes": "Client clock \u2014 an audit trail timestamped by the machine being audited."
+        },
+        {
+          "name": "user",
+          "tsType": "'owner' | ''",
+          "sqlType": "uuid references users (id)",
+          "nullable": true,
+          "notes": "A two-value literal standing in for an actor id (comment at :158-160 admits it renders as the signed-in admin's email)."
+        },
+        {
+          "name": "role",
+          "tsType": "string",
+          "sqlType": "text",
+          "nullable": true,
+          "notes": "Free string, defaults 'Org_admin'."
+        },
+        {
+          "name": "action",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Dotted free-text. T&E writes exactly 6: expense.report_created, expense.report_advanced, travel.request_created, travel.request_closed, card.statement_imported, reimbursement.run_created, reimbursement.run_advanced, travel_expense.settings_updated. ChangeHistoryPane matches on 5 hardcoded prefixes (settings.tsx:549-553), so a new prefix silently disappears from the pane."
+        },
+        {
+          "name": "status",
+          "tsType": "'Success' | 'Failed'",
+          "sqlType": "text not null default 'success'",
+          "nullable": false,
+          "notes": "Always 'Success' in every T&E path."
+        },
+        {
+          "name": "resource",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free string: 'expense_report' | 'travel_request' | 'card' | 'reimbursement' | 'app'."
+        },
+        {
+          "name": "resourceId",
+          "tsType": "string",
+          "sqlType": "uuid",
+          "nullable": true,
+          "notes": "Usually an entity uuid, EXCEPT card.statement_imported which writes the sentence `${fresh.length} rows` into the id column (workspace.tsx:1505). A uuid column will reject that value outright."
+        },
+        {
+          "name": "ip",
+          "tsType": "string",
+          "sqlType": "inet",
+          "nullable": true,
+          "notes": "Always '' \u2014 the browser cannot know it."
+        },
+        {
+          "name": "before / after / summary",
+          "tsType": "n/a \u2014 ABSENT",
+          "sqlType": "jsonb / jsonb / text",
+          "nullable": true,
+          "notes": "MISSING COLUMNS. The Settings header promises every change 'can be undone' (settings.tsx:630) and the pane shows only an action slug + relative time. app_settings_changes (migrations/0004:210) already models before/after \u2014 nothing in T&E writes it."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "users",
+          "via": "user ('owner' literal)",
+          "gap": "Actor is a literal string, not a user id."
+        },
+        {
+          "kind": "polymorphic",
+          "target": "expense_reports / travel_requests / reimbursement_runs / card imports",
+          "via": "resource + resourceId",
+          "gap": "Untyped polymorphic pair with no FK; one writer puts a non-uuid sentence in resourceId."
+        },
+        {
+          "kind": "note",
+          "target": "audit array growth",
+          "gap": "The generic logAudit helper caps the array at 500 (workspace.tsx:1128) but every T&E mutation prepends directly without the cap, so the T&E app grows the localStorage audit array without bound."
+        }
+      ]
+    },
+    {
+      "name": "Schedule (shared, consumed by the Schedules pane)",
+      "sourceType": "Schedule",
+      "sourceFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/lib/workspace.tsx:609-617",
+      "purpose": "Workspace-wide timed job. The T&E Schedules pane shows a filtered read-only view and links out; it cannot create, edit or run anything.",
+      "tenantScoped": false,
+      "statusVocabulary": [
+        "Agent",
+        "Pipeline",
+        "Bot",
+        "Canvas Workflow"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "string",
+          "sqlType": "uuid primary key",
+          "nullable": false,
+          "notes": "Existing schedules table: migrations/0002_jobs_and_schedules.sql:9."
+        },
+        {
+          "name": "name",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Displayed in the pane."
+        },
+        {
+          "name": "kind",
+          "tsType": "ScheduleKind",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Not shown in the T&E pane."
+        },
+        {
+          "name": "target",
+          "tsType": "string",
+          "sqlType": "uuid references apps/agents + app_code text",
+          "nullable": false,
+          "notes": "DISPLAY-STRING RELATIONSHIP. The pane decides a job belongs to this app with job.target.includes('Travel') (settings.tsx:509) \u2014 a substring match on a human-typed label. Renaming a job's target, or any unrelated job whose target mentions 'Travel', changes what this app shows."
+        },
+        {
+          "name": "cadence",
+          "tsType": "string",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "Free-text cadence displayed verbatim; not a cron expression type."
+        },
+        {
+          "name": "nextRun",
+          "tsType": "string",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "Not displayed in the T&E pane."
+        },
+        {
+          "name": "active",
+          "tsType": "boolean",
+          "sqlType": "boolean not null default true",
+          "nullable": false,
+          "notes": "Not displayed and not toggleable from this pane \u2014 inactive jobs look identical to active ones here."
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "apps / app_installations",
+          "via": "target (display string)",
+          "gap": "Substring matching on a display name instead of an app_code FK."
+        }
+      ]
+    },
+    {
+      "name": "ExpenseItem \u2014 ABSENT, required",
+      "sourceType": "none (does not exist)",
+      "sourceFile": "implied by /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:176,326 and settings.tsx:82",
+      "purpose": "The expense line. Every piece of copy in the app assumes it exists \u2014 'group several expenses into one report', per-LINE spend limits, card charges matched to 'expense lines', GL account per category \u2014 and no such record type exists anywhere in the codebase. Without it an expense report's total can never change from its create-time value.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "tenant_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references tenants (id) on delete cascade",
+          "nullable": false
+        },
+        {
+          "name": "expense_report_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references expense_reports (id) on delete cascade",
+          "nullable": false
+        },
+        {
+          "name": "category_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references expense_categories (id)",
+          "nullable": false,
+          "notes": "Replaces all three of today's display-label category vocabularies."
+        },
+        {
+          "name": "spent_on",
+          "tsType": "n/a",
+          "sqlType": "date not null",
+          "nullable": false,
+          "notes": "Needed by the promised duplicate detection (same employee, amount, date, category)."
+        },
+        {
+          "name": "merchant",
+          "tsType": "n/a",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "description",
+          "tsType": "n/a",
+          "sqlType": "text",
+          "nullable": true
+        },
+        {
+          "name": "amount / currency / base_amount / fx_rate",
+          "tsType": "n/a",
+          "sqlType": "numeric(18,4) not null / char(3) not null / numeric(18,4) not null / numeric(18,8)",
+          "nullable": false,
+          "notes": "Per-line currency is what makes the tenant-billing-currency claim on the Reports tab true rather than false."
+        },
+        {
+          "name": "quantity / unit / distance_km",
+          "tsType": "n/a",
+          "sqlType": "numeric(12,3) / text / numeric(12,3)",
+          "nullable": true,
+          "notes": "policyCategories includes 'per km' and 'per diem' lines, which need a quantity, not just an amount. The RATE itself is an open question \u2014 see openQuestions."
+        },
+        {
+          "name": "is_personal / card_transaction_id",
+          "tsType": "n/a",
+          "sqlType": "boolean not null default false / uuid references card_transactions (id) on delete set null",
+          "nullable": true,
+          "notes": "The reverse side of the card match, so a card-paid line is excluded from reimbursement."
+        },
+        {
+          "name": "policy_violations",
+          "tsType": "n/a",
+          "sqlType": "jsonb not null default '[]'::jsonb",
+          "nullable": false
+        },
+        {
+          "name": "gl_account_id / project_id / cost_center_id",
+          "tsType": "n/a",
+          "sqlType": "uuid references gl_accounts (id) / uuid references projects (id) / uuid references cost_centers (id)",
+          "nullable": true
+        },
+        {
+          "name": "custom_field_values",
+          "tsType": "n/a",
+          "sqlType": "jsonb not null default '{}'::jsonb",
+          "nullable": false
+        },
+        {
+          "name": "created_at / updated_at / created_by / archived_at",
+          "tsType": "n/a",
+          "sqlType": "timestamptz x2 not null default now() / uuid references users (id) / timestamptz",
+          "nullable": true
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "expense_reports",
+          "via": "expense_report_id",
+          "gap": "Entire entity absent today."
+        },
+        {
+          "kind": "has-many",
+          "target": "receipts",
+          "via": "expense_item_id",
+          "gap": "Entire entity absent today."
+        }
+      ]
+    },
+    {
+      "name": "Receipt \u2014 ABSENT, required",
+      "sourceType": "none (does not exist)",
+      "sourceFile": "implied by /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/TravelExpense.tsx:50 and settings.tsx:107-146",
+      "purpose": "The app's own one-line description promises 'receipt capture' and a whole settings pane configures receipt email-in, yet grep for 'receipt' across workspace.tsx returns only two settings keys. There is no upload control, no attachment, no OCR result and no stored file on this surface.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "tenant_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references tenants (id) on delete cascade",
+          "nullable": false
+        },
+        {
+          "name": "expense_item_id",
+          "tsType": "n/a",
+          "sqlType": "uuid references expense_items (id) on delete cascade",
+          "nullable": true,
+          "notes": "Nullable so an emailed-in receipt can exist before it is attached to a line."
+        },
+        {
+          "name": "file_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references files (id)",
+          "nullable": false,
+          "notes": "migrations/0004_platform.sql:12 already provides files + file_grants."
+        },
+        {
+          "name": "source",
+          "tsType": "n/a",
+          "sqlType": "text not null check (source in ('upload','email','mobile','card_feed'))",
+          "nullable": false
+        },
+        {
+          "name": "inbound_message_id / from_address / received_at",
+          "tsType": "n/a",
+          "sqlType": "text / text / timestamptz",
+          "nullable": true,
+          "notes": "Needed to make email-in idempotent and to resolve 'the sender's employee record' the copy promises."
+        },
+        {
+          "name": "ocr_status / ocr_merchant / ocr_amount / ocr_currency / ocr_date / ocr_raw",
+          "tsType": "n/a",
+          "sqlType": "text check (ocr_status in ('pending','ok','failed','skipped')) / text / numeric(18,4) / char(3) / date / jsonb",
+          "nullable": true,
+          "notes": "agentCatalog.ts:58 ships a 'Receipt OCR Extractor' agent for this app. The OCR PROVIDER is an open question \u2014 do not assume one."
+        },
+        {
+          "name": "created_at / created_by / archived_at",
+          "tsType": "n/a",
+          "sqlType": "timestamptz not null default now() / uuid references users (id) / timestamptz",
+          "nullable": true
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "expense_items",
+          "via": "expense_item_id",
+          "gap": "Entire entity absent today."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "files",
+          "via": "file_id",
+          "gap": "files table exists; nothing in T&E writes to it."
+        }
+      ]
+    },
+    {
+      "name": "ApprovalTask \u2014 ABSENT, required",
+      "sourceType": "none (does not exist)",
+      "sourceFile": "implied by /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:681-730 and settings.tsx:268-326",
+      "purpose": "The Approval Inbox is a read-only list with no buttons, and approvalLevels are configured but never consulted. There is no record of who must approve what, who did, when, or why it was rejected \u2014 advanceExpenseReport simply moves the status one place along an array (workspace.tsx:1438-1460).",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "pending",
+        "approved",
+        "rejected",
+        "returned",
+        "delegated",
+        "skipped"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "tenant_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references tenants (id) on delete cascade",
+          "nullable": false
+        },
+        {
+          "name": "subject_type / subject_id",
+          "tsType": "n/a",
+          "sqlType": "text not null check (subject_type in ('expense_report','travel_request','agency_invoice')) / uuid not null",
+          "nullable": false
+        },
+        {
+          "name": "level_id / level_sequence",
+          "tsType": "n/a",
+          "sqlType": "uuid references approval_levels (id) / integer not null",
+          "nullable": false,
+          "notes": "Makes 'reports climb these levels in order' real."
+        },
+        {
+          "name": "assignee_user_id / decided_by",
+          "tsType": "n/a",
+          "sqlType": "uuid references users (id) x2",
+          "nullable": true
+        },
+        {
+          "name": "state / decided_at / comment",
+          "tsType": "n/a",
+          "sqlType": "text not null default 'pending' / timestamptz / text",
+          "nullable": true,
+          "notes": "A rejection reason has nowhere to live today; there is no reject path at all."
+        },
+        {
+          "name": "due_at",
+          "tsType": "n/a",
+          "sqlType": "timestamptz",
+          "nullable": true,
+          "notes": "Drives the 'Approval SLA & Queue' report view, which is currently a one-line count."
+        },
+        {
+          "name": "created_at",
+          "tsType": "n/a",
+          "sqlType": "timestamptz not null default now()",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "polymorphic",
+          "target": "expense_reports / travel_requests",
+          "via": "subject_type + subject_id",
+          "gap": "Entire entity absent today."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "approval_levels",
+          "via": "level_id",
+          "gap": "Levels exist only as label+threshold strings in a settings blob."
+        }
+      ]
+    },
+    {
+      "name": "AgencyInvoice \u2014 ABSENT, required",
+      "sourceType": "none (does not exist)",
+      "sourceFile": "implied by /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:662-679",
+      "purpose": "The Agency review tab is a hardcoded empty state with no data source and no controls \u2014 nothing can ever appear in it. src/lib/portalData.ts:23-24 does define partner-portal tabs 'Travel requests' and 'Travel invoices', so the intended producer exists on the portal side with no receiving record here.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "submitted",
+        "under_review",
+        "accepted",
+        "rejected",
+        "paid"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "tenant_id / company_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references tenants (id) on delete cascade / uuid references companies (id)",
+          "nullable": true
+        },
+        {
+          "name": "agency_party_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references parties (id)",
+          "nullable": false,
+          "notes": "migrations/0003_crm.sql already gives a parties table for organisations \u2014 reuse it rather than a new vendor name string."
+        },
+        {
+          "name": "travel_request_id",
+          "tsType": "n/a",
+          "sqlType": "uuid references travel_requests (id)",
+          "nullable": true,
+          "notes": "agentCatalog.ts:61 ships an 'Agency Invoice Reconciler' that cross-checks an invoice against the trip's booked segments \u2014 which requires both this FK and travel_segments."
+        },
+        {
+          "name": "invoice_number / invoice_date / due_date",
+          "tsType": "n/a",
+          "sqlType": "text not null / date not null / date",
+          "nullable": true
+        },
+        {
+          "name": "amount / tax_amount / currency",
+          "tsType": "n/a",
+          "sqlType": "numeric(18,4) not null / numeric(18,4) / char(3) not null",
+          "nullable": true,
+          "notes": "Tax treatment is an open question \u2014 do not invent it."
+        },
+        {
+          "name": "status / reviewed_by / reviewed_at / rejection_reason",
+          "tsType": "n/a",
+          "sqlType": "text not null default 'submitted' / uuid references users (id) / timestamptz / text",
+          "nullable": true,
+          "notes": "The copy says rows 'stay here until accepted or rejected' (panes.tsx:668-669)."
+        },
+        {
+          "name": "file_id",
+          "tsType": "n/a",
+          "sqlType": "uuid references files (id)",
+          "nullable": true
+        },
+        {
+          "name": "created_at / updated_at",
+          "tsType": "n/a",
+          "sqlType": "timestamptz not null default now() x2",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "parties",
+          "via": "agency_party_id",
+          "gap": "Entire entity absent today."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "travel_requests",
+          "via": "travel_request_id",
+          "gap": "Entire entity absent today."
+        }
+      ]
+    },
+    {
+      "name": "TravelSegment \u2014 ABSENT, required",
+      "sourceType": "none (does not exist)",
+      "sourceFile": "implied by /Users/sushank/.codex/worktrees/ac6c/gst/src/lib/travelExpenseData.ts:94-99 and panes.tsx:496",
+      "purpose": "Per-leg detail promised by the Travel pane blurb and described in detail by the read-only Segment-fields settings pane. segmentModes defines four modes and their field labels; TeSettings.segmentFields is declared for the customised version and is dead. No segment record, no segment editor, no storage.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "flight",
+        "train",
+        "bus",
+        "hotel"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key default gen_random_uuid()",
+          "nullable": false
+        },
+        {
+          "name": "tenant_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references tenants (id) on delete cascade",
+          "nullable": false
+        },
+        {
+          "name": "travel_request_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references travel_requests (id) on delete cascade",
+          "nullable": false
+        },
+        {
+          "name": "sequence",
+          "tsType": "n/a",
+          "sqlType": "integer not null",
+          "nullable": false
+        },
+        {
+          "name": "mode",
+          "tsType": "n/a",
+          "sqlType": "text not null check (mode in ('flight','train','bus','hotel'))",
+          "nullable": false
+        },
+        {
+          "name": "depart_at / arrive_at / origin / destination",
+          "tsType": "n/a",
+          "sqlType": "timestamptz x2 / text x2",
+          "nullable": true
+        },
+        {
+          "name": "details",
+          "tsType": "n/a",
+          "sqlType": "jsonb not null default '{}'::jsonb",
+          "nullable": false,
+          "notes": "Holds the mode-specific fields from segmentModes: flight = Carrier/Flight number/Cabin/Baggage; train = Operator/Train number/Class/Berth; bus = Operator/Service/Seat; hotel = Property/Room type/Nights/Meal plan. Shape governed by travel_segment_field_defs."
+        },
+        {
+          "name": "estimated_cost / actual_cost / currency",
+          "tsType": "n/a",
+          "sqlType": "numeric(18,4) x2 / char(3)",
+          "nullable": true
+        },
+        {
+          "name": "booking_reference / booked_at / booked_by_agency_id",
+          "tsType": "n/a",
+          "sqlType": "text / timestamptz / uuid references parties (id)",
+          "nullable": true
+        },
+        {
+          "name": "created_at / updated_at",
+          "tsType": "n/a",
+          "sqlType": "timestamptz not null default now() x2",
+          "nullable": false
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "travel_requests",
+          "via": "travel_request_id",
+          "gap": "Entire entity absent today."
+        }
+      ]
+    },
+    {
+      "name": "CardStatementImport / CorporateCard \u2014 ABSENT, required",
+      "sourceType": "none (does not exist)",
+      "sourceFile": "implied by /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:289-348",
+      "purpose": "The tab is called 'Cards' and accepts statement files, but no card, cardholder, issuing account or import batch is recorded. An import cannot be identified, attributed, reversed, or reported on, and the duplicate-skip count is computed inside the reducer and thrown away.",
+      "tenantScoped": true,
+      "fields": [
+        {
+          "name": "corporate_cards.id / tenant_id / company_id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key / uuid not null references tenants (id) on delete cascade / uuid references companies (id)",
+          "nullable": true
+        },
+        {
+          "name": "corporate_cards.holder_user_id",
+          "tsType": "n/a",
+          "sqlType": "uuid references users (id)",
+          "nullable": true,
+          "notes": "Without this, a charge cannot be routed to the person who must expense it."
+        },
+        {
+          "name": "corporate_cards.last_four / network / issuer / currency / status",
+          "tsType": "n/a",
+          "sqlType": "char(4) / text / text / char(3) / text check (status in ('active','blocked','closed'))",
+          "nullable": true,
+          "notes": "NEVER store a full PAN. The card network/issuer feed contract is an open question."
+        },
+        {
+          "name": "card_statement_imports.id / tenant_id / card_id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key / uuid not null references tenants (id) on delete cascade / uuid references corporate_cards (id)",
+          "nullable": true
+        },
+        {
+          "name": "card_statement_imports.file_id / format / period_start / period_end",
+          "tsType": "n/a",
+          "sqlType": "uuid references files (id) / text check (format in ('csv','ofx','qfx')) / date x2",
+          "nullable": true,
+          "notes": "The file input advertises .csv,.ofx,.qfx (panes.tsx:331) but the handler parses every one of them as comma-separated text \u2014 an OFX/QFX upload imports garbage rows with no error."
+        },
+        {
+          "name": "card_statement_imports.rows_parsed / rows_inserted / rows_skipped_duplicate / rows_rejected",
+          "tsType": "n/a",
+          "sqlType": "integer not null default 0 x4",
+          "nullable": false,
+          "notes": "The UI message 'Imported N rows; duplicates were skipped' reports rows PARSED (panes.tsx:311), while the dedupe happens later inside importCardTransactions (workspace.tsx:1497-1500) and its skip count is never surfaced. These four counters make that message true."
+        },
+        {
+          "name": "card_statement_imports.imported_by / imported_at / reversed_at",
+          "tsType": "n/a",
+          "sqlType": "uuid references users (id) / timestamptz not null default now() / timestamptz",
+          "nullable": true
+        }
+      ],
+      "relations": [
+        {
+          "kind": "has-many",
+          "target": "card_transactions",
+          "via": "statement_import_id",
+          "gap": "Entire entity absent today; imports are unattributed and irreversible."
+        },
+        {
+          "kind": "belongs-to",
+          "target": "users",
+          "via": "holder_user_id",
+          "gap": "Entire entity absent today."
+        }
+      ]
+    },
+    {
+      "name": "GlExport / GlJournal \u2014 ABSENT, required",
+      "sourceType": "none (does not exist)",
+      "sourceFile": "implied by /Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:402-406 and settings.tsx:358-392",
+      "purpose": "GL export is named in the task scope and promised twice in the UI \u2014 'Moved to Accounts (books the ledger)' and 'exporting the CSV is Batch Generation (the bank file for disbursement)'. There is no export control, no Blob download, no ledger posting and no file anywhere in the T&E surface (grep for csv/Blob/download over src/screens/app/travel returns only prose and the file INPUT). src/lib/csv.ts already provides csvCell/recordsCsv/downloadCsv \u2014 this app simply never calls them.",
+      "tenantScoped": true,
+      "statusVocabulary": [
+        "pending",
+        "generated",
+        "posted",
+        "failed",
+        "reversed"
+      ],
+      "fields": [
+        {
+          "name": "id / tenant_id / company_id",
+          "tsType": "n/a",
+          "sqlType": "uuid primary key / uuid not null references tenants (id) on delete cascade / uuid references companies (id)",
+          "nullable": true
+        },
+        {
+          "name": "reimbursement_run_id",
+          "tsType": "n/a",
+          "sqlType": "uuid not null references reimbursement_runs (id)",
+          "nullable": false
+        },
+        {
+          "name": "kind",
+          "tsType": "n/a",
+          "sqlType": "text not null check (kind in ('gl_journal','bank_file'))",
+          "nullable": false,
+          "notes": "The two promises are different artefacts and must not share one column."
+        },
+        {
+          "name": "format",
+          "tsType": "n/a",
+          "sqlType": "text not null",
+          "nullable": false,
+          "notes": "The concrete bank-file format is an open question \u2014 do not assume NACHA/SEPA/NEFT."
+        },
+        {
+          "name": "status / generated_at / posted_at / reversed_at / error",
+          "tsType": "n/a",
+          "sqlType": "text not null default 'pending' / timestamptz x3 / text",
+          "nullable": true
+        },
+        {
+          "name": "file_id / checksum / line_count / total_amount / currency",
+          "tsType": "n/a",
+          "sqlType": "uuid references files (id) / text / integer / numeric(18,4) / char(3)",
+          "nullable": true
+        },
+        {
+          "name": "generated_by",
+          "tsType": "n/a",
+          "sqlType": "uuid references users (id)",
+          "nullable": true
+        }
+      ],
+      "relations": [
+        {
+          "kind": "belongs-to",
+          "target": "reimbursement_runs",
+          "via": "reimbursement_run_id",
+          "gap": "Entire entity absent today; the stage name 'Batch Generation' generates nothing."
+        },
+        {
+          "kind": "references",
+          "target": "gl_accounts",
+          "via": "per-line account mapping",
+          "gap": "glAccounts settings map holds free-typed codes, not FKs, and is read by no code path."
+        }
+      ]
+    }
+  ],
+  "operations": [
+    {
+      "id": "te-dash-01",
+      "entity": "ExpenseReport",
+      "action": "read/aggregate",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 76,
+      "currentBehaviour": "Four stat tiles computed in-render from the localStorage array. 'Approved spend' = sum(Approved)+sum(Reimbursed) but its sub-label reads only `${count('Approved')} reports`, so the number and the caption describe different sets.",
+      "requiredBehaviour": "Server-side aggregate scoped by tenant_id and date range, with the caption derived from the same query as the value.",
+      "validation": "none",
+      "authorization": "none \u2014 no roles anywhere in this app"
+    },
+    {
+      "id": "te-dash-02",
+      "entity": "ExpenseReport",
+      "action": "read/aggregate",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 38,
+      "currentBehaviour": "'Avg turnaround' averages reimbursedAt \u2212 createdAt over reports that have reimbursedAt, then labels it 'submit \u2192 reimbursed'. No submitted_at exists, so the figure is create\u2192reimburse.",
+      "requiredBehaviour": "Average submitted_at \u2192 disbursed_at; label must match the column actually measured.",
+      "validation": "none"
+    },
+    {
+      "id": "te-dash-03",
+      "entity": "ExpenseReport",
+      "action": "read/aggregate",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 67,
+      "currentBehaviour": "'Spend by category' assigns each report a category with expenseCategories[item.title.length % expenseCategories.length] \u2014 the bar chart is generated from the LENGTH OF THE TITLE STRING. Renaming a report moves its spend to a different category.",
+      "requiredBehaviour": "Group expense_items by category_id; drop the title-length hash entirely.",
+      "validation": "none"
+    },
+    {
+      "id": "te-dash-04",
+      "entity": "ExpenseReport",
+      "action": "read",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 136,
+      "currentBehaviour": "'Monthly trend' panel prints `${expenseReports.length} reports this month` over the UNFILTERED array \u2014 every report ever created is counted as this month's.",
+      "requiredBehaviour": "Filter to the current period, or render a real month-over-month series."
+    },
+    {
+      "id": "te-dash-05",
+      "entity": "ReimbursementRun",
+      "action": "read",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 53,
+      "currentBehaviour": "'next payable' is useState(() => new Date(Date.now()+86_400_000)) \u2014 literally tomorrow, every time, regardless of slaDays, runs, or whether anything is payable.",
+      "requiredBehaviour": "Derive from the next scheduled payment batch, or remove the claim.",
+      "validation": "none"
+    },
+    {
+      "id": "te-dash-06",
+      "entity": "ExpenseReport",
+      "action": "read/aggregate",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 101,
+      "currentBehaviour": "Four pipeline cards count and sum by status, adding amounts across mixed currencies as bare numbers.",
+      "requiredBehaviour": "Convert to the tenant base currency before summing, or group per currency."
+    },
+    {
+      "id": "te-dash-07",
+      "entity": "CardTransaction",
+      "action": "read",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 35,
+      "currentBehaviour": "'Unmatched card txns' counts transactions with matchedTo == null. Read-only tile, no navigation to the Cards tab.",
+      "requiredBehaviour": "Count scoped by tenant and open period; make the tile a link into the filtered Cards list."
+    },
+    {
+      "id": "te-dash-08",
+      "entity": "TravelRequest",
+      "action": "read",
+      "surface": "Dashboard",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 89,
+      "currentBehaviour": "'Travel pending' counts status === 'Active'. Active only means 'not closed'; nothing about the record says it is pending anyone.",
+      "requiredBehaviour": "Count requests in a real submitted/awaiting-approval state."
+    },
+    {
+      "id": "te-rep-01",
+      "entity": "ExpenseReport",
+      "action": "ui-state",
+      "surface": "Expense reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 180,
+      "currentBehaviour": "'Quick expense' button: setState only (setOpen('quick')).",
+      "requiredBehaviour": "unchanged \u2014 dialog trigger"
+    },
+    {
+      "id": "te-rep-02",
+      "entity": "ExpenseReport",
+      "action": "ui-state",
+      "surface": "Expense reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 185,
+      "currentBehaviour": "'+ New report' button: setState only (setOpen('report')).",
+      "requiredBehaviour": "unchanged \u2014 dialog trigger"
+    },
+    {
+      "id": "te-rep-03",
+      "entity": "ExpenseReport",
+      "action": "create",
+      "surface": "Expense reports dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 159,
+      "currentBehaviour": "'Create' writes browser localStorage only via useWorkspace().addExpenseReport \u2014 mints crypto.randomUUID(), stamps the client clock, prepends to the array and writes one audit row 'expense.report_created'. No network call exists.",
+      "requiredBehaviour": "POST /api/v1/te/expense-reports under tenant scope, server-minted uuid, server clock, report_number allocated, claimant = session user.",
+      "validation": "Create is disabled unless title.trim() is non-empty. Nothing else is validated.",
+      "authorization": "none",
+      "sideEffect": "audit row appended to the same localStorage blob, uncapped"
+    },
+    {
+      "id": "te-rep-04",
+      "entity": "ExpenseReport",
+      "action": "create",
+      "surface": "Expense reports dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 254,
+      "currentBehaviour": "BUG: the Quick-expense Category <select> is bound to local state `category` and that state is never read by create() \u2014 the chosen category is silently discarded on save (compare panes.tsx:160-165, which passes only title/currency/status/total).",
+      "requiredBehaviour": "Persist category_id on the created expense_item; until expense_items exist the control should not be shown."
+    },
+    {
+      "id": "te-rep-05",
+      "entity": "ExpenseReport",
+      "action": "create",
+      "surface": "Expense reports dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 164,
+      "currentBehaviour": "total = Number(amount)||0 for quick, hard 0 for a full report. A non-numeric amount becomes 0.00 with no error.",
+      "requiredBehaviour": "Report total must be the maintained sum of its items; reject non-numeric input with a field error."
+    },
+    {
+      "id": "te-rep-06",
+      "entity": "ExpenseReport",
+      "action": "create",
+      "surface": "Expense reports dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 263,
+      "currentBehaviour": "Currency <select> over 6 hardcoded currencies; stored verbatim, never used for conversion.",
+      "requiredBehaviour": "Validate against an ISO-4217 list the tenant enables; store base_amount + fx_rate at submission."
+    },
+    {
+      "id": "te-rep-07",
+      "entity": "ExpenseReport",
+      "action": "transition",
+      "surface": "Expense reports list",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 209,
+      "currentBehaviour": "One button whose label is looked up from a static map (Draft\u2192'Submit', Submitted\u2192'Approve', Approved\u2192'Mark reimbursed') and which calls advanceExpenseReport \u2014 index+1 along ['Draft','Submitted','Approved','Reimbursed'] (workspace.tsx:1438-1460), writing browser localStorage only. The SAME user can click Submit then Approve then Mark reimbursed with no second identity involved.",
+      "requiredBehaviour": "Distinct submit / approve / reject endpoints, each authorising the caller, each recording actor + timestamp + comment, and approval must walk the configured approval levels.",
+      "validation": "none \u2014 no policy check, no receipt check, no threshold check",
+      "authorization": "NONE \u2014 self-approval is one click",
+      "sideEffect": "audit row 'expense.report_advanced' with no from/to status recorded"
+    },
+    {
+      "id": "te-rep-08",
+      "entity": "ExpenseReport",
+      "action": "transition",
+      "surface": "Expense reports list",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 211,
+      "currentBehaviour": "'Mark reimbursed' on an Approved report sets status Reimbursed + reimbursedAt directly, BYPASSING reimbursement runs entirely. A report can therefore be Reimbursed with no run, and can also sit inside a run that is still mid-stage.",
+      "requiredBehaviour": "Reimbursement must only happen through a disbursed run (or an explicit manual-payment record); the shortcut button must be removed or must create the payment record it implies."
+    },
+    {
+      "id": "te-rep-09",
+      "entity": "ExpenseReport",
+      "action": "update",
+      "surface": "Expense reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 191,
+      "currentBehaviour": "ABSENT: no edit control. Once created, a report's title, currency and total can never change.",
+      "requiredBehaviour": "PATCH with optimistic concurrency (version column), allowed only in Draft/returned states."
+    },
+    {
+      "id": "te-rep-10",
+      "entity": "ExpenseReport",
+      "action": "delete",
+      "surface": "Expense reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 191,
+      "currentBehaviour": "ABSENT: no delete or cancel control. A mistyped report is permanent.",
+      "requiredBehaviour": "Soft-cancel/archive (archived_at) restricted to the claimant while in Draft."
+    },
+    {
+      "id": "te-rep-11",
+      "entity": "ExpenseItem",
+      "action": "create",
+      "surface": "Expense reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 176,
+      "currentBehaviour": "ABSENT: the blurb says 'Group several expenses into one report' but there is no add-line control, no detail view and no line list. A 'report' is a title with a permanent 0.00.",
+      "requiredBehaviour": "Report detail route with full line CRUD; report total maintained from lines."
+    },
+    {
+      "id": "te-rep-12",
+      "entity": "Receipt",
+      "action": "create",
+      "surface": "Expense reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 151,
+      "currentBehaviour": "ABSENT: no attach, no upload, no drag-drop, no camera. The app header sells 'receipt capture' (TravelExpense.tsx:50).",
+      "requiredBehaviour": "Upload to files, link a receipts row to the item, run OCR asynchronously."
+    },
+    {
+      "id": "te-rep-13",
+      "entity": "ExpenseReport",
+      "action": "read",
+      "surface": "Expense reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 192,
+      "currentBehaviour": "Full unpaginated list rendered from the array, newest first (prepend order). No search, no filter, no sort, no status tabs, no pagination, no loading or error state.",
+      "requiredBehaviour": "Server pagination + filter by status/claimant/date/project; loading, empty, error and permission states."
+    },
+    {
+      "id": "te-card-01",
+      "entity": "CardTransaction",
+      "action": "import",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 295,
+      "currentBehaviour": "File input \u2192 FileReader.readAsText \u2192 drop the first line as a header \u2192 line.split(',') per row \u2192 keep rows with >= 3 cells \u2192 writes browser localStorage only via importCardTransactions. The repo's own quoted parser (src/lib/csv.ts parseCsv) is NOT used, so any quoted field containing a comma shifts every subsequent column.",
+      "requiredBehaviour": "Server-side upload to files, parse with a real quoted parser, validate per row, report rejected rows back to the user, store a card_statement_imports batch.",
+      "validation": "cells.length >= 3 only. No date parsing, no amount parsing, no currency, no header-name checking, no row limit, no file-size limit.",
+      "sideEffect": "audit row card.statement_imported whose resourceId is the sentence `${fresh.length} rows` (workspace.tsx:1505) instead of an id"
+    },
+    {
+      "id": "te-card-02",
+      "entity": "CardTransaction",
+      "action": "import",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 331,
+      "currentBehaviour": "The file input advertises accept=\".csv,.ofx,.qfx,text/csv\" but the handler has exactly one code path \u2014 comma splitting. An OFX or QFX file imports as nonsense rows with no error.",
+      "requiredBehaviour": "Detect and parse each declared format, or stop advertising the ones not supported."
+    },
+    {
+      "id": "te-card-03",
+      "entity": "CardTransaction",
+      "action": "import",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 311,
+      "currentBehaviour": "Toast text `Imported ${rows.length} rows; duplicates were skipped` reports rows PARSED, not rows stored. Deduplication happens afterwards inside importCardTransactions against a 'date|merchant|amount' string key (workspace.tsx:1497) and the skipped count is discarded \u2014 so importing the same file twice reports the same success message while storing nothing.",
+      "requiredBehaviour": "Return {parsed, inserted, skipped_duplicate, rejected} from the import and render the real numbers."
+    },
+    {
+      "id": "te-card-04",
+      "entity": "CardTransaction",
+      "action": "import",
+      "surface": "Cards",
+      "sourceFile": "src/lib/workspace.tsx",
+      "sourceLine": 1497,
+      "currentBehaviour": "Dedupe key is date|merchant|amount with no external transaction id, so two genuine identical same-day charges (two coffees, same shop, same price) are silently collapsed to one and the second is lost.",
+      "requiredBehaviour": "Dedupe on the provider's transaction id; fall back to a composite key only with an explicit occurrence counter."
+    },
+    {
+      "id": "te-card-05",
+      "entity": "CardTransaction",
+      "action": "match",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 334,
+      "currentBehaviour": "'Auto-match' calls autoMatchCards (workspace.tsx:1514-1527): for each unmatched txn, .find the FIRST expense report whose total is within 0.005 of the amount and store its id in matchedTo. Amount is the only criterion \u2014 no date window, no merchant, no currency, no cardholder, no employee. Many transactions can match the same report. Writes browser localStorage only. Returns a count used for the toast.",
+      "requiredBehaviour": "Match a charge to an expense ITEM using amount + date window + currency + cardholder, produce candidate suggestions with a confidence, and require human confirmation before the match is authoritative.",
+      "validation": "Math.abs(total - amount) < 0.005 on floats"
+    },
+    {
+      "id": "te-card-06",
+      "entity": "CardTransaction",
+      "action": "audit",
+      "surface": "Cards",
+      "sourceFile": "src/lib/workspace.tsx",
+      "sourceLine": 1514,
+      "currentBehaviour": "autoMatchCards is the ONLY T&E mutation that writes no audit event. Matching a charge to a report leaves no trace, while the Change History pane claims to show 'every change made inside this app'.",
+      "requiredBehaviour": "Emit a card.matched / card.unmatched event per transaction with the before and after target."
+    },
+    {
+      "id": "te-card-07",
+      "entity": "CardTransaction",
+      "action": "unmatch",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 365,
+      "currentBehaviour": "ABSENT: nothing in the codebase ever sets matchedTo back to null, and the row renders only a static 'Matched' badge. A wrong auto-match is permanent and the report it points at is never even shown.",
+      "requiredBehaviour": "Unmatch control per row, plus a manual-match picker; both audited."
+    },
+    {
+      "id": "te-card-08",
+      "entity": "CardTransaction",
+      "action": "create-expense",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 326,
+      "currentBehaviour": "ABSENT: the blurb promises unmatched charges are 'turned into a draft expense'. No code path creates an expense from a transaction.",
+      "requiredBehaviour": "'Create expense from charge' action producing a draft expense_item pre-filled from the transaction and linked back to it."
+    },
+    {
+      "id": "te-card-09",
+      "entity": "CardTransaction",
+      "action": "filter",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 353,
+      "currentBehaviour": "All/Matched/Unmatched <select>: setState only, filters the in-memory array. No date filter, no merchant search, no card filter, no pagination.",
+      "requiredBehaviour": "Server-side filtering and pagination with the same three states plus card, period and amount range."
+    },
+    {
+      "id": "te-card-10",
+      "entity": "CorporateCard",
+      "action": "manage",
+      "surface": "Cards",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 289,
+      "currentBehaviour": "ABSENT: the tab is named 'Cards' yet there is no card list, no cardholder assignment and no account \u2014 every imported row lands in one anonymous pool.",
+      "requiredBehaviour": "Card register with holder assignment, so charges route to the right claimant."
+    },
+    {
+      "id": "te-reim-01",
+      "entity": "ExpenseReport",
+      "action": "select",
+      "surface": "Reimbursements",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 427,
+      "currentBehaviour": "Checkbox per approved report: setState only (selected string[]). No select-all, no amount running total beyond the button counter.",
+      "requiredBehaviour": "unchanged client behaviour, but the eligible set must come from a server query that excludes reports already in an open run."
+    },
+    {
+      "id": "te-reim-02",
+      "entity": "ReimbursementRun",
+      "action": "create",
+      "surface": "Reimbursements",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 413,
+      "currentBehaviour": "'Create run (n)' writes browser localStorage only via createReimbursementRun: sums the selected reports' totals across currencies, stores the id array and stage 'Request Processed'. Crucially the selected REPORTS ARE NOT TOUCHED \u2014 they stay 'Approved' \u2014 even though the blurb says creating the run marks them Request Processed.",
+      "requiredBehaviour": "Transactionally create the run, insert run items, and move each report into a payment-pending state that blocks it from joining a second run.",
+      "validation": "Button disabled when nothing selected. No check that the reports are still Approved, not already in another run, and share a currency.",
+      "authorization": "none"
+    },
+    {
+      "id": "te-reim-03",
+      "entity": "ReimbursementRun",
+      "action": "transition",
+      "surface": "Reimbursements",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 454,
+      "currentBehaviour": "The whole run ROW is a button: one click advances a stage with no confirmation, no undo and no indication that clicking will change anything. Reaching 'Disbursed' silently flips every member report to Reimbursed with a client timestamp (workspace.tsx:1554-1579).",
+      "requiredBehaviour": "Explicit per-stage actions with confirmation, each authorised separately (posting to the ledger and releasing a payment are not the same permission), each recording actor and timestamp."
+    },
+    {
+      "id": "te-reim-04",
+      "entity": "ReimbursementRun",
+      "action": "post-to-gl",
+      "surface": "Reimbursements",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 404,
+      "currentBehaviour": "'Moved to Accounts (books the ledger)' changes a string. No ledger, no journal, no GL account lookup \u2014 teSettings.glAccounts is read by nothing.",
+      "requiredBehaviour": "Generate balanced journal lines per category using the GL mapping, store a gl_journal, and expose the posting result."
+    },
+    {
+      "id": "te-reim-05",
+      "entity": "GlExport",
+      "action": "export",
+      "surface": "Reimbursements",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 405,
+      "currentBehaviour": "'exporting the CSV is Batch Generation (the bank file for disbursement)' \u2014 THERE IS NO EXPORT CONTROL ANYWHERE IN THE APP. grep for csv/Blob/download over src/screens/app/travel finds only prose and the import file input. src/lib/csv.ts downloadCsv exists and is never called from here.",
+      "requiredBehaviour": "Generate a persisted, checksummed payment file tied to the run; regeneration must be idempotent and audited."
+    },
+    {
+      "id": "te-reim-06",
+      "entity": "ReimbursementRun",
+      "action": "cancel",
+      "surface": "Reimbursements",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 448,
+      "currentBehaviour": "ABSENT: no cancel, no revert, no failure stage. advanceReimbursementRun clamps at the last index, so a run that reaches Disbursed is frozen forever, correct or not.",
+      "requiredBehaviour": "Cancel before disbursement; a reversal record after it."
+    },
+    {
+      "id": "te-reim-07",
+      "entity": "ReimbursementRun",
+      "action": "read",
+      "surface": "Reimbursements",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 451,
+      "currentBehaviour": "Runs render as '{n} reports' + total + stage. No run number, no created date, no member list, no drill-down, no payee.",
+      "requiredBehaviour": "Run detail with numbered reference, member reports, per-report amounts and payment status."
+    },
+    {
+      "id": "te-trav-01",
+      "entity": "TravelRequest",
+      "action": "filter",
+      "surface": "Travel",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 507,
+      "currentBehaviour": "Active/Closed/All segmented control: setState only.",
+      "requiredBehaviour": "Server filter over the real lifecycle states."
+    },
+    {
+      "id": "te-trav-02",
+      "entity": "TravelRequest",
+      "action": "ui-state",
+      "surface": "Travel",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 498,
+      "currentBehaviour": "'+ New request': setState only (setOpen(true)).",
+      "requiredBehaviour": "unchanged \u2014 dialog trigger"
+    },
+    {
+      "id": "te-trav-03",
+      "entity": "TravelRequest",
+      "action": "create",
+      "surface": "Travel dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 639,
+      "currentBehaviour": "'Create' writes browser localStorage only via addTravelRequest \u2014 uuid + status 'Active', audit row travel.request_created. budgetHead is hardcoded to ''.",
+      "requiredBehaviour": "POST under tenant scope with requester = session user and status 'draft'/'submitted'.",
+      "validation": "Create disabled unless both start and end are set. No end>=start check, no past-date check, no cost check.",
+      "authorization": "none"
+    },
+    {
+      "id": "te-trav-04",
+      "entity": "TravelRequest",
+      "action": "create",
+      "surface": "Travel dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 641,
+      "currentBehaviour": "Purpose is optional and silently defaults to the literal string 'Travel request' when blank, despite the Start/End labels being the only ones marked with a required asterisk.",
+      "requiredBehaviour": "Either require purpose or stop substituting a placeholder that becomes indistinguishable row text."
+    },
+    {
+      "id": "te-trav-05",
+      "entity": "TravelRequest",
+      "action": "create",
+      "surface": "Travel dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 615,
+      "currentBehaviour": "Project <select> contains exactly one hardcoded option, '- None -' with value '' \u2014 there is no project source in the app, so the field is always the empty string. Stored as a display-name string.",
+      "requiredBehaviour": "Load projects for the tenant and store project_id as an FK."
+    },
+    {
+      "id": "te-trav-06",
+      "entity": "TravelRequest",
+      "action": "create",
+      "surface": "Travel dialog",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 625,
+      "currentBehaviour": "'Budget head (pick project first)' is a permanently DISABLED <select> holding one '- Select -' placeholder. Nothing can ever enable it; budgetHead is always ''.",
+      "requiredBehaviour": "Populate from the chosen project's budget heads and store budget_head_id as an FK."
+    },
+    {
+      "id": "te-trav-07",
+      "entity": "TravelRequest",
+      "action": "transition",
+      "surface": "Travel",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 541,
+      "currentBehaviour": "'Close' on an Active row calls closeTravelRequest \u2014 status 'Closed', browser localStorage only, no timestamp, no actor, no reason, no confirmation. Irreversible: nothing reopens a closed request.",
+      "requiredBehaviour": "Distinguish cancel from settle-and-close; record closed_at, closed_by and reason; permit reopen where the lifecycle allows it."
+    },
+    {
+      "id": "te-trav-08",
+      "entity": "TravelSegment",
+      "action": "create",
+      "surface": "Travel",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 496,
+      "currentBehaviour": "ABSENT: the blurb promises 'add per-leg segments (flight/train/bus/hotel with mode-specific details)'. There is no segment editor, no segment list and no segment record \u2014 segmentModes is only rendered as read-only reference text in Settings.",
+      "requiredBehaviour": "Segment CRUD on a request detail route, driven by travel_segment_field_defs."
+    },
+    {
+      "id": "te-trav-09",
+      "entity": "TravelRequest",
+      "action": "submit/approve",
+      "surface": "Travel",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 496,
+      "currentBehaviour": "ABSENT: the blurb promises 'submit for approval'. A request is born Active and the only action is Close. The Approval Inbox lists Active requests as pending but offers no decision control.",
+      "requiredBehaviour": "Submit \u2192 approval tasks per configured level \u2192 approve/reject with comment."
+    },
+    {
+      "id": "te-trav-10",
+      "entity": "TravelRequest",
+      "action": "advance/settle",
+      "surface": "Travel",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 496,
+      "currentBehaviour": "ABSENT: the blurb promises 'settle actuals against any advance', and travel policy configures an advance percentage, and two notification events name advance/settlement. No advance record, no settlement screen, no link from a trip to its expense reports.",
+      "requiredBehaviour": "Advance request/disbursement records, and a settlement that nets actual expense_reports against the advance."
+    },
+    {
+      "id": "te-trav-11",
+      "entity": "TravelRequest",
+      "action": "update/delete",
+      "surface": "Travel",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 518,
+      "currentBehaviour": "ABSENT: no edit, no delete, no detail view. A trip with wrong dates stays wrong.",
+      "requiredBehaviour": "Edit while in draft; soft-archive otherwise."
+    },
+    {
+      "id": "te-agen-01",
+      "entity": "AgencyInvoice",
+      "action": "read",
+      "surface": "Agency review",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 662,
+      "currentBehaviour": "Static component \u2014 no hook, no data source, no controls. It renders the SAME empty state unconditionally; there is no code path by which a row could ever appear.",
+      "requiredBehaviour": "List agency_invoices in submitted/under_review state for the tenant, with empty, loading and error states."
+    },
+    {
+      "id": "te-agen-02",
+      "entity": "AgencyInvoice",
+      "action": "accept/reject",
+      "surface": "Agency review",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 668,
+      "currentBehaviour": "ABSENT: copy says 'Rows stay here until accepted or rejected' \u2014 neither action exists, because no row can exist.",
+      "requiredBehaviour": "Accept (\u2192 payable) and Reject (with reason) actions, both audited, both notifying the agency through the portal."
+    },
+    {
+      "id": "te-appr-01",
+      "entity": "ApprovalTask",
+      "action": "read",
+      "surface": "Approval inbox",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 683,
+      "currentBehaviour": "Builds the list in-render from two local arrays: expense reports with status 'Submitted' plus travel requests with status 'Active'. The 'Pending' counter is their length. Purchase orders, purchase invoices and material requests are named in the copy and never included.",
+      "requiredBehaviour": "Query approval_tasks assigned to the session user across every document type named in the copy."
+    },
+    {
+      "id": "te-appr-02",
+      "entity": "ApprovalTask",
+      "action": "approve/reject",
+      "surface": "Approval inbox",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 709,
+      "currentBehaviour": "THERE ARE NO ACTION CONTROLS. Each row is three <span>s \u2014 title, type badge, amount. The copy says 'Rows disappear once you action them'; nothing can be actioned from this screen at all.",
+      "requiredBehaviour": "Per-row Approve / Reject / Request-info with comment, plus bulk approve, each authorised against the task's assignee."
+    },
+    {
+      "id": "te-appr-03",
+      "entity": "ApprovalTask",
+      "action": "read",
+      "surface": "Approval inbox",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 716,
+      "currentBehaviour": "Travel requests are listed as awaiting approval purely because status === 'Active', which only means not-closed. Every trip ever created shows as pending forever.",
+      "requiredBehaviour": "Only list documents with an open approval task."
+    },
+    {
+      "id": "te-rpt-01",
+      "entity": "ExpenseReport",
+      "action": "navigate",
+      "surface": "Reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 762,
+      "currentBehaviour": "Five report-view buttons: setState only (setView).",
+      "requiredBehaviour": "Each view backed by its own aggregate query."
+    },
+    {
+      "id": "te-rpt-02",
+      "entity": "ExpenseReport",
+      "action": "filter",
+      "surface": "Reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 781,
+      "currentBehaviour": "From/To date inputs: setState only; filter compares createdAt.slice(0,10) string-wise. No validation that from <= to.",
+      "requiredBehaviour": "Server-side range filter on the timestamp appropriate to each view (submitted/approved/disbursed, not created)."
+    },
+    {
+      "id": "te-rpt-03",
+      "entity": "ExpenseReport",
+      "action": "filter",
+      "surface": "Reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 797,
+      "currentBehaviour": "30/90/180/365 buttons: setState only, recomputing from Date.now().",
+      "requiredBehaviour": "unchanged client behaviour"
+    },
+    {
+      "id": "te-rpt-04",
+      "entity": "ExpenseReport",
+      "action": "read/aggregate",
+      "surface": "Reports \u203a Spend Overview",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 746,
+      "currentBehaviour": "Renders ONE canned sentence: '{n} reports \u00b7 {sum} claimed in range'. No table, no chart, no breakdown, no export.",
+      "requiredBehaviour": "Real spend aggregate by category, project, period and currency."
+    },
+    {
+      "id": "te-rpt-05",
+      "entity": "ExpenseReport",
+      "action": "read/aggregate",
+      "surface": "Reports \u203a Top spenders",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 749,
+      "currentBehaviour": "A STATIC STRING that ignores the data entirely: 'Top spenders rank by claimed total once reports exist.' It says the same thing when 500 reports exist. Ranking is impossible anyway \u2014 reports have no claimant, project or agency.",
+      "requiredBehaviour": "Ranked lists by employee, project and agency, which first requires those FKs on the report."
+    },
+    {
+      "id": "te-rpt-06",
+      "entity": "ExpenseReport",
+      "action": "read/aggregate",
+      "surface": "Reports \u203a Approval SLA",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 750,
+      "currentBehaviour": "Counts in-range reports with status 'Submitted' into one sentence. No SLA maths at all \u2014 nothing compares age against slaDays, and there is no submitted_at to age from.",
+      "requiredBehaviour": "Queue by approver with age buckets and breach flags against the configured SLA."
+    },
+    {
+      "id": "te-rpt-07",
+      "entity": "ReimbursementRun",
+      "action": "read/aggregate",
+      "surface": "Reports \u203a Reimbursement Pipeline",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 751,
+      "currentBehaviour": "Says '{n} reimbursement runs in range' but counts reimbursementRuns.length \u2014 the date range is never applied to runs.",
+      "requiredBehaviour": "Filter runs by created/disbursed date and break them down by stage."
+    },
+    {
+      "id": "te-rpt-08",
+      "entity": "AgencyInvoice",
+      "action": "read/aggregate",
+      "surface": "Reports \u203a Agency Billing",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 752,
+      "currentBehaviour": "A STATIC STRING: 'Agency billing appears once an agency posts an invoice through the Partner Portal.' No query, no entity.",
+      "requiredBehaviour": "Aggregate agency_invoices once that entity exists."
+    },
+    {
+      "id": "te-rpt-09",
+      "entity": "ExpenseReport",
+      "action": "export",
+      "surface": "Reports",
+      "sourceFile": "src/screens/app/travel/panes.tsx",
+      "sourceLine": 755,
+      "currentBehaviour": "ABSENT: no export, no print, no scheduled delivery on any of the five views.",
+      "requiredBehaviour": "CSV/XLSX export per view using the existing src/lib/csv.ts helpers."
+    },
+    {
+      "id": "te-set-nav-01",
+      "entity": "TeSettings",
+      "action": "navigate",
+      "surface": "Settings",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 649,
+      "currentBehaviour": "Left-nav buttons call setParams({tab:'settings', s:id}) \u2014 URL only. Unsaved draft state in the pane being left is silently discarded with no warning.",
+      "requiredBehaviour": "Warn on navigating away from a dirty pane."
+    },
+    {
+      "id": "te-set-nav-02",
+      "entity": "TeSettings",
+      "action": "no-op",
+      "surface": "Settings",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 633,
+      "currentBehaviour": "'Open Copilot' does document.querySelector('[aria-label=\"Open AI Copilot\"]')?.click() \u2014 a DOM reach-around into another component that silently does nothing if that button is not mounted.",
+      "requiredBehaviour": "Open the copilot through shared state or context, not a querySelector click."
+    },
+    {
+      "id": "te-set-pol-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Expense policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 100,
+      "currentBehaviour": "'Save policy' writes browser localStorage only via updateTeSettings(draft). NOTE it passes the WHOLE draft (useDraft was seeded with all of teSettings), so this pane rewrites every settings section, not just the policy \u2014 a concurrent change in another tab is clobbered wholesale.",
+      "requiredBehaviour": "PATCH only the expense_policy section of app_settings with a version check.",
+      "validation": "Save is disabled unless the JSON-stringified draft differs from the current value. No field validation whatsoever.",
+      "authorization": "none",
+      "sideEffect": "one audit row 'travel_expense.settings_updated' with resourceId 'TE' and no before/after"
+    },
+    {
+      "id": "te-set-pol-02",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Expense policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 51,
+      "currentBehaviour": "Enforcement select (warn|block): stored and read by NOTHING. No submission path evaluates policy.",
+      "requiredBehaviour": "Evaluate at submit; block must actually reject the submission with field errors."
+    },
+    {
+      "id": "te-set-pol-03",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Expense policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 62,
+      "currentBehaviour": "'Receipt required at/above' is a free-text input (inputMode=decimal only) with placeholder 'disabled'. Letters save fine. No currency is attached to the threshold.",
+      "requiredBehaviour": "numeric(18,4) + currency, validated server-side, enforced at submit against items with no receipt."
+    },
+    {
+      "id": "te-set-pol-04",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Expense policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 73,
+      "currentBehaviour": "'Flag possible duplicates' checkbox saved; the label promises matching on employee, amount, date and category \u2014 expense reports carry none of those four.",
+      "requiredBehaviour": "Duplicate detection over expense_items once employee/date/category exist."
+    },
+    {
+      "id": "te-set-pol-05",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Expense policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 84,
+      "currentBehaviour": "12 per-category limit inputs keyed by the lowercase policyCategories labels. Values are unvalidated strings. These 12 labels do not intersect the 8 Title-Case expenseCategories used by the quick-expense picker and the GL pane, so a limit can never bind to a categorised expense.",
+      "requiredBehaviour": "One expense_categories table with stable ids; limits and GL mappings both reference it."
+    },
+    {
+      "id": "te-set-mail-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Receipt email-in",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 142,
+      "currentBehaviour": "'Save' writes browser localStorage only (updateTeSettings({receiptEmail: draft})).",
+      "requiredBehaviour": "Persist to app_settings section 'receipt_email'.",
+      "validation": "dirty check only \u2014 the address is not validated as an email at all"
+    },
+    {
+      "id": "te-set-mail-02",
+      "entity": "Receipt",
+      "action": "ingest",
+      "surface": "Settings \u203a Receipt email-in",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 114,
+      "currentBehaviour": "Copy: 'Forward a receipt to this address and it becomes a draft expense against the sender's employee record.' NOTHING ingests mail. There is no inbound handler, no provider, no employee record to attribute to, and the default address 'expenses@apragya-tenant.mail' is not a deliverable domain.",
+      "requiredBehaviour": "Tenant-unique generated inbound address, verified; inbound webhook creating receipts + draft items, with sender\u2192employee resolution and an unknown-sender path. The mail provider is an OPEN QUESTION."
+    },
+    {
+      "id": "te-set-mail-03",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Receipt email-in",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 129,
+      "currentBehaviour": "The inbound address is a free-text input the admin types, so two tenants can claim the same address and nothing checks it.",
+      "requiredBehaviour": "System-generated and unique; show it read-only with a copy button."
+    },
+    {
+      "id": "te-set-trav-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Travel policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 195,
+      "currentBehaviour": "'Save' writes browser localStorage only (updateTeSettings({travel: draft})). All three values are read by nothing.",
+      "requiredBehaviour": "Persist per tenant/company; evaluate at travel-request submission."
+    },
+    {
+      "id": "te-set-trav-02",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Travel policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 164,
+      "currentBehaviour": "advancePercent is type=number with min/max attributes only; clearing the field produces Number('') = NaN which is then JSON-serialised as null into storage.",
+      "requiredBehaviour": "Server check between 0 and 100, reject empty."
+    },
+    {
+      "id": "te-set-trav-03",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Travel policy",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 184,
+      "currentBehaviour": "'Default per-diem' is one free-text string \u2014 no currency, no domestic/international split, no destination band, no meal breakdown, no effective date. policyCategories separately lists 'per diem' and 'per km' as limit rows.",
+      "requiredBehaviour": "A per-diem rate table (band, destination, currency, effective-from). The RATES and their legal basis are an OPEN QUESTION \u2014 do not invent them."
+    },
+    {
+      "id": "te-set-seg-01",
+      "entity": "TeSettings",
+      "action": "read",
+      "surface": "Settings \u203a Travel segment fields",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 202,
+      "currentBehaviour": "Entirely read-only: renders the hardcoded segmentModes constant as badge lists and states in its own copy that the live editor was not transcribed. teSettings.segmentFields is declared, defaulted to {}, and read/written by nothing.",
+      "requiredBehaviour": "Editable per-mode field definitions (key, label, type, required, order) driving the absent segment editor."
+    },
+    {
+      "id": "te-set-note-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Travel notifications",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 260,
+      "currentBehaviour": "'Save' writes browser localStorage only (updateTeSettings({travelNotifications: draft})).",
+      "requiredBehaviour": "Write to the existing notification_preferences table (migrations/0004_platform.sql:87)."
+    },
+    {
+      "id": "te-set-note-02",
+      "entity": "TeSettings",
+      "action": "notify",
+      "surface": "Settings \u203a Travel notifications",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 236,
+      "currentBehaviour": "Five toggles saved; NO travel action ever sends anything. addTravelRequest and closeTravelRequest write audit rows only and never call the workspace notify() helper. Two of the five events (advance disbursed, actuals due for settlement) refer to records that do not exist.",
+      "requiredBehaviour": "Emit notifications on real lifecycle transitions to requester and approver, honouring these preferences."
+    },
+    {
+      "id": "te-set-appr-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Approval Levels",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 320,
+      "currentBehaviour": "'Save' writes browser localStorage only (updateTeSettings({approvalLevels: draft})).",
+      "requiredBehaviour": "Persist as approval_levels rows with an explicit sequence column."
+    },
+    {
+      "id": "te-set-appr-02",
+      "entity": "TeSettings",
+      "action": "create",
+      "surface": "Settings \u203a Approval Levels",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 316,
+      "currentBehaviour": "'+ Add level' appends {id: crypto.randomUUID(), label:'New level', threshold:''} to local draft state only until Save. Seeded levels use the literals 'l1'/'l2', so ids are inconsistent.",
+      "requiredBehaviour": "Server-minted ids for every level."
+    },
+    {
+      "id": "te-set-appr-03",
+      "entity": "TeSettings",
+      "action": "delete",
+      "surface": "Settings \u203a Approval Levels",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 303,
+      "currentBehaviour": "The \u2715 removes a level from draft state with NO confirmation; deleting the level an in-flight report is sitting on is not prevented (nothing is in flight, because levels are never applied).",
+      "requiredBehaviour": "Confirm; block or migrate deletion of a level with open approval tasks."
+    },
+    {
+      "id": "te-set-appr-04",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Approval Levels",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 284,
+      "currentBehaviour": "A level is a free-text label plus a free-text threshold. The approver is a SENTENCE ('Reporting manager'), not a user or role reference, and thresholds carry no currency. Order is array position with no reorder control.",
+      "requiredBehaviour": "approver_role_id / approver_user_id FK, numeric threshold + currency, explicit sequence with drag-reorder."
+    },
+    {
+      "id": "te-set-appr-05",
+      "entity": "ApprovalTask",
+      "action": "evaluate",
+      "surface": "Settings \u203a Approval Levels",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 275,
+      "currentBehaviour": "Copy: 'Reports climb these levels in order.' They do not climb anything \u2014 advanceExpenseReport moves one index along a fixed 4-status array and never reads approvalLevels.",
+      "requiredBehaviour": "Generate approval tasks per matching level on submit and gate the Approved status on all of them completing."
+    },
+    {
+      "id": "te-set-sla-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Reimbursement SLA",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 351,
+      "currentBehaviour": "'Save' writes browser localStorage only (updateTeSettings({slaDays: draft})). This is the ONE setting any other screen reads \u2014 and only to print 'SLA {n}d' in the Dashboard header. Nothing is measured, escalated or breached against it. The default is also duplicated as the unused constant reimbursementSlaDays in travelExpenseData.ts:126.",
+      "requiredBehaviour": "Compute due dates from approved_at, surface breaches in the SLA report view, and drive escalation.",
+      "validation": "min=1 attribute only; Number('') = NaN can be saved"
+    },
+    {
+      "id": "te-set-gl-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a GL accounts",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 387,
+      "currentBehaviour": "'Save' writes browser localStorage only (updateTeSettings({glAccounts: draft})).",
+      "requiredBehaviour": "Persist as expense_category_gl_map rows."
+    },
+    {
+      "id": "te-set-gl-02",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a GL accounts",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 370,
+      "currentBehaviour": "8 inputs keyed by Title-Case expenseCategories labels; the value is a free-typed account code validated against nothing, and read by nothing. The pane says these post 'when a run is moved to accounts' \u2014 that transition changes a string.",
+      "requiredBehaviour": "Pick from the tenant's chart of accounts (FK), validate the account is postable, and actually use the mapping when generating journal lines."
+    },
+    {
+      "id": "te-set-cf-01",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Custom Fields",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 470,
+      "currentBehaviour": "'Save' writes browser localStorage only (updateTeSettings({customFields: draft})).",
+      "requiredBehaviour": "Persist as custom_field_defs scoped to tenant + entity type."
+    },
+    {
+      "id": "te-set-cf-02",
+      "entity": "TeSettings",
+      "action": "create/delete",
+      "surface": "Settings \u203a Custom Fields",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 464,
+      "currentBehaviour": "'+ Add field' appends {id: crypto.randomUUID(), label:'New field', type:'text', required:false}; the \u2715 removes it with no confirmation and no check for stored values (there are none, since nothing renders these fields).",
+      "requiredBehaviour": "Server-minted id and a stable field key; deleting a field with stored values must be blocked or archived."
+    },
+    {
+      "id": "te-set-cf-03",
+      "entity": "TeSettings",
+      "action": "update",
+      "surface": "Settings \u203a Custom Fields",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 419,
+      "currentBehaviour": "Type select offers text/number/date/select from an inline literal array; a 'select' field has NO options editor, so it can never have choices. Fields are identified by their editable label with no immutable key \u2014 renaming one orphans any values keyed by it.",
+      "requiredBehaviour": "Immutable field key + editable label; an options editor for select; validation rules per type."
+    },
+    {
+      "id": "te-set-cf-04",
+      "entity": "ExpenseReport",
+      "action": "render",
+      "surface": "Settings \u203a Custom Fields",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 402,
+      "currentBehaviour": "Copy: 'Extra fields captured on every expense report in this tenant.' The expense-report dialog renders exactly four controls (title, amount, category, currency) and never reads customFields. 'required' is enforced nowhere.",
+      "requiredBehaviour": "Render defined fields on the report form, validate required ones, store into custom_field_values."
+    },
+    {
+      "id": "te-set-ai-01",
+      "entity": "AgentCatalog",
+      "action": "read",
+      "surface": "Settings \u203a AI Agents",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 478,
+      "currentBehaviour": "Read-only list of 5 hardcoded agents from src/lib/agentCatalog.ts:55-63 keyed by app code 'TE'. No enable/disable, no configuration, no run history, no per-agent cost. The only control is a Link to /app/agent-portal.",
+      "requiredBehaviour": "Per-tenant agent enablement and configuration, with runs linked to the records they touched.",
+      "authorization": "none"
+    },
+    {
+      "id": "te-set-sch-01",
+      "entity": "Schedule",
+      "action": "read",
+      "surface": "Settings \u203a Schedules",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 509,
+      "currentBehaviour": "Read-only, and the ownership test is schedules.filter(job => job.target.includes('Travel')) \u2014 a SUBSTRING MATCH ON A DISPLAY STRING. Any unrelated job whose target mentions 'Travel' appears here; renaming a target hides the job. Only name and cadence are shown \u2014 not kind, nextRun or active, so a disabled job is indistinguishable from a running one.",
+      "requiredBehaviour": "Filter by app_code FK; show next run, last result and active state; allow create/pause from here.",
+      "authorization": "none"
+    },
+    {
+      "id": "te-set-hist-01",
+      "entity": "AuditEvent",
+      "action": "read",
+      "surface": "Settings \u203a Change History",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 545,
+      "currentBehaviour": "Filters the in-memory audit array by five hardcoded action prefixes and renders action slug + relative time. No actor, no before/after, no filter, no paging, no export. Any future action prefix silently vanishes from this pane.",
+      "requiredBehaviour": "Query audit_events by tenant + app with actor, target, before/after diff, filtering and paging."
+    },
+    {
+      "id": "te-set-hist-02",
+      "entity": "AuditEvent",
+      "action": "read",
+      "surface": "Settings \u203a Change History",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 562,
+      "currentBehaviour": "Copy claims 'Every change made inside this app' \u2014 but autoMatchCards (workspace.tsx:1514) writes no audit event at all, and card.statement_imported stores the sentence '{n} rows' in the resourceId column. Two of the app's mutations are therefore untraceable or misfiled.",
+      "requiredBehaviour": "Every mutation emits a typed audit row with a real resource id."
+    },
+    {
+      "id": "te-set-app-01",
+      "entity": "none",
+      "action": "read",
+      "surface": "Settings \u203a Appearance",
+      "sourceFile": "src/screens/app/travel/settings.tsx",
+      "sourceLine": 583,
+      "currentBehaviour": "Two static paragraphs, no controls. Honestly states that the live options were not transcribed.",
+      "requiredBehaviour": "Either per-app appearance overrides or remove the nav entry."
+    },
+    {
+      "id": "te-persist-01",
+      "entity": "all",
+      "action": "persist",
+      "surface": "every tab",
+      "sourceFile": "src/lib/workspace.tsx",
+      "sourceLine": 940,
+      "currentBehaviour": "Every T&E mutation goes through update(), which JSON.stringifies the ENTIRE workspace (all 15 apps' data) into one localStorage key 'apragya.workspace' on every keystroke-level save. There is no server, no user scoping, no tenant scoping, no concurrency control, and a quota failure is swallowed by an empty catch \u2014 the user sees a successful save that persisted nothing.",
+      "requiredBehaviour": "Per-entity API calls with tenant scope, optimistic-concurrency versions, and surfaced save failures."
+    },
+    {
+      "id": "te-persist-02",
+      "entity": "AuditEvent",
+      "action": "persist",
+      "surface": "every tab",
+      "sourceFile": "src/lib/workspace.tsx",
+      "sourceLine": 1128,
+      "currentBehaviour": "The generic logAudit helper caps the audit array at 500 entries, but all eight T&E mutations prepend to prev.audit directly WITHOUT that cap, so heavy T&E use grows the single localStorage blob without bound until the quota throws and every subsequent save silently no-ops.",
+      "requiredBehaviour": "Audit rows go to their own append-only table, never to the record blob."
+    }
+  ],
+  "surfaces": [
+    {
+      "route": "/app/travel-expense",
+      "tab": "dashboard",
+      "title": "Dashboard",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:25-149",
+      "verdict": "Read-only tiles computed in-render from localStorage. Numbers are real counts of local data, but three of them are fabricated or mislabelled: the category chart hashes the report TITLE LENGTH into a category, 'this month' filters nothing, and 'next payable' is a hardcoded tomorrow.",
+      "statesImplemented": [
+        "populated",
+        "empty (per-panel text)"
+      ],
+      "statesMissing": [
+        "loading",
+        "error",
+        "permission-denied",
+        "date-range scoping",
+        "currency normalisation",
+        "drill-down navigation"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=expense_reports",
+      "tab": "expense_reports",
+      "title": "Expense reports",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:151-287",
+      "verdict": "Create + one-way status advance, browser localStorage only. No line items, no receipts, no claimant, no edit, no delete, no detail view, no reject. The Quick-expense category is collected and silently discarded. A full report's total is\u6c38 0.00 because nothing can add an expense to it.",
+      "statesImplemented": [
+        "empty",
+        "populated",
+        "create dialog"
+      ],
+      "statesMissing": [
+        "loading",
+        "saving",
+        "error",
+        "validation errors beyond required-title",
+        "detail view",
+        "edit",
+        "delete/cancel",
+        "reject/return",
+        "line items",
+        "receipts",
+        "pagination",
+        "search/filter/sort",
+        "policy violation display"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=cards",
+      "tab": "cards",
+      "title": "Cards",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:289-388",
+      "verdict": "CSV import via FileReader with a naive split(',') that ignores the repo's own quoted parser, plus an amount-only auto-match. Browser localStorage only. No card entity, no unmatch, no manual match, no import batch, and the success toast counts parsed rows rather than stored rows.",
+      "statesImplemented": [
+        "empty",
+        "populated",
+        "filter All/Matched/Unmatched",
+        "post-import note",
+        "post-match note"
+      ],
+      "statesMissing": [
+        "loading",
+        "parse-error / rejected-row reporting",
+        "unsupported-format error (OFX/QFX are parsed as CSV)",
+        "unmatch",
+        "manual match",
+        "match confidence",
+        "matched-report display",
+        "pagination",
+        "card/cardholder scoping",
+        "import history and reversal"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=reimbursements",
+      "tab": "reimbursements",
+      "title": "Reimbursements",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:390-474",
+      "verdict": "Batch selection and a 4-stage click-through, browser localStorage only. The blurb describes three concrete effects (marking reports Request Processed, booking the ledger, exporting a bank CSV) and NONE of the three happens; the export control does not exist at all. Disbursing is the one real effect: it flips member reports to Reimbursed.",
+      "statesImplemented": [
+        "empty (both panels)",
+        "populated",
+        "selection"
+      ],
+      "statesMissing": [
+        "loading",
+        "error",
+        "confirmation before advancing",
+        "run detail / member list",
+        "cancel or reverse a run",
+        "GL export",
+        "bank file export",
+        "guard against a report joining two runs",
+        "currency grouping"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=travel",
+      "tab": "travel",
+      "title": "Travel",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:476-660",
+      "verdict": "Create + Close only, browser localStorage only. The Project select has one empty option and the Budget head select is permanently disabled, so both FK-shaped fields are always ''. Segments, submission, approval, advances and settlement \u2014 all four promised in the blurb \u2014 do not exist.",
+      "statesImplemented": [
+        "empty",
+        "populated",
+        "scope filter Active/Closed/All",
+        "create dialog"
+      ],
+      "statesMissing": [
+        "loading",
+        "saving",
+        "error",
+        "date-order validation",
+        "detail view",
+        "edit",
+        "segments",
+        "submit/approve/reject",
+        "advance",
+        "settlement",
+        "reopen",
+        "currency",
+        "pagination"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=agency_review",
+      "tab": "agency_review",
+      "title": "Agency review",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:662-679",
+      "verdict": "Pure shell. No hook, no data source, no controls \u2014 the empty state is unconditional and no row can ever appear. src/lib/portalData.ts defines the partner-portal side ('Travel invoices') with no receiving entity here.",
+      "statesImplemented": [
+        "empty"
+      ],
+      "statesMissing": [
+        "populated",
+        "loading",
+        "error",
+        "accept",
+        "reject with reason",
+        "invoice detail",
+        "reconciliation against segments"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=approval_inbox",
+      "tab": "approval_inbox",
+      "title": "Approval inbox",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:681-730",
+      "verdict": "Read-only list with NO action controls whatsoever \u2014 each row is three spans. It claims to span purchase orders, purchase invoices and material requests but only ever shows Submitted expense reports and Active travel requests, and 'Active' is not an approval state.",
+      "statesImplemented": [
+        "empty",
+        "populated",
+        "pending counter"
+      ],
+      "statesMissing": [
+        "approve",
+        "reject",
+        "request info",
+        "bulk action",
+        "assignee scoping",
+        "document detail",
+        "other document types",
+        "loading",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=reports",
+      "tab": "reports",
+      "title": "Reports",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/panes.tsx:732-819",
+      "verdict": "Five named views that each render ONE canned sentence. Two of the five (Top spenders, Agency billing) are static strings that ignore the data entirely; a third (Reimbursement pipeline) ignores the date range it sits under. The footnote claims a single tenant billing currency while the sums mix currencies unconverted.",
+      "statesImplemented": [
+        "view switching",
+        "date range",
+        "quick ranges 30/90/180/365"
+      ],
+      "statesMissing": [
+        "actual tables or charts",
+        "grouping dimensions",
+        "currency conversion",
+        "export",
+        "drill-down",
+        "loading",
+        "error",
+        "empty vs no-data distinction",
+        "from<=to validation"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings",
+      "tab": "settings",
+      "title": "Settings (shell)",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:614-675",
+      "verdict": "Grouped left nav driven by the URL ?s= param over 13 panes. Leaving a pane with unsaved edits discards them silently. The banner promises every change is saved in Change History 'and can be undone' \u2014 no undo exists anywhere in the app, and the Copilot button reaches into the DOM with querySelector().click().",
+      "statesImplemented": [
+        "nav",
+        "section routing",
+        "per-pane dirty tracking"
+      ],
+      "statesMissing": [
+        "unsaved-changes guard",
+        "undo/revert",
+        "per-section permissions",
+        "save error surfacing"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=expense_policy",
+      "tab": "settings",
+      "title": "Settings \u203a Expense policy",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:28-105",
+      "verdict": "Fully editable and saved to browser localStorage \u2014 and read by nothing. Because useDraft is seeded with the whole teSettings object, Save rewrites every settings section. Money thresholds are free-text strings with no currency; the 12 limit categories do not match the 8 categories used elsewhere.",
+      "statesImplemented": [
+        "populated",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "field validation",
+        "saving",
+        "save error",
+        "enforcement at submit",
+        "per-section save scope",
+        "currency on thresholds"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=receipt_email",
+      "tab": "settings",
+      "title": "Settings \u203a Receipt email-in",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:107-148",
+      "verdict": "Toggle + free-text address saved to browser localStorage. No mailbox, no inbound handler, no provider, no employee resolution \u2014 the promised 'forward a receipt and it becomes a draft expense' path does not exist in any form.",
+      "statesImplemented": [
+        "populated",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "email validation",
+        "address uniqueness",
+        "verification",
+        "inbound processing",
+        "ingest log",
+        "unknown-sender handling",
+        "saving",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=travel_policy",
+      "tab": "settings",
+      "title": "Settings \u203a Travel policy",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:150-200",
+      "verdict": "Three inputs saved to browser localStorage, read by nothing. Per-diem is one flat currency-less string; advancePectent accepts NaN when cleared.",
+      "statesImplemented": [
+        "populated",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "validation",
+        "currency",
+        "per-diem rate table",
+        "enforcement at request submission",
+        "saving",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=travel_segments",
+      "tab": "settings",
+      "title": "Settings \u203a Travel segment fields",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:202-227",
+      "verdict": "Read-only display of the hardcoded segmentModes constant. No controls at all; the pane says so itself. teSettings.segmentFields is a declared, defaulted, completely unused key.",
+      "statesImplemented": [
+        "populated (static defaults)"
+      ],
+      "statesMissing": [
+        "add/edit/remove field",
+        "per-mode enable",
+        "required flag",
+        "field type",
+        "ordering",
+        "save"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=travel_notifications",
+      "tab": "settings",
+      "title": "Settings \u203a Travel notifications",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:229-266",
+      "verdict": "Five checkboxes saved to browser localStorage. No travel action ever sends a notification \u2014 addTravelRequest and closeTravelRequest write audit rows only. Two of the five events reference advance/settlement records that do not exist.",
+      "statesImplemented": [
+        "populated",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "channel selection (email/in-app)",
+        "recipient roles",
+        "templates",
+        "actual delivery",
+        "saving",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=approval_levels",
+      "tab": "settings",
+      "title": "Settings \u203a Approval Levels",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:268-326",
+      "verdict": "Full local CRUD over a label+threshold list, saved to browser localStorage, applied by nothing. Approvers are free-text sentences, thresholds are currency-less strings, order is array position with no reorder control, and removal has no confirmation.",
+      "statesImplemented": [
+        "populated",
+        "add",
+        "remove",
+        "edit",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "approver role/user reference",
+        "currency on thresholds",
+        "reorder",
+        "confirm on remove",
+        "in-use protection",
+        "validation",
+        "evaluation at submit",
+        "saving",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=sla",
+      "tab": "settings",
+      "title": "Settings \u203a Reimbursement SLA",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:328-356",
+      "verdict": "One number saved to browser localStorage. The only setting any other screen reads, and only to print a label on the Dashboard \u2014 nothing is measured, escalated or breached against it.",
+      "statesImplemented": [
+        "populated",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "validation (NaN saveable)",
+        "breach calculation",
+        "escalation",
+        "business-day vs calendar-day semantics",
+        "saving",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=gl_accounts",
+      "tab": "settings",
+      "title": "Settings \u203a Reimbursement GL accounts",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:358-393",
+      "verdict": "Eight free-text account-code inputs keyed by display labels, saved to browser localStorage, read by no code path. The 'Moved to accounts' stage this pane describes posts nothing.",
+      "statesImplemented": [
+        "populated",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "chart-of-accounts lookup",
+        "account validation",
+        "per-company mapping",
+        "debit/credit sides",
+        "posting",
+        "saving",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=custom_fields",
+      "tab": "settings",
+      "title": "Settings \u203a Custom Fields",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:395-476",
+      "verdict": "Full local CRUD saved to browser localStorage; the fields are rendered on no form and validated nowhere. A 'select' field has no options editor. Fields are keyed by their editable label with no stable key.",
+      "statesImplemented": [
+        "empty",
+        "populated",
+        "add",
+        "remove",
+        "edit",
+        "dirty/disabled save"
+      ],
+      "statesMissing": [
+        "stable field key",
+        "select options editor",
+        "validation rules",
+        "rendering on the report form",
+        "required enforcement",
+        "in-use protection on delete",
+        "saving",
+        "error"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=ai_agents",
+      "tab": "settings",
+      "title": "Settings \u203a AI Agents",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:478-505",
+      "verdict": "Read-only list of five hardcoded catalog entries; the only control navigates to the Agent Portal. None of the five agents is wired to anything in this app.",
+      "statesImplemented": [
+        "populated (static)"
+      ],
+      "statesMissing": [
+        "enable/disable",
+        "configuration",
+        "run history",
+        "cost attribution",
+        "empty state (a missing app code would render a blank list silently)"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=schedules",
+      "tab": "settings",
+      "title": "Settings \u203a Schedules",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:507-541",
+      "verdict": "Read-only, filtered by target.includes('Travel') \u2014 a substring match on a human-typed display string rather than an app FK. Shows name and cadence only; a paused job looks identical to an active one.",
+      "statesImplemented": [
+        "empty",
+        "populated"
+      ],
+      "statesMissing": [
+        "create/edit/pause/run-now",
+        "next run",
+        "last result",
+        "active flag",
+        "app-code scoping"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=change_history",
+      "tab": "settings",
+      "title": "Settings \u203a Change History",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:543-581",
+      "verdict": "Read-only list of action slug + relative time, filtered by five hardcoded action prefixes. No actor, no target, no diff, no paging, no export \u2014 and it misses the one mutation (card auto-match) that writes no audit row at all.",
+      "statesImplemented": [
+        "empty",
+        "populated"
+      ],
+      "statesMissing": [
+        "actor",
+        "target record link",
+        "before/after diff",
+        "filtering",
+        "paging",
+        "export",
+        "undo (promised in the Settings banner)"
+      ]
+    },
+    {
+      "route": "/app/travel-expense?tab=settings&s=appearance",
+      "tab": "settings",
+      "title": "Settings \u203a Appearance",
+      "screenFile": "/Users/sushank/.codex/worktrees/ac6c/gst/src/screens/app/travel/settings.tsx:583-596",
+      "verdict": "Static explanatory text, no controls. Honest about being untranscribed, but it occupies a nav slot that does nothing.",
+      "statesImplemented": [
+        "static"
+      ],
+      "statesMissing": [
+        "any control at all"
+      ]
+    }
+  ],
+  "falseSuccessCopy": [
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 176,
+      "text": "Group several expenses into one report - submit, approve and reimburse the whole trip once, instead of a claim per receipt.",
+      "why": "There is no control anywhere that adds an expense to a report, no line-item record type, and no report detail view. A 'report' created through this panel has total 0.00 permanently."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 311,
+      "text": "Imported ${rows.length} rows; duplicates were skipped.",
+      "why": "rows.length is the count PARSED from the file, not the count stored. Deduplication happens afterwards inside importCardTransactions and the skipped count is discarded \u2014 re-importing the identical file reports the same cheerful number while storing nothing."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 326,
+      "text": "Charges are matched to expense lines - so a card-paid expense isn't reimbursed again - or turned into a draft expense.",
+      "why": "Three claims, none true: there are no expense lines (matching targets whole reports), nothing excludes a matched charge from reimbursement, and no code path turns a charge into a draft expense."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 402,
+      "text": "Creating the run marks the selected reports as Request Processed",
+      "why": "createReimbursementRun does not touch the reports at all \u2014 they remain 'Approved'. Only the run row carries a stage."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 404,
+      "text": "posting is Moved to Accounts (books the ledger)",
+      "why": "Advancing the stage changes one string. There is no ledger, no journal entry and no GL posting in the codebase; the configured GL account map is read by nothing."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 405,
+      "text": "exporting the CSV is Batch Generation (the bank file for disbursement)",
+      "why": "There is no export control anywhere in the Travel & Expense surface \u2014 no button, no Blob, no download. src/lib/csv.ts downloadCsv exists and is never called from this app. No file is ever produced."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 448,
+      "text": "Purchase stage per batch. Click a run to advance it to the next stage.",
+      "why": "The whole row is a click target that irreversibly advances state with no confirmation; reaching 'Disbursed' marks every member report Reimbursed even though no payment has been made and no file has been generated."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 496,
+      "text": "Request a trip, add per-leg segments (flight/train/bus/hotel with mode-specific details), submit for approval, then settle actuals against any advance.",
+      "why": "Four promises, zero implementations: no segment editor or record, no submit action, no approval, no advance and no settlement. The dialog collects six fields and the only later action is Close."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 674,
+      "text": "When a travel agency submits an invoice from their portal, it lands here for your accept or reject.",
+      "why": "AgencyReviewPane has no data source and no state \u2014 the empty block is rendered unconditionally. No agency-invoice record type exists, so nothing can ever land here and there is no accept or reject control."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 696,
+      "text": "Every item waiting on your approval, across purchase orders, purchase invoices, material requests, expense reports and travel requests. Rows disappear once you action them.",
+      "why": "Only Submitted expense reports and Active travel requests are listed \u2014 the three procurement document types are never queried. And there is no action control on any row, so nothing can be actioned or made to disappear."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 79,
+      "text": "Avg turnaround \u2026 submit \u2192 reimbursed",
+      "why": "The value is reimbursedAt \u2212 createdAt. No submitted_at exists on an expense report, so the metric measures creation-to-reimbursement and is labelled as something else."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 113,
+      "text": "Spend by category",
+      "why": "There is no category on an expense report. The chart assigns one with expenseCategories[report.title.length % 8] \u2014 renaming a report by one character moves its money to a different category bar."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 139,
+      "text": "{n} reports this month, {sum} approved.",
+      "why": "The count is expenseReports.length over the entire unfiltered array; no month boundary is applied anywhere in the panel."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 98,
+      "text": "SLA {slaDays}d \u00b7 next payable {nextPayable}",
+      "why": "nextPayable is initialised once as today + 1 day and is unrelated to the SLA, to any run, or to whether anything is payable at all."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 749,
+      "text": "Top spenders rank by claimed total once reports exist.",
+      "why": "A hardcoded string that never changes, even with hundreds of reports. Ranking by spender is impossible regardless: reports have no claimant, project or agency."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 752,
+      "text": "Agency billing appears once an agency posts an invoice through the Partner Portal.",
+      "why": "Hardcoded string; no agency-invoice entity and no ingestion path exist, so this view can never render anything else."
+    },
+    {
+      "file": "src/screens/app/travel/panes.tsx",
+      "line": 809,
+      "text": "All amounts shown in tenant billing currency.",
+      "why": "Every total on this tab (and on the Dashboard, and in reimbursement runs) is a bare sum over reports whose currency varies across six options. No conversion, no rate, no base-currency column exists \u2014 USD and INR figures are added together."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 39,
+      "text": "Spend limits, receipt requirements and duplicate detection checked when a report is submitted. Warn to flag, or block to stop submission on a hard violation.",
+      "why": "No submission path evaluates policy. advanceExpenseReport moves an index along a status array and never reads teSettings; 'block' stops nothing."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 79,
+      "text": "Flag possible duplicates (same employee, amount, date and category)",
+      "why": "An expense report has none of employee, date or category \u2014 only title, currency, status, total and timestamps. The described comparison cannot be performed on the data that exists."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 115,
+      "text": "Forward a receipt to this address and it becomes a draft expense against the sender's employee record.",
+      "why": "No inbound mail handler, no provider, no receipt entity and no employee record exist. The default address's domain is not deliverable, and the field is a free-text input any admin can overwrite."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 158,
+      "text": "What a trip may cost before it needs approval, and how much of it can be advanced before travel.",
+      "why": "Neither threshold is consulted. Travel requests have no approval step at all and no advance record, so both numbers are inert."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 237,
+      "text": "Which travel events notify the requester and their approver.",
+      "why": "No notification is ever sent by any travel action; addTravelRequest and closeTravelRequest write audit rows only and never call notify(). Travel requests also have no requester or approver field."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 276,
+      "text": "Reports climb these levels in order. A level with no threshold always applies; one with a threshold only applies at or above that amount.",
+      "why": "advanceExpenseReport never reads approvalLevels. A report moves Draft\u2192Submitted\u2192Approved in two clicks by the same person regardless of how many levels are configured or what their thresholds say."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 335,
+      "text": "Days from approval to disbursement. The Dashboard's pipeline header reads this value, so changing it here changes what the app promises there.",
+      "why": "Accurate about the label and nothing more: the value is printed and never used to compute a due date, flag a breach or escalate. There is also no approved_at timestamp to measure from."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 366,
+      "text": "The ledger account each expense category posts to when a run is moved to accounts.",
+      "why": "glAccounts is read by zero code paths. Advancing a run to 'Moved to Accounts' writes a string into run.stage and posts nothing anywhere."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 403,
+      "text": "Extra fields captured on every expense report in this tenant.",
+      "why": "The expense-report dialog renders four fixed controls and never reads customFields. No report stores a custom value, and the per-field 'required' flag is enforced nowhere."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 562,
+      "text": "Every change made inside this app, newest first. The same entries appear in the tenant audit trail.",
+      "why": "autoMatchCards mutates transactions and writes no audit event at all, and the card import writes the sentence '{n} rows' where a resource id belongs. The pane also filters on five hardcoded action prefixes, so any new action silently disappears."
+    },
+    {
+      "file": "src/screens/app/travel/settings.tsx",
+      "line": 630,
+      "text": "Every change is saved in Change History and can be undone.",
+      "why": "There is no undo, revert or restore control anywhere in the app, and no before/after state is recorded that an undo could use. app_settings_changes in migrations/0004 models exactly that and nothing here writes to it."
+    },
+    {
+      "file": "src/screens/app/travel/TravelExpense.tsx",
+      "line": 50,
+      "text": "Expense reports with receipt capture, travel requests, per-diem, corporate cards, and reimbursements. Submit \u2192 approve \u2192 reimburse on one platform.",
+      "why": "Receipt capture does not exist (no upload, no receipt entity). Per-diem is a settings string used by nothing. Corporate cards has no card entity. 'One platform' is one browser's localStorage key."
+    }
+  ],
+  "openQuestions": [
+    "Per-diem rules: the app stores a single flat 'Default per-diem' string with no currency and lists both 'per diem' and 'per km' as policy limit categories. Real per-diem needs destination bands, domestic vs international rates, partial-day and meal-provided deductions, and effective-dated rate versions. NONE of this is inferable from the code \u2014 the rates, the bands and any statutory basis must come from the product owner. Do not invent them.",
+    "Mileage / 'per km' reimbursement rate: a limit category exists with no rate, no vehicle class and no effective date. Rates are frequently set by statute or tax authority and must not be invented.",
+    "Tax treatment: no expense record carries a tax amount, tax code, reclaimable flag or supplier tax id, and agency invoices (absent) would need them. Whether input tax is tracked or reclaimed on employee expenses, and under which jurisdiction, is unknown and must not be assumed.",
+    "Currency conversion: six currencies are selectable and every total sums them unconverted while the Reports tab claims 'tenant billing currency'. Which currency is the base, where FX rates come from, and whether the rate is locked at expense date / submission / approval / payment must be specified before base_amount columns can be defined.",
+    "Reimbursement payment rail: 'Batch Generation' is described as 'the bank file for disbursement' with no format, no bank account, no payee bank details and no export. The concrete file format and banking integration must be specified; do not assume NACHA, SEPA, BACS or NEFT.",
+    "Payroll coupling: many T&E products reimburse through payroll rather than a bank batch. Nothing in the code indicates which, and the repo has a separate Payroll app (code PAY). Whether reimbursements settle via payroll, via a bank file, or both, is unknown.",
+    "Corporate card feed: the importer accepts .csv/.ofx/.qfx by attribute but only parses commas. Which card provider(s), which feed format, whether it is a file drop or an API, and what unique transaction identifier the provider supplies (needed to replace the fragile date|merchant|amount dedupe key) are all unspecified. Do not invent a provider contract.",
+    "Receipt email-in: no mail provider, no inbound webhook, no address allocation scheme and no verification exist. Which provider handles inbound mail, how the tenant address is generated and verified, and what happens to mail from an unrecognised sender (reject, quarantine, create unattributed) must be decided.",
+    "OCR: agentCatalog ships a 'Receipt OCR Extractor' for this app with no implementation. Which OCR/extraction service, what confidence threshold auto-fills versus asks, and whether the raw response is retained (and for how long) are unspecified.",
+    "Approver resolution: approval levels are free-text labels such as 'Reporting manager' and 'Finance'. Whether an approver resolves from an HR reporting line, a role, a named user, a cost-centre owner, or a project manager is undefined \u2014 and there is no employees/HR table in migrations yet. Delegation and out-of-office reassignment are likewise unaddressed.",
+    "Approval semantics: does a threshold-bearing level replace lower levels or add to them? Must every matching level approve, or is any one sufficient? Does an amount change after partial approval reset the chain? The UI text ('climb these levels in order') is not precise enough to encode.",
+    "Self-approval and segregation of duties: today one person clicks Submit, Approve and Mark reimbursed. Whether a claimant may ever approve their own report, and what the minimum separation is between approver and disburser, is a policy decision.",
+    "Expense category taxonomy: three non-overlapping lists exist in code (12 lowercase policyCategories, 8 Title-Case expenseCategories, and the GL map keyed by the latter). Which is canonical, whether categories are tenant-editable, and whether they are hierarchical must be decided before expense_categories can be modelled.",
+    "Chart of accounts: GL account codes are free text with no validation. Whether a chart of accounts lives in this product, is synced from an ERP, or is per-company, determines whether gl_accounts is a table here or an external reference.",
+    "Project and budget-head sources: both travel-request fields are FK-shaped but empty (one option, one disabled control), and no projects or budget_heads table exists. Whether these come from the Project Management app, a finance module, or a new table is unresolved.",
+    "SLA semantics: 21 days from approval to disbursement \u2014 calendar days or business days? Which tenant calendar and holidays apply? What happens on breach (escalate to whom, notify, or report only)?",
+    "Multi-entity scope: migrations model companies within a tenant. Whether expense reports, policies, approval levels, GL mappings and SLAs are tenant-wide or per-company (app_settings already supports both via a nullable company_id) needs deciding per section.",
+    "Retention and personal data: receipts and card statements carry personal financial data. Retention periods, deletion on employee offboarding, and whether receipt images are exportable to the employee are unspecified \u2014 and the repo has a Compliance Center app whose retentionPolicies are not connected to T&E.",
+    "Travel-request lifecycle: 'Active' and 'Closed' are the only states. What the intended lifecycle is (draft \u2192 submitted \u2192 approved \u2192 booked \u2192 travelled \u2192 settled \u2192 closed, with cancellation), and whether a request can be edited after approval, has to be defined before the status check constraint can be written.",
+    "Agency invoice flow: the partner portal declares 'Travel invoices' but the review tab has no entity. What an agency may submit, whether it must reference a trip or segments, what accept/reject does downstream (payable? credit note?), and who is authorised to review are all unknown.",
+    "Duplicate-report policy: card auto-match currently permits many charges to match one report and a report to sit in two reimbursement runs. Whether a report may be partially paid, re-paid after a failed disbursement, or split across runs determines whether run membership needs per-report amounts and a payment-status column."
+  ]
+}
